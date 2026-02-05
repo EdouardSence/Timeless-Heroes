@@ -1,0 +1,238 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║      📊 NEON PROGRESS BAR STYLES — Soft Cyberpunk Kawaii                  ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+@import './design-system/cozy-cyber.css';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress {
+    --progress-color: var(--neon-cyan);
+    --progress-glow: var(--neon-cyan-glow);
+
+    position: relative;
+    width: 100%;
+}
+
+.neon-progress__container {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.neon-progress__track {
+    flex: 1;
+    position: relative;
+    background: var(--cozy-bg-void);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid rgba(127, 219, 218, 0.1);
+}
+
+.neon-progress__fill {
+    position: relative;
+    height: 100%;
+    border-radius: inherit;
+    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SIZES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress--xs .neon-progress__track {
+    height: 4px;
+}
+
+.neon-progress--sm .neon-progress__track {
+    height: 6px;
+}
+
+.neon-progress--md .neon-progress__track {
+    height: 8px;
+}
+
+.neon-progress--lg .neon-progress__track {
+    height: 12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § VARIANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress--cyan {
+    --progress-color: var(--neon-cyan);
+    --progress-glow: var(--neon-cyan-glow);
+}
+
+.neon-progress--cyan .neon-progress__fill {
+    background: linear-gradient(90deg, var(--neon-cyan), #5fcfce);
+}
+
+.neon-progress--lavender {
+    --progress-color: var(--neon-lavender);
+    --progress-glow: var(--neon-lavender-glow);
+}
+
+.neon-progress--lavender .neon-progress__fill {
+    background: linear-gradient(90deg, var(--neon-lavender), #9d8ec9);
+}
+
+.neon-progress--pink {
+    --progress-color: var(--neon-pink);
+    --progress-glow: var(--neon-pink-glow);
+}
+
+.neon-progress--pink .neon-progress__fill {
+    background: linear-gradient(90deg, var(--neon-pink), #e88aa8);
+}
+
+.neon-progress--mint {
+    --progress-color: var(--neon-mint);
+    --progress-glow: var(--neon-mint-glow);
+}
+
+.neon-progress--mint .neon-progress__fill {
+    background: linear-gradient(90deg, var(--neon-mint), #7bc48c);
+}
+
+.neon-progress--gold {
+    --progress-color: var(--neon-gold);
+    --progress-glow: var(--neon-gold-glow);
+}
+
+.neon-progress--gold .neon-progress__fill {
+    background: linear-gradient(90deg, var(--neon-gold), #f5c556);
+}
+
+.neon-progress--rainbow .neon-progress__fill {
+    background: linear-gradient(90deg,
+            var(--neon-cyan) 0%,
+            var(--neon-lavender) 33%,
+            var(--neon-pink) 66%,
+            var(--neon-gold) 100%);
+    --progress-color: var(--neon-lavender);
+    --progress-glow: var(--neon-lavender-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SHIMMER EFFECT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress__shimmer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.25) 50%,
+            transparent 100%);
+    opacity: 0;
+    transition: opacity var(--transition-base);
+}
+
+.neon-progress--animated .neon-progress__shimmer {
+    opacity: 1;
+    animation: shimmer-slide 2s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(200%);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § GLOW EFFECT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress__glow {
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 200%;
+    background: radial-gradient(circle at center,
+            var(--progress-glow) 0%,
+            transparent 70%);
+    filter: blur(4px);
+    opacity: 0.8;
+    animation: glow-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+
+    0%,
+    100% {
+        opacity: 0.6;
+        transform: translateY(-50%) scale(1);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translateY(-50%) scale(1.2);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SEGMENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress__segments {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    pointer-events: none;
+}
+
+.neon-progress__segment {
+    flex: 1;
+    border-right: 1px solid rgba(0, 0, 0, 0.4);
+}
+
+.neon-progress__segment:last-child {
+    border-right: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § LABELS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-progress__label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    color: var(--progress-color);
+    white-space: nowrap;
+}
+
+.neon-progress__label--top {
+    margin-bottom: var(--space-1);
+    text-align: right;
+}
+
+.neon-progress__label--right {
+    min-width: 40px;
+    text-align: right;
+}
+
+.neon-progress__label--inside {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--cozy-bg-void);
+    font-weight: var(--weight-bold);
+    z-index: 5;
+}

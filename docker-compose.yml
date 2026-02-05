@@ -72,7 +72,123 @@ services:
     depends_on:
       - redis
     profiles:
-      - dev  
+      - dev
+
+  # ============================================================================
+  # APPLICATION SERVICES
+  # ============================================================================
+  
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./apps/api-gateway/Dockerfile
+    container_name: timeless-api-gateway
+    restart: unless-stopped
+    ports:
+      - "3000:3000"     # HTTP/WebSocket
+      - "9999:9999"     # TCP Ingest (Keylogger)
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      TCP_INGEST_PORT: 9999
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      MAX_CPS: ${MAX_CPS:-20}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/api-gateway:/app/apps/api-gateway:delegated
+      - ./packages:/app/packages:delegated
+      - /app/node_modules
+      - /app/apps/api-gateway/node_modules
+  
+  svc-user-progression:
+    build:
+      context: .
+      dockerfile: ./apps/svc-user-progression/Dockerfile
+    container_name: timeless-svc-progression
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PROGRESSION_PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/svc-user-progression:/app/apps/svc-user-progression:delegated
+      - ./packages:/app/packages:delegated
+      - /app/node_modules
+      - /app/apps/svc-user-progression/node_modules
+  
+  worker-game-loop:
+    build:
+      context: .
+      dockerfile: ./apps/worker-game-loop/Dockerfile
+    container_name: timeless-worker-game-loop
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      WORKER_PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/worker-game-loop:/app/apps/worker-game-loop:delegated
+      - ./packages:/app/packages:delegated
+      - /app/node_modules
+      - /app/apps/worker-game-loop/node_modules
+  
+  svc-payment:
+    build:
+      context: .
+      dockerfile: ./apps/svc-payment/Dockerfile
+    container_name: timeless-svc-payment
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PAYMENT_PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/svc-payment:/app/apps/svc-payment:delegated
+      - ./packages:/app/packages:delegated
+      - /app/node_modules
+      - /app/apps/svc-payment/node_modules
 
 volumes:
   postgres_data:

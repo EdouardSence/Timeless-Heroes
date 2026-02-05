@@ -1,0 +1,241 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║      🔘 NEON BUTTON STYLES — Soft Cyberpunk Kawaii                        ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+@import './design-system/cozy-cyber.css';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-button {
+    --btn-color: var(--neon-cyan);
+    --btn-glow: var(--neon-cyan-glow);
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: var(--weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    overflow: hidden;
+    transition: all var(--transition-base);
+    outline: none;
+}
+
+.neon-button:focus-visible {
+    box-shadow: 0 0 0 3px var(--btn-glow);
+}
+
+.neon-button__content {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.neon-button__text {
+    white-space: nowrap;
+}
+
+.neon-button__icon {
+    display: flex;
+    align-items: center;
+    font-size: 1.1em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SIZES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-button--sm {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-xs);
+    border-radius: var(--radius-sm);
+}
+
+.neon-button--md {
+    padding: var(--space-3) var(--space-5);
+    font-size: var(--text-sm);
+}
+
+.neon-button--lg {
+    padding: var(--space-4) var(--space-6);
+    font-size: var(--text-base);
+    border-radius: var(--radius-lg);
+}
+
+.neon-button--full {
+    width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § COLORS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-button--cyan {
+    --btn-color: var(--neon-cyan);
+    --btn-glow: var(--neon-cyan-glow);
+}
+
+.neon-button--lavender {
+    --btn-color: var(--neon-lavender);
+    --btn-glow: var(--neon-lavender-glow);
+}
+
+.neon-button--pink {
+    --btn-color: var(--neon-pink);
+    --btn-glow: var(--neon-pink-glow);
+}
+
+.neon-button--mint {
+    --btn-color: var(--neon-mint);
+    --btn-glow: var(--neon-mint-glow);
+}
+
+.neon-button--gold {
+    --btn-color: var(--neon-gold);
+    --btn-glow: var(--neon-gold-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § VARIANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Primary - Filled */
+.neon-button--primary {
+    background: transparent;
+    color: var(--cozy-bg-void);
+}
+
+.neon-button--primary .neon-button__bg {
+    position: absolute;
+    inset: 0;
+    background: var(--btn-color);
+    z-index: 1;
+    transition: transform var(--transition-fast);
+}
+
+.neon-button--primary .neon-button__glow {
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle at center, var(--btn-glow), transparent 60%);
+    opacity: 0;
+    filter: blur(20px);
+    z-index: 0;
+    transition: opacity var(--transition-base);
+}
+
+.neon-button--primary:hover .neon-button__glow {
+    opacity: 0.6;
+}
+
+.neon-button--primary:hover {
+    box-shadow: 0 4px 20px var(--btn-glow);
+    transform: translateY(-2px);
+}
+
+.neon-button--primary:active {
+    transform: translateY(0);
+}
+
+/* Secondary - Outlined */
+.neon-button--secondary {
+    background: transparent;
+    color: var(--btn-color);
+    border: 1px solid var(--btn-color);
+}
+
+.neon-button--secondary .neon-button__bg {
+    position: absolute;
+    inset: 0;
+    background: var(--btn-color);
+    opacity: 0;
+    z-index: 1;
+    transition: opacity var(--transition-base);
+}
+
+.neon-button--secondary .neon-button__glow {
+    display: none;
+}
+
+.neon-button--secondary:hover {
+    color: var(--cozy-bg-void);
+    box-shadow: 0 0 20px var(--btn-glow);
+}
+
+.neon-button--secondary:hover .neon-button__bg {
+    opacity: 1;
+}
+
+/* Ghost - Minimal */
+.neon-button--ghost {
+    background: transparent;
+    color: var(--btn-color);
+}
+
+.neon-button--ghost .neon-button__bg {
+    position: absolute;
+    inset: 0;
+    background: var(--btn-glow);
+    opacity: 0;
+    z-index: 1;
+    transition: opacity var(--transition-fast);
+}
+
+.neon-button--ghost .neon-button__glow {
+    display: none;
+}
+
+.neon-button--ghost:hover .neon-button__bg {
+    opacity: 0.15;
+}
+
+/* Danger */
+.neon-button--danger {
+    --btn-color: #ff6b6b;
+    --btn-glow: rgba(255, 107, 107, 0.4);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § STATES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.neon-button--disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.neon-button--loading {
+    pointer-events: none;
+}
+
+.neon-button__spinner {
+    display: flex;
+    align-items: center;
+}
+
+.neon-button__spinner svg {
+    width: 1.2em;
+    height: 1.2em;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

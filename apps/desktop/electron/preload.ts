@@ -1,25 +1,43 @@
+/**
+ * Preload script - Bridge between main and renderer processes
+ */
 
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron';
 
-// --------- Expose some API to the Renderer process ---------
-contextBridge.exposeInMainWorld('ipcRenderer', {
-  on(...args: Parameters<typeof ipcRenderer.on>) {
-    const [channel, listener] = args
-    return ipcRenderer.on(channel, (event, ...args) => listener(event, ...args))
+// Expose protected methods to renderer
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Game State
+  getGameState: () => ipcRenderer.invoke('get-game-state'),
+  getItems: () => ipcRenderer.invoke('get-items'),
+  
+  // Updates
+  updateMultiplier: (multiplier: number) => ipcRenderer.invoke('update-multiplier', multiplier),
+  updatePassiveRate: (passiveRate: number) => ipcRenderer.invoke('update-passive-rate', passiveRate),
+  subtractLoC: (amount: number) => ipcRenderer.invoke('subtract-loc', amount),
+  saveItems: (items: Record<string, number>) => ipcRenderer.invoke('save-items', items),
+  
+  // Window controls
+  showMenu: () => ipcRenderer.send('show-menu'),
+  hideMenu: () => ipcRenderer.send('hide-menu'),
+  toggleWidgetSize: (collapsed: boolean) => ipcRenderer.send('toggle-widget-size', collapsed),
+  closeApp: () => ipcRenderer.send('close-app'),
+  moveWidget: (pos: { x: number; y: number }) => ipcRenderer.send('move-widget', pos),
+  
+  // Events
+  onGameStateUpdate: (callback: (state: unknown) => void) => {
+    ipcRenderer.on('game-state-update', (_, state) => callback(state));
   },
-  off(...args: Parameters<typeof ipcRenderer.off>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.off(channel, ...omit)
+  onUserKeyPress: (callback: () => void) => {
+    ipcRenderer.on('user-keypress', () => callback());
   },
-  send(...args: Parameters<typeof ipcRenderer.send>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.send(channel, ...omit)
+  onLevelUp: (callback: (level: number) => void) => {
+    ipcRenderer.on('level-up', (_, level) => callback(level));
   },
-  invoke(...args: Parameters<typeof ipcRenderer.invoke>) {
-    const [channel, ...omit] = args
-    return ipcRenderer.invoke(channel, ...omit)
+  
+  // Cleanup
+  removeAllListeners: () => {
+    ipcRenderer.removeAllListeners('game-state-update');
+    ipcRenderer.removeAllListeners('user-keypress');
+    ipcRenderer.removeAllListeners('level-up');
   },
-
-  // You can expose other specific functions here
-  // e.g. startKeylogger: () => ipcRenderer.invoke('start-keylogger')
-})
+});

@@ -1,0 +1,160 @@
+/* BongoCat.css */
+.bongo-cat {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.cat-svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.2));
+    transition: transform 0.05s ease-out;
+}
+
+/* Paw animations */
+.paw {
+    transition: transform 0.05s ease-out;
+    transform-origin: center;
+}
+
+.bongo-cat.typing .left-paw {
+    animation: bongo-left 0.1s ease-out;
+}
+
+.bongo-cat.typing .right-paw {
+    animation: bongo-right 0.1s ease-out 0.05s;
+}
+
+@keyframes bongo-left {
+    0% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(5px);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+@keyframes bongo-right {
+    0% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(5px);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+/* Combo effects */
+.bongo-cat.combo-common .cat-svg {
+    filter: drop-shadow(0 0 5px rgba(100, 200, 100, 0.5));
+}
+
+.bongo-cat.combo-rare .cat-svg {
+    filter: drop-shadow(0 0 10px rgba(100, 100, 255, 0.6));
+}
+
+.bongo-cat.combo-epic .cat-svg {
+    filter: drop-shadow(0 0 15px rgba(200, 100, 255, 0.7));
+    animation: pulse-epic 0.5s infinite;
+}
+
+.bongo-cat.combo-legendary .cat-svg {
+    filter: drop-shadow(0 0 20px rgba(255, 200, 50, 0.8));
+    animation: pulse-legendary 0.3s infinite;
+}
+
+@keyframes pulse-epic {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+@keyframes pulse-legendary {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+/* Combo particles */
+.combo-particles {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    pointer-events: none;
+    width: 100px;
+    height: 100px;
+    transform: translate(-50%, -50%);
+}
+
+.particle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: linear-gradient(45deg, #ffd700, #ff6b6b);
+    border-radius: 50%;
+    opacity: 0;
+}
+
+/* Manually animating particles for now as simple CSS */
+.particle:nth-child(1) {
+    top: 40%;
+    left: 40%;
+    animation: particle-float 1s infinite 0s;
+}
+
+.particle:nth-child(2) {
+    top: 60%;
+    left: 30%;
+    animation: particle-float 1s infinite 0.2s;
+}
+
+.particle:nth-child(3) {
+    top: 30%;
+    left: 60%;
+    animation: particle-float 1s infinite 0.4s;
+}
+
+.particle:nth-child(4) {
+    top: 70%;
+    left: 70%;
+    animation: particle-float 1s infinite 0.6s;
+}
+
+@keyframes particle-float {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-20px) scale(0);
+    }
+}

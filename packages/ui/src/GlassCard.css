@@ -1,0 +1,209 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║      🃏 GLASS CARD STYLES — Soft Cyberpunk Kawaii                         ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+@import './design-system/cozy-cyber.css';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § BASE CARD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card {
+    --card-accent: var(--neon-cyan);
+    --card-accent-glow: var(--neon-cyan-glow);
+
+    position: relative;
+    background: var(--cozy-glass-dark);
+    backdrop-filter: blur(var(--cozy-glass-blur));
+    -webkit-backdrop-filter: blur(var(--cozy-glass-blur));
+    border: 1px solid rgba(127, 219, 218, 0.12);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    transition:
+        transform var(--transition-base),
+        box-shadow var(--transition-base),
+        border-color var(--transition-base);
+}
+
+/* Inner gradient overlay */
+.glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+            rgba(255, 255, 255, 0.03) 0%,
+            transparent 50%,
+            rgba(0, 0, 0, 0.1) 100%);
+    pointer-events: none;
+    border-radius: inherit;
+}
+
+/* Top highlight line */
+.glass-card::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            transparent 100%);
+    pointer-events: none;
+}
+
+.glass-card__content {
+    position: relative;
+    z-index: 2;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SIZES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card--sm {
+    padding: var(--space-3);
+    border-radius: var(--radius-md);
+}
+
+.glass-card--md {
+    padding: var(--space-4);
+}
+
+.glass-card--lg {
+    padding: var(--space-6);
+    border-radius: var(--radius-xl);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § VARIANTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card--cyan {
+    --card-accent: var(--neon-cyan);
+    --card-accent-glow: var(--neon-cyan-glow);
+    border-color: rgba(127, 219, 218, 0.15);
+}
+
+.glass-card--lavender {
+    --card-accent: var(--neon-lavender);
+    --card-accent-glow: var(--neon-lavender-glow);
+    border-color: rgba(180, 167, 214, 0.15);
+}
+
+.glass-card--pink {
+    --card-accent: var(--neon-pink);
+    --card-accent-glow: var(--neon-pink-glow);
+    border-color: rgba(244, 165, 193, 0.15);
+}
+
+.glass-card--mint {
+    --card-accent: var(--neon-mint);
+    --card-accent-glow: var(--neon-mint-glow);
+    border-color: rgba(152, 212, 166, 0.15);
+}
+
+.glass-card--gold {
+    --card-accent: var(--neon-gold);
+    --card-accent-glow: var(--neon-gold-glow);
+    border-color: rgba(255, 215, 135, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § HOVER EFFECTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card--hover:hover {
+    transform: translateY(-2px);
+    border-color: var(--card-accent);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.3),
+        0 0 0 1px var(--card-accent-glow);
+}
+
+.glass-card--clickable {
+    cursor: pointer;
+}
+
+.glass-card--clickable:active {
+    transform: translateY(0) scale(0.99);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § CIRCUIT BORDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card__circuit-border {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    z-index: 10;
+
+    background: linear-gradient(135deg,
+            var(--card-accent) 0%,
+            transparent 30%,
+            transparent 70%,
+            var(--card-accent) 100%);
+    background-size: 300% 300%;
+    animation: circuit-rotate 8s linear infinite;
+
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.5;
+    transition: opacity var(--transition-base);
+}
+
+.glass-card--circuit:hover .glass-card__circuit-border {
+    opacity: 1;
+}
+
+@keyframes circuit-rotate {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § GLOW EFFECT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.glass-card__glow {
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle at center,
+            var(--card-accent-glow) 0%,
+            transparent 60%);
+    opacity: 0;
+    filter: blur(40px);
+    z-index: 0;
+    transition: opacity var(--transition-slow);
+    pointer-events: none;
+}
+
+.glass-card--glow .glass-card__glow {
+    opacity: 0.15;
+    animation: cozy-pulse 3s ease-in-out infinite;
+}
+
+.glass-card--glow:hover .glass-card__glow {
+    opacity: 0.3;
+}

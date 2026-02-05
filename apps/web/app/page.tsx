@@ -1,7 +1,4 @@
-import type { Link } from '@repo/api';
-import { Button } from '@repo/ui/button';
 import Image, { type ImageProps } from 'next/image';
-
 import styles from './page.module.css';
 
 type Props = Omit<ImageProps, 'src'> & {
@@ -18,6 +15,13 @@ const ThemeImage = (props: Props) => {
       <Image {...rest} src={srcDark} className="imgDark" />
     </>
   );
+};
+
+type Link = {
+  id: number;
+  title: string;
+  url: string;
+  description: string;
 };
 
 async function getLinks(): Promise<Link[]> {
@@ -84,10 +88,6 @@ export default async function Home() {
             Read our docs
           </a>
         </div>
-
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
 
         {links.length > 0 ? (
           <div className={styles.ctas}>
