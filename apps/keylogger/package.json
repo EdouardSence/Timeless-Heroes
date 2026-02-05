@@ -1,0 +1,23 @@
+{
+    "name": "@app/keylogger",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Background service that captures keyboard inputs and earns LoC",
+    "main": "dist/index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "start": "tsx src/index.ts",
+        "build": "tsc"
+    },
+    "dependencies": {
+        "chalk": "^4.1.2",
+        "dotenv": "^16.4.5",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.19.3",
+        "@types/ws": "^8.5.10",
+        "tsx": "^4.19.3",
+        "typescript": "5.5.4"
+    }
+}
