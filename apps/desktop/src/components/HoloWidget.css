@@ -1,0 +1,723 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║       🖥️ HOLO-WIDGET STYLES — Soft Cyberpunk Kawaii Overlay              ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+/* Design system imported in main.tsx */
+
+/* Google Fonts import */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;900&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § MAIN CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 150px;
+    padding: var(--space-3);
+    border-radius: var(--radius-xl);
+    overflow: auto;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    box-sizing: border-box;
+
+    /* Subtle outer glow */
+    box-shadow:
+        0 0 0 1px rgba(127, 219, 218, 0.15),
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 60px rgba(127, 219, 218, 0.08);
+
+    transition:
+        box-shadow var(--transition-base),
+        transform var(--transition-bounce);
+}
+
+.holo-widget--pulse {
+    animation: widget-pulse 0.15s ease-out;
+}
+
+.holo-widget--combo-active {
+    box-shadow:
+        0 0 0 1px rgba(180, 167, 214, 0.3),
+        0 8px 32px rgba(0, 0, 0, 0.5),
+        0 0 80px rgba(180, 167, 214, 0.15),
+        0 0 120px rgba(244, 165, 193, 0.1);
+}
+
+@keyframes widget-pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.005);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § CIRCUIT BORDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__circuit-border {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    pointer-events: none;
+    z-index: 10;
+
+    /* Animated gradient border */
+    background: linear-gradient(135deg,
+            var(--neon-cyan) 0%,
+            transparent 25%,
+            transparent 50%,
+            var(--neon-lavender) 75%,
+            var(--neon-pink) 100%);
+    background-size: 300% 300%;
+    animation: circuit-rotate 8s linear infinite;
+
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.6;
+}
+
+.holo-widget:hover .holo-widget__circuit-border {
+    opacity: 1;
+}
+
+@keyframes circuit-rotate {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § GLASS BACKGROUND
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__glass {
+    position: absolute;
+    inset: 0;
+    background: var(--cozy-glass-dark);
+    backdrop-filter: blur(var(--cozy-glass-blur));
+    -webkit-backdrop-filter: blur(var(--cozy-glass-blur));
+    border-radius: inherit;
+    z-index: -1;
+
+    /* Inner glow */
+    box-shadow: var(--inner-glow);
+}
+
+/* Gradient overlay for depth */
+.holo-widget__glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+            rgba(127, 219, 218, 0.03) 0%,
+            transparent 30%,
+            transparent 70%,
+            rgba(180, 167, 214, 0.02) 100%);
+    border-radius: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SCANLINES OVERLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    overflow: hidden;
+    z-index: 100;
+    opacity: 0.03;
+
+    background: repeating-linear-gradient(0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.3) 2px,
+            rgba(0, 0, 0, 0.3) 4px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § HEADER - Terminal Style
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+    padding-bottom: var(--space-2);
+    border-bottom: 1px solid rgba(127, 219, 218, 0.1);
+}
+
+.holo-widget__terminal-dots {
+    display: flex;
+    gap: 6px;
+}
+
+.holo-widget__dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transition: filter var(--transition-fast);
+}
+
+.holo-widget__dot--close {
+    background: var(--neon-pink);
+    box-shadow: 0 0 8px var(--neon-pink-glow);
+}
+
+.holo-widget__dot--minimize {
+    background: var(--neon-peach);
+    box-shadow: 0 0 8px var(--neon-peach-glow);
+}
+
+.holo-widget__dot--maximize {
+    background: var(--neon-mint);
+    box-shadow: 0 0 8px var(--neon-mint-glow);
+}
+
+.holo-widget__title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+}
+
+.holo-widget__title-prefix {
+    color: var(--neon-lavender);
+    opacity: 0.7;
+}
+
+.holo-widget__title-text {
+    color: var(--text-secondary);
+}
+
+.holo-widget__combo-badge {
+    margin-left: var(--space-2);
+    padding: 2px 8px;
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-lavender));
+    border-radius: var(--radius-full);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    color: var(--cozy-bg-void);
+    animation: cozy-pulse 0.5s ease-in-out infinite;
+}
+
+.holo-widget__combo-x {
+    opacity: 0.7;
+}
+
+.holo-widget__actions {
+    display: flex;
+    gap: var(--space-1);
+}
+
+.holo-widget__btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cozy-bg-elevated);
+    border: 1px solid rgba(127, 219, 218, 0.2);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.holo-widget__btn:hover {
+    background: var(--cozy-bg-hover);
+    border-color: var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 12px var(--neon-cyan-glow);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § MAIN CONTENT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__content {
+    display: flex;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.holo-widget__avatar-container {
+    flex-shrink: 0;
+    width: 140px;
+}
+
+.holo-widget__stats-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § LOC DISPLAY - Main Counter
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__loc-display {
+    padding: var(--space-3);
+    background: rgba(127, 219, 218, 0.05);
+    border: 1px solid rgba(127, 219, 218, 0.15);
+    border-radius: var(--radius-md);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Subtle gradient overlay */
+.holo-widget__loc-display::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+            rgba(127, 219, 218, 0.05) 0%,
+            transparent 50%,
+            rgba(180, 167, 214, 0.03) 100%);
+    pointer-events: none;
+}
+
+.holo-widget__loc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-1);
+}
+
+.holo-widget__loc-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.holo-widget__loc-tier {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-bold);
+    padding: 2px 6px;
+    background: var(--cozy-bg-elevated);
+    border-radius: var(--radius-sm);
+    color: var(--neon-lavender);
+    letter-spacing: 0.1em;
+}
+
+.holo-widget__loc-value {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+}
+
+.holo-widget__loc-number {
+    font-family: var(--font-mono);
+    font-size: var(--text-xl);
+    font-weight: var(--weight-bold);
+    color: var(--neon-cyan);
+    text-shadow: 0 0 20px var(--neon-cyan-glow);
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.holo-widget__loc-unit {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § METRICS GRID - System Monitor Style
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-2);
+}
+
+.holo-widget__metric {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    background: var(--cozy-bg-surface);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.holo-widget__metric:hover {
+    border-color: rgba(127, 219, 218, 0.2);
+    background: var(--cozy-bg-elevated);
+}
+
+.holo-widget__metric-icon {
+    font-size: var(--text-base);
+    opacity: 0.7;
+}
+
+.holo-widget__metric-data {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.holo-widget__metric-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--text-primary);
+    line-height: 1.2;
+}
+
+.holo-widget__metric-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: lowercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § FOOTER - Build Progress
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__footer {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.holo-widget__build-info {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+.holo-widget__build-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--text-muted);
+}
+
+.holo-widget__build-icon {
+    color: var(--neon-mint);
+    font-size: 10px;
+    animation: cozy-pulse 1s ease-in-out infinite;
+}
+
+.holo-widget__version-badge {
+    padding: 2px 6px;
+    background: linear-gradient(135deg, var(--neon-mint), var(--neon-cyan));
+    border-radius: var(--radius-sm);
+    color: var(--cozy-bg-void);
+    font-weight: var(--weight-bold);
+    font-size: var(--text-xs);
+}
+
+.holo-widget__build-progress-text {
+    margin-left: auto;
+    color: var(--neon-cyan);
+    font-weight: var(--weight-medium);
+}
+
+/* Progress Bar */
+.holo-widget__progress-track {
+    position: relative;
+    height: 6px;
+    background: var(--cozy-bg-void);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+    border: 1px solid rgba(127, 219, 218, 0.1);
+}
+
+.holo-widget__progress-fill {
+    position: absolute;
+    inset: 0;
+    right: auto;
+    background: linear-gradient(90deg,
+            var(--neon-cyan) 0%,
+            var(--neon-lavender) 50%,
+            var(--neon-pink) 100%);
+    border-radius: inherit;
+    transition: width var(--transition-slow);
+    overflow: hidden;
+}
+
+.holo-widget__progress-shimmer {
+    position: absolute;
+    inset: 0;
+    width: 50%;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.3) 50%,
+            transparent 100%);
+    animation: progress-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes progress-shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+/* Progress segments overlay */
+.holo-widget__progress-segments {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    pointer-events: none;
+}
+
+.holo-widget__progress-segment {
+    flex: 1;
+    border-right: 1px solid rgba(0, 0, 0, 0.3);
+}
+
+.holo-widget__progress-segment:last-child {
+    border-right: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § LEVEL UP NOTIFICATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__level-up {
+    position: absolute;
+    top: var(--space-4);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-5);
+    background: linear-gradient(135deg,
+            rgba(152, 212, 166, 0.9) 0%,
+            rgba(127, 219, 218, 0.9) 100%);
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 0 30px var(--neon-mint-glow),
+        0 8px 32px rgba(0, 0, 0, 0.4);
+    z-index: 50;
+    animation: level-up-burst 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.holo-widget__level-up-icon {
+    font-size: var(--text-lg);
+    animation: cozy-pulse 0.5s ease-in-out infinite;
+}
+
+.holo-widget__level-up-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.holo-widget__level-up-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--cozy-bg-void);
+    opacity: 0.8;
+}
+
+.holo-widget__level-up-version {
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--cozy-bg-void);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § COLLAPSED STATE - CyberCat Only (Minimal)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget--collapsed {
+    width: 100%;
+    height: 100%;
+    padding: 25px;
+    /* Safe zone for Shadows/Glows/Tooltips */
+    cursor: default;
+    transition: all var(--transition-base);
+    overflow: visible;
+    /* Allow lights to bleed if possible (though window clips) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+.holo-widget--collapsed:hover {
+    transform: none;
+    box-shadow: none !important;
+}
+
+/* Hide glass effect in collapsed mode */
+.holo-widget--collapsed .holo-widget__glass {
+    display: none;
+}
+
+.holo-widget__collapsed-cat {
+    position: relative;
+    z-index: 2;
+    /* Fill available space inside padding */
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform var(--transition-fast);
+    /* border-radius: 50%; Removed to allow full shape */
+}
+
+.holo-widget__collapsed-cat:hover {
+    transform: scale(1.05);
+    /* Reduced scale slightly to avoid clipping */
+}
+
+.holo-widget__collapsed-cat .cyber-cat {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+}
+
+/* Stats tooltip - hidden by default, shown on hover */
+.holo-widget__collapsed-tooltip {
+    position: absolute;
+    bottom: 5px;
+    /* Inside the window padding area */
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--cozy-glass-dark);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--neon-cyan);
+    border-radius: var(--radius-md);
+    box-shadow: 0 0 20px var(--neon-cyan-glow);
+    opacity: 0;
+    pointer-events: none;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+    z-index: 100;
+}
+
+.holo-widget--collapsed:hover .holo-widget__collapsed-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.holo-widget__collapsed-loc {
+    font-family: var(--font-mono);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--neon-cyan);
+    text-shadow: 0 0 10px var(--neon-cyan-glow);
+}
+
+.holo-widget__collapsed-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § RESIZE GUIDES (Collapsed Mode)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__resize-guides {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.holo-widget__resize-guide {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-color: rgba(127, 219, 218, 0.5);
+    border-style: solid;
+    opacity: 0;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.holo-widget--collapsed:hover .holo-widget__resize-guide {
+    opacity: 1;
+}
+
+.holo-widget__resize-guide--tl {
+    top: 0;
+    left: 0;
+    border-width: 2px 0 0 2px;
+    border-top-left-radius: 8px;
+}
+
+.holo-widget__resize-guide--tr {
+    top: 0;
+    right: 0;
+    border-width: 2px 2px 0 0;
+    border-top-right-radius: 8px;
+}
+
+.holo-widget__resize-guide--bl {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 2px 2px;
+    border-bottom-left-radius: 8px;
+}
+
+.holo-widget__resize-guide--br {
+    bottom: 0;
+    right: 0;
+    border-width: 0 2px 2px 0;
+    border-bottom-right-radius: 8px;
+    /* Make the bottom right one stand out a bit more as it's the standard resize corner */
+    border-color: rgba(127, 219, 218, 0.8);
+}

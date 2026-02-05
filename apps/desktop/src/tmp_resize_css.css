@@ -1,0 +1,54 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   § RESIZE GUIDES (Collapsed Mode)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.holo-widget__resize-guides {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.holo-widget__resize-guide {
+    position: absolute;
+    width: 15px;
+    height: 15px;
+    border-color: rgba(127, 219, 218, 0.5);
+    border-style: solid;
+    opacity: 0;
+    transition: opacity 0.2s, border-color 0.2s;
+}
+
+.holo-widget--collapsed:hover .holo-widget__resize-guide {
+    opacity: 1;
+}
+
+.holo-widget__resize-guide--tl {
+    top: 0;
+    left: 0;
+    border-width: 2px 0 0 2px;
+    border-top-left-radius: 8px;
+}
+
+.holo-widget__resize-guide--tr {
+    top: 0;
+    right: 0;
+    border-width: 2px 2px 0 0;
+    border-top-right-radius: 8px;
+}
+
+.holo-widget__resize-guide--bl {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 2px 2px;
+    border-bottom-left-radius: 8px;
+}
+
+.holo-widget__resize-guide--br {
+    bottom: 0;
+    right: 0;
+    border-width: 0 2px 2px 0;
+    border-bottom-right-radius: 8px;
+    /* Make the bottom right one stand out a bit more as it's the standard resize corner */
+    border-color: rgba(127, 219, 218, 0.8);
+}
