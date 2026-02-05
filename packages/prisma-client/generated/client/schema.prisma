@@ -1,0 +1,389 @@
+// Timeless-Heroes - Prisma Schema
+// Database: PostgreSQL
+// Theme: Developer Idle Game
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id       String @id @default(uuid())
+  email    String @unique
+  username String @unique
+  password String // bcrypt hashed
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+  lastActiveAt DateTime?
+
+  // Relations
+  progression    Progression?
+  ownedItems     OwnedItem[]
+  activePrograms ActiveProgram[]
+  transactions   Transaction[]
+  achievements   UserAchievement[]
+
+  @@index([email])
+  @@index([username])
+}
+
+// ============================================================================
+// GAME PROGRESSION
+// ============================================================================
+
+model Progression {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Core Currency: "Lines of Code" (LoC)
+  linesOfCode       Decimal @default(0) @db.Decimal(30, 0) // Big number support
+  totalLinesWritten Decimal @default(0) @db.Decimal(30, 0) // Lifetime stats
+
+  // Multipliers
+  clickMultiplier    Float @default(1.0) // LoC per click
+  passiveMultiplier  Float @default(0.0) // LoC per second (AFK)
+  criticalChance     Float @default(0.05) // 5% base crit chance
+  criticalMultiplier Float @default(2.0) // 2x crit damage
+
+  // Level System
+  level            Int     @default(1)
+  experience       Decimal @default(0) @db.Decimal(20, 0)
+  experienceToNext Decimal @default(100) @db.Decimal(20, 0)
+
+  // Prestige System
+  prestigeLevel  Int     @default(0)
+  prestigePoints Decimal @default(0) @db.Decimal(20, 0)
+
+  // Statistics
+  totalClicks          BigInt @default(0)
+  totalPlaytimeSeconds BigInt @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([totalLinesWritten]) // For leaderboard queries
+}
+
+// ============================================================================
+// ITEMS & UPGRADES
+// ============================================================================
+
+model Item {
+  id          String       @id @default(uuid())
+  slug        String       @unique // e.g., "mechanical-keyboard", "monitor-4k"
+  name        String
+  description String
+  category    ItemCategory
+
+  // Base stats
+  baseCost   Decimal    @db.Decimal(30, 0)
+  baseEffect Float // Effect value (e.g., +5 LoC/click)
+  effectType EffectType
+
+  // Growth
+  costMultiplier Float @default(1.15) // Price = BaseCost * 1.15^owned
+  maxQuantity    Int? // null = unlimited
+
+  // Unlock conditions
+  unlockLevel    Int     @default(1)
+  unlockItemSlug String? // Requires owning this item first
+
+  // Metadata
+  iconUrl String?
+  rarity  Rarity  @default(COMMON)
+
+  ownedItems OwnedItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([rarity])
+}
+
+model OwnedItem {
+  id     String @id @default(uuid())
+  userId String
+  itemId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  quantity Int @default(1)
+  level    Int @default(1) // Item upgrades
+
+  purchasedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([itemId])
+}
+
+enum ItemCategory {
+  HARDWARE // Keyboards, monitors, etc.
+  SOFTWARE // IDEs, plugins, etc.
+  COFFEE // Consumables for boosts
+  TEAM_MEMBER // Passive generators
+  INFRASTRUCTURE // Servers, cloud, etc.
+}
+
+enum EffectType {
+  CLICK_BONUS // Adds to click value
+  PASSIVE_BONUS // Adds to passive generation
+  CLICK_MULTIPLIER // Multiplies click value
+  PASSIVE_MULTIPLIER
+  CRIT_CHANCE
+  CRIT_MULTIPLIER
+  EXPERIENCE_BONUS
+}
+
+enum Rarity {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+  MYTHIC
+}
+
+// ============================================================================
+// PROGRAMS (EXPEDITIONS/JOBS)
+// ============================================================================
+
+model ProgramType {
+  id          String @id @default(uuid())
+  slug        String @unique // e.g., "compile_kernel", "deploy_microservices"
+  name        String
+  description String
+
+  // Duration & Rewards
+  baseDurationSecs Int // Base time to complete
+  baseReward       Decimal @db.Decimal(30, 0)
+  experienceReward Decimal @db.Decimal(20, 0)
+
+  // Scaling
+  rewardMultiplier Float @default(1.0)
+
+  // Unlock conditions
+  unlockLevel Int @default(1)
+
+  // Loot table
+  lootTable Json? // Array of {itemSlug, dropRate, quantity}
+
+  // Metadata
+  iconUrl  String?
+  category ProgramCategory
+
+  activePrograms ActiveProgram[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+  @@index([unlockLevel])
+}
+
+model ActiveProgram {
+  id            String @id @default(uuid())
+  userId        String
+  programTypeId String
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  programType ProgramType @relation(fields: [programTypeId], references: [id], onDelete: Cascade)
+
+  // Timing
+  startedAt      DateTime  @default(now())
+  estimatedEndAt DateTime
+  completedAt    DateTime?
+
+  // Status
+  status ProgramStatus @default(RUNNING)
+
+  // Job reference
+  bullJobId String? // BullMQ job ID for cancellation
+
+  // Results (populated on completion)
+  earnedReward Decimal? @db.Decimal(30, 0)
+  earnedExp    Decimal? @db.Decimal(20, 0)
+  lootItems    Json? // Array of {itemSlug, quantity}
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([estimatedEndAt])
+}
+
+enum ProgramCategory {
+  BUG_FIX // Quick, low reward
+  FEATURE // Medium duration
+  REFACTORING // Medium, experience-focused
+  ARCHITECTURE // Long duration, high reward
+  DEPLOYMENT // Variable
+  RESEARCH // Very long, unlocks items
+}
+
+enum ProgramStatus {
+  RUNNING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+// ============================================================================
+// PAYMENTS & TRANSACTIONS
+// ============================================================================
+
+model Transaction {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Stripe
+  stripePaymentId  String  @unique
+  stripeCustomerId String?
+
+  // Amount
+  amountCents Int
+  currency    String @default("eur")
+
+  // Status
+  status      TransactionStatus @default(PENDING)
+  processedAt DateTime?
+
+  // Idempotency
+  idempotencyKey String @unique // Prevent double processing
+
+  // What was purchased
+  productType ProductType
+  productData Json // {premiumCurrency: 1000} or {itemSlug: "golden-keyboard"}
+
+  // Fulfillment
+  fulfilled        Boolean   @default(false)
+  fulfilledAt      DateTime?
+  fulfillmentJobId String? // BullMQ job ID
+
+  // Error handling
+  lastError  String?
+  retryCount Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([stripePaymentId])
+  @@index([status])
+  @@index([idempotencyKey])
+}
+
+enum TransactionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum ProductType {
+  PREMIUM_CURRENCY // Buy gems/coins
+  ITEM_PACK // Buy specific items
+  SUBSCRIPTION // Monthly benefits
+  BOOST // Temporary multipliers
+}
+
+// ============================================================================
+// ACHIEVEMENTS
+// ============================================================================
+
+model Achievement {
+  id          String @id @default(uuid())
+  slug        String @unique
+  name        String
+  description String
+
+  // Unlock condition
+  conditionType  AchievementCondition
+  conditionValue Decimal              @db.Decimal(30, 0) // e.g., 1000000 for "Write 1M LoC"
+
+  // Rewards
+  rewardLoC      Decimal? @db.Decimal(30, 0)
+  rewardExp      Decimal? @db.Decimal(20, 0)
+  rewardItemSlug String?
+
+  // Metadata
+  iconUrl String?
+  points  Int     @default(10)
+  hidden  Boolean @default(false)
+
+  userAchievements UserAchievement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conditionType])
+}
+
+model UserAchievement {
+  id            String @id @default(uuid())
+  userId        String
+  achievementId String
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  unlockedAt DateTime  @default(now())
+  claimed    Boolean   @default(false)
+  claimedAt  DateTime?
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+}
+
+enum AchievementCondition {
+  TOTAL_LINES_WRITTEN
+  TOTAL_CLICKS
+  TOTAL_PLAYTIME
+  LEVEL_REACHED
+  PRESTIGE_LEVEL
+  ITEMS_OWNED
+  PROGRAMS_COMPLETED
+  CRITICAL_HITS
+}
+
+// ============================================================================
+// OFFLINE PROGRESSION TRACKING
+// ============================================================================
+
+model OfflineSession {
+  id     String @id @default(uuid())
+  userId String
+
+  disconnectedAt DateTime
+  reconnectedAt  DateTime?
+
+  // Calculated gains on reconnection
+  earnedLoC Decimal? @db.Decimal(30, 0)
+  earnedExp Decimal? @db.Decimal(20, 0)
+
+  processed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([processed])
+}
