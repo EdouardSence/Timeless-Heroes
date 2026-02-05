@@ -1,0 +1,402 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║            🐱 CYBER-CAT STYLES — Soft Cyberpunk Kawaii                    ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+/* Design system imported in main.tsx */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat {
+    --glow-color: var(--neon-cyan);
+    position: relative;
+    width: 100%;
+    max-width: 200px;
+    aspect-ratio: 240 / 220;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: cozy-float 4s ease-in-out infinite;
+}
+
+.cyber-cat__svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4));
+    transition: filter var(--transition-base);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § HOLOGRAPHIC AURA
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__aura {
+    position: absolute;
+    inset: -20%;
+    border-radius: 50%;
+    background: radial-gradient(circle at center,
+            var(--glow-color) 0%,
+            transparent 70%);
+    opacity: 0;
+    filter: blur(30px);
+    transition: opacity var(--transition-slow);
+    pointer-events: none;
+}
+
+.cyber-cat--typing .cyber-cat__aura {
+    opacity: 0.15;
+}
+
+.cyber-cat--rare .cyber-cat__aura,
+.cyber-cat--epic .cyber-cat__aura,
+.cyber-cat--legendary .cyber-cat__aura {
+    opacity: 0.25;
+    animation: cozy-pulse 1.5s ease-in-out infinite;
+}
+
+.cyber-cat--legendary .cyber-cat__aura {
+    opacity: 0.4;
+    background: radial-gradient(circle at center,
+            var(--neon-gold) 0%,
+            var(--neon-pink) 40%,
+            transparent 70%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § VR HEADSET EFFECTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__visor {
+    animation: neon-flicker 8s ease-in-out infinite;
+}
+
+.cyber-cat--typing .cyber-cat__visor {
+    animation: holo-shimmer 2s linear infinite;
+}
+
+.cyber-cat__visor-data {
+    opacity: 0.3;
+    transition: opacity var(--transition-base);
+}
+
+.cyber-cat--typing .cyber-cat__visor-data {
+    opacity: 0.7;
+    animation: neon-flicker 0.5s steps(2) infinite;
+}
+
+.cyber-cat__antenna-light {
+    animation: cozy-pulse 2s ease-in-out infinite;
+}
+
+.cyber-cat--typing .cyber-cat__antenna-light {
+    animation: neon-flicker 0.3s steps(2) infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § PIERCINGS & ACCENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__piercing {
+    filter: drop-shadow(0 0 4px currentColor);
+    animation: cozy-pulse 3s ease-in-out infinite;
+}
+
+.cyber-cat__string-tip {
+    filter: drop-shadow(0 0 6px currentColor);
+    animation: cozy-pulse 2.5s ease-in-out infinite alternate;
+}
+
+.cyber-cat__status-led {
+    filter: drop-shadow(0 0 8px var(--neon-mint));
+    animation: cozy-pulse 1.5s ease-in-out infinite;
+}
+
+.cyber-cat--typing .cyber-cat__status-led {
+    fill: var(--neon-cyan);
+    filter: drop-shadow(0 0 10px var(--neon-cyan));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § WHISKERS GLOW
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__whiskers line {
+    transition: opacity var(--transition-fast);
+}
+
+.cyber-cat--typing .cyber-cat__whiskers line {
+    opacity: 1 !important;
+    animation: neon-flicker 0.8s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § KEYBOARD EFFECTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__key {
+    transition:
+        transform var(--transition-fast),
+        fill var(--transition-fast),
+        filter var(--transition-fast);
+    transform-origin: center;
+}
+
+.cyber-cat__key--pressed {
+    transform: translateY(2px);
+    fill: var(--key-color) !important;
+    filter: drop-shadow(0 0 6px var(--key-color));
+}
+
+.cyber-cat--typing .cyber-cat__keyboard {
+    filter: drop-shadow(0 0 8px rgba(127, 219, 218, 0.3));
+}
+
+/* Random key lighting when idle */
+.cyber-cat:not(.cyber-cat--typing) .cyber-cat__key:nth-child(3n) {
+    fill: rgba(127, 219, 218, 0.15);
+}
+
+.cyber-cat:not(.cyber-cat--typing) .cyber-cat__key:nth-child(5n) {
+    fill: rgba(180, 167, 214, 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § PAWS ANIMATION
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__paw {
+    transform-origin: center bottom;
+    transition: transform var(--transition-fast);
+}
+
+.cyber-cat--typing .cyber-cat__paw--left {
+    animation: typing-bounce 0.15s ease-out;
+}
+
+.cyber-cat--typing .cyber-cat__paw--right {
+    animation: typing-bounce 0.15s ease-out 0.075s;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § COMBO EFFECTS BY TIER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Common (10+) */
+.cyber-cat--common .cyber-cat__svg {
+    filter: drop-shadow(0 0 10px var(--neon-cyan-glow));
+}
+
+/* Rare (25+) */
+.cyber-cat--rare .cyber-cat__svg {
+    filter: drop-shadow(0 0 15px var(--neon-lavender-glow));
+}
+
+.cyber-cat--rare .cyber-cat__whiskers line {
+    stroke-width: 2;
+}
+
+/* Epic (50+) */
+.cyber-cat--epic .cyber-cat__svg {
+    filter:
+        drop-shadow(0 0 20px var(--neon-pink-glow)) drop-shadow(0 0 40px var(--neon-pink-glow));
+    animation: combo-fire 0.5s ease-in-out infinite;
+}
+
+.cyber-cat--epic .cyber-cat__hoodie-front,
+.cyber-cat--epic .cyber-cat__hoodie-back {
+    fill: #2a1a3e;
+}
+
+/* Legendary (100+) */
+.cyber-cat--legendary .cyber-cat__svg {
+    filter:
+        drop-shadow(0 0 25px var(--neon-gold-glow)) drop-shadow(0 0 50px var(--neon-gold-glow)) drop-shadow(0 0 80px var(--neon-pink-glow));
+}
+
+.cyber-cat--legendary .cyber-cat__visor {
+    animation: rgb-shift 1s linear infinite;
+}
+
+.cyber-cat--legendary .cyber-cat__whiskers line {
+    animation: rgb-cycle 2s linear infinite;
+    stroke-width: 2.5;
+}
+
+@keyframes rgb-shift {
+    0% {
+        filter: hue-rotate(0deg);
+    }
+
+    100% {
+        filter: hue-rotate(360deg);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § PARTICLE EFFECTS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__particles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.cyber-cat__particle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color);
+    bottom: 40%;
+    left: 50%;
+    opacity: 0;
+    filter: blur(1px);
+    animation: particle-float 1s ease-out infinite;
+    animation-delay: var(--delay);
+    transform: translateX(var(--x));
+    box-shadow: 0 0 10px var(--color);
+}
+
+@keyframes particle-float {
+    0% {
+        opacity: 1;
+        transform: translateY(0) translateX(var(--x)) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-60px) translateX(calc(var(--x) * 1.5)) scale(0.3);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § COMBO DISPLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__combo-display {
+    position: absolute;
+    top: -10px;
+    right: -20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 12px;
+    background: var(--cozy-glass-dark);
+    backdrop-filter: blur(10px);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--neon-cyan);
+    box-shadow: var(--glow-cyan);
+    animation: level-up-burst 0.3s ease-out;
+}
+
+/* Compact mode for collapsed widget */
+.cyber-cat__combo-display--compact {
+    top: auto;
+    bottom: 0px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%) scale(0.8);
+    padding: 2px 8px;
+    white-space: nowrap;
+    z-index: 10;
+
+    /* Ensure visual styles are applied */
+    background: var(--cozy-glass-dark);
+    border: 1px solid var(--neon-cyan);
+    box-shadow: var(--glow-cyan);
+
+    /* Fix jump glitch */
+    animation: none;
+}
+
+/* Fix Legendary Aura Overflow in Compact Mode */
+.cyber-cat--compact.cyber-cat--legendary .cyber-cat__aura {
+    background: radial-gradient(circle at center,
+            var(--neon-gold) 0%,
+            rgba(255, 215, 0, 0.2) 40%,
+            transparent 60%);
+    opacity: 0.3;
+}
+
+.cyber-cat--compact.cyber-cat--legendary .cyber-cat__svg {
+    /* Reduce massive glowing shadows in compact mode */
+    filter: drop-shadow(0 0 15px var(--neon-gold-glow));
+}
+
+.cyber-cat__combo-value {
+    font-family: var(--font-mono);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    color: var(--neon-cyan);
+    line-height: 1;
+    text-shadow: 0 0 10px var(--neon-cyan-glow);
+}
+
+.cyber-cat__combo-display--compact .cyber-cat__combo-value {
+    font-size: 14px;
+}
+
+.cyber-cat__combo-label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+/* Tier-specific combo display colors */
+.cyber-cat__combo-display--rare {
+    border-color: var(--neon-lavender);
+    box-shadow: var(--glow-lavender);
+}
+
+.cyber-cat__combo-display--rare .cyber-cat__combo-value {
+    color: var(--neon-lavender);
+    text-shadow: 0 0 10px var(--neon-lavender-glow);
+}
+
+.cyber-cat__combo-display--epic {
+    border-color: var(--neon-pink);
+    box-shadow: var(--glow-pink);
+}
+
+.cyber-cat__combo-display--epic .cyber-cat__combo-value {
+    color: var(--neon-pink);
+    text-shadow: 0 0 10px var(--neon-pink-glow);
+    animation: cozy-pulse 0.5s ease-in-out infinite;
+}
+
+.cyber-cat__combo-display--legendary {
+    border-color: var(--neon-gold);
+    box-shadow: var(--glow-gold);
+    background: linear-gradient(135deg,
+            rgba(255, 215, 135, 0.1) 0%,
+            var(--cozy-glass-dark) 50%,
+            rgba(244, 165, 193, 0.1) 100%);
+}
+
+.cyber-cat__combo-display--legendary .cyber-cat__combo-value {
+    background: linear-gradient(90deg,
+            var(--neon-gold) 0%,
+            var(--neon-pink) 50%,
+            var(--neon-cyan) 100%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: holo-shimmer 2s linear infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § LEVEL BADGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.cyber-cat__level-badge text {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    filter: drop-shadow(0 0 4px var(--neon-cyan-glow));
+}
