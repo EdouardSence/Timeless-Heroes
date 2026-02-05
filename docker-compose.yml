@@ -1,0 +1,83 @@
+# Timeless-Heroes Docker Compose
+# Distributed Architecture for Developer Idle Game
+# 
+# ARCHITECTURE:
+# ┌──────────────────┐    ┌───────────────────┐    ┌──────────────────┐
+# │ PowerShell Agent │───>│  API Gateway      │───>│  Redis           │
+# │ (Local PC)       │TCP │  (NestJS)         │    │  (Hot Storage)   │
+# └──────────────────┘    └───────────────────┘    └────────┬─────────┘
+#                                │                          │
+#                         WebSocket                         │ BullMQ Jobs
+#                                │                          ▼
+#                                ▼                 ┌──────────────────┐
+#                         ┌──────────────┐         │  Worker Game Loop│
+#                         │ Frontend     │         │  (BullMQ Worker) │
+#                         │ (Next.js)    │         └────────┬─────────┘
+#                         └──────────────┘                  │
+#                                                           ▼
+#                                                  ┌──────────────────┐
+#                                                  │  PostgreSQL      │
+#                                                  │  (Persistence)   │
+#                                                  └──────────────────┘
+
+version: '3.8'
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE
+  # ============================================================================
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: timeless-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-timeless}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-timeless_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-timeless_heroes}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timeless}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  redis:
+    image: redis:7-alpine
+    container_name: timeless-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  # Redis Commander - Redis GUI (development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: timeless-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-redis_secret}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - dev  
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: timeless-network
