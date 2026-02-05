@@ -362,7 +362,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/raphaelalarcon/WebstormProjects/Timeless-Heroes/packages/prisma-client/generated/client",
+      "value": "C:\\Users\\Aurelien\\Desktop\\YNOV M2\\WebGame\\Timeless-Heroes\\packages\\prisma-client\\generated\\client",
       "fromEnvVar": null
     },
     "config": {
@@ -371,16 +371,17 @@ const config = {
     "binaryTargets": [
       {
         "fromEnvVar": null,
-        "value": "darwin-arm64",
+        "value": "windows",
         "native": true
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/raphaelalarcon/WebstormProjects/Timeless-Heroes/packages/prisma-client/schema.prisma",
+    "sourceFilePath": "C:\\Users\\Aurelien\\Desktop\\YNOV M2\\WebGame\\Timeless-Heroes\\packages\\prisma-client\\schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {
-    "rootEnvPath": null
+    "rootEnvPath": null,
+    "schemaEnvPath": "../../.env"
   },
   "relativePath": "../..",
   "clientVersion": "5.22.0",
@@ -389,7 +390,6 @@ const config = {
     "db"
   ],
   "activeProvider": "postgresql",
-  "postinstall": false,
   "inlineDatasources": {
     "db": {
       "url": {
