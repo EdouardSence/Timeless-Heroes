@@ -1,13 +1,13 @@
 {
-  "linesOfCode": 7392,
-  "totalKeyPresses": 1309,
-  "level": 5,
-  "experience": 497,
-  "experienceToNext": 505,
+  "linesOfCode": 108,
+  "totalKeyPresses": 702,
+  "level": 4,
+  "experience": 227,
+  "experienceToNext": 337,
   "multiplier": 12,
   "passiveRate": 0,
   "items": {
     "mechanical-keyboard": 11
   },
-  "lastSave": "2026-02-23T09:01:24.781Z"
+  "lastSave": "2026-02-23T10:30:30.376Z"
 }

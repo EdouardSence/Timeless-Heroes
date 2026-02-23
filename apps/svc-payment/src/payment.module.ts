@@ -5,12 +5,13 @@
 
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { QueueName } from '@repo/shared-types';
 import { IdempotencyService } from './idempotency/idempotency.service';
 import { ProvisionOrderProcessor } from './provision/provision-order.processor';
 import { ProvisionService } from './provision/provision.service';
+import { PaymentController } from './payment/payment.controller';
 import { StripeWebhookController } from './stripe/stripe-webhook.controller';
 import { StripeService } from './stripe/stripe.service';
 
@@ -18,22 +19,26 @@ import { StripeService } from './stripe/stripe.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['../../.env.local', '../../.env', '.env.local', '.env'],
     }),
-    
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD || undefined,
-      },
+
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
+        },
+      }),
+      inject: [ConfigService],
     }),
-    
+
     BullModule.registerQueue({
       name: QueueName.PROVISION_ORDER,
     }),
   ],
-  controllers: [StripeWebhookController],
+  controllers: [StripeWebhookController, PaymentController],
   providers: [
     StripeService,
     ProvisionOrderProcessor,
@@ -41,4 +46,4 @@ import { StripeService } from './stripe/stripe.service';
     IdempotencyService,
   ],
 })
-export class PaymentModule {}
+export class PaymentModule { }
