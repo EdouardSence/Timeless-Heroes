@@ -206,6 +206,7 @@ function startWebSocketServer(): void {
 
 // ============================================================================
 // TCP SERVER (pour recevoir les frappes du PowerShell)
+// Robuste : gestion d'erreurs, reconnexion des clients, server restart
 // ============================================================================
 
 function startTCPServer(): void {
@@ -221,9 +222,30 @@ function startTCPServer(): void {
       });
     });
 
-    socket.on('close', () => {
-      console.log(chalk.yellow('⌨️  Keyboard hook déconnecté'));
+    socket.on('error', (err) => {
+      console.log(chalk.yellow(`⌨️  Socket error: ${err.message}`));
     });
+
+    socket.on('close', () => {
+      console.log(chalk.yellow('⌨️  Keyboard hook déconnecté (reconnexion auto côté client)'));
+    });
+  });
+
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(chalk.red(`❌ Port ${TCP_PORT} déjà utilisé, retry dans 3s...`));
+      setTimeout(() => {
+        server.close();
+        server.listen(TCP_PORT, '127.0.0.1');
+      }, 3000);
+    } else {
+      console.log(chalk.red(`❌ TCP server error: ${err.message}`));
+    }
+  });
+
+  server.on('close', () => {
+    console.log(chalk.yellow('🔄 TCP server fermé, redémarrage dans 3s...'));
+    setTimeout(() => startTCPServer(), 3000);
   });
 
   server.listen(TCP_PORT, '127.0.0.1', () => {
