@@ -43,9 +43,6 @@ kill_port() {
 cleanup() {
     echo ""
     echo -e "${YELLOW}Arrêt des services...${NC}"
-    kill_port 9999
-    kill_port 9997
-    kill_port 3001
     kill $(jobs -p) 2>/dev/null || true
     echo -e "${GREEN}Services arrêtés.${NC}"
     exit 0
@@ -70,16 +67,9 @@ if ! command -v pnpm &> /dev/null; then
 fi
 echo -e "${GREEN}✓ pnpm trouvé${NC}"
 
-if ! command -v nc &> /dev/null; then
-    echo -e "${YELLOW}⚠ netcat (nc) non trouvé - installation recommandée${NC}"
-fi
-
 # Kill any existing processes on our ports
 echo ""
 echo -e "${YELLOW}Libération des ports...${NC}"
-kill_port 9999
-kill_port 9997
-kill_port 3001
 sleep 1
 
 # 1. Start Docker services (Redis, PostgreSQL) if docker-compose exists

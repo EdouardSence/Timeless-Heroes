@@ -29,9 +29,6 @@ kill_port() {
 cleanup() {
     echo ""
     echo -e "${YELLOW}Arrêt des services...${NC}"
-    kill_port 9999
-    kill_port 9997
-    kill_port 3001
     kill $(jobs -p) 2>/dev/null || true
     echo -e "${GREEN}Services arrêtés.${NC}"
     exit 0
@@ -60,9 +57,6 @@ echo -e "${GREEN}✓ pnpm trouvé${NC}"
 # Kill any existing processes on our ports
 echo ""
 echo -e "${YELLOW}Libération des ports...${NC}"
-kill_port 9999
-kill_port 9997
-kill_port 3001
 sleep 1
 
 # 1. Start Docker services (Redis, PostgreSQL) if docker is available
@@ -87,12 +81,9 @@ echo -e "${GREEN}======================================================${NC}"
 echo -e "${GREEN}                  TOUT EST LANCÉ !                    ${NC}"
 echo -e "${GREEN}======================================================${NC}"
 echo ""
-echo -e "🎮 Serveur de jeu:  ${GREEN}localhost:9999${NC} (TCP)"
-echo -e "🌐 WebSocket:       ${GREEN}localhost:9997${NC}"
-echo -e "📊 Dashboard:       ${GREEN}http://localhost:3001/game${NC}"
+echo -e "Le chat (CyberCat) réagira à vos touches clavier."
 echo ""
 echo -e "${CYAN}Appuie sur Ctrl+C pour tout arrêter${NC}"
 echo ""
 
-# Keep script running and show logs
-tail -f /tmp/timeless-keylogger.log /tmp/timeless-web.log 2>/dev/null || wait
+wait
