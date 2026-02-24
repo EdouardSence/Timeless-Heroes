@@ -4,6 +4,7 @@ node_modules
 # Build outputs
 .next
 dist
+# Prevent copying any pre-existing 'out' directory from the host; Turbo prune will create /app/out/ inside the container.
 out
 
 # Git
