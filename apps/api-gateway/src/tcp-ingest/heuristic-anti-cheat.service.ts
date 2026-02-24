@@ -9,6 +9,8 @@
  * 1. Rate of key presses (CPS)
  * 2. Timing variance (standard deviation)
  * 3. Pattern regularity
+ * 
+ * All timing data is stored in Redis (no in-memory Maps).
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -18,17 +20,9 @@ import Redis from 'ioredis';
 import { RedisKeys } from '@repo/redis-client';
 import { IAntiCheatResult, AntiCheatReason, ITypingMetrics } from './tcp-ingest.types';
 
-interface ITimingWindow {
-  timestamps: number[];
-  deltas: number[];
-}
-
 @Injectable()
 export class HeuristicAntiCheatService {
   private readonly logger = new Logger(HeuristicAntiCheatService.name);
-
-  // In-memory sliding window of recent key press timings per user
-  private userTimings: Map<string, ITimingWindow> = new Map();
 
   // Configuration
   private readonly MAX_CPS: number;
@@ -36,6 +30,7 @@ export class HeuristicAntiCheatService {
   private readonly MIN_DELTA_MS = 30; // Minimum realistic time between keypresses
   private readonly MAX_REGULARITY_SCORE = 0.9; // Above this = too regular = bot
   private readonly MIN_STD_DEV = 15; // Human typing has at least 15ms variance
+  private readonly TIMING_TTL = 300; // 5 minutes TTL for timing data
 
   constructor(
     private readonly configService: ConfigService,
@@ -47,6 +42,7 @@ export class HeuristicAntiCheatService {
 
   /**
    * Analyze a key press and determine if it's human or bot behavior
+   * All timing data is stored in Redis for distributed access.
    */
   async analyzeKeyPress(userId: string, timestamp: number): Promise<IAntiCheatResult> {
     // 1. Check if user is banned
@@ -59,38 +55,39 @@ export class HeuristicAntiCheatService {
       };
     }
 
-    // 2. Get or create timing window for user
-    let window = this.userTimings.get(userId);
-    if (!window) {
-      window = { timestamps: [], deltas: [] };
-      this.userTimings.set(userId, window);
-    }
+    const timestampsKey = RedisKeys.ANTICHEAT_TIMESTAMPS(userId);
+    const deltasKey = RedisKeys.ANTICHEAT_DELTAS(userId);
 
-    // 3. Calculate delta from last keypress
-    const lastTimestamp = window.timestamps[window.timestamps.length - 1];
+    // 2. Get last timestamp from Redis list
+    const lastTimestampStr = await this.redis.lindex(timestampsKey, -1);
+    const lastTimestamp = lastTimestampStr ? parseInt(lastTimestampStr, 10) : null;
     const deltaMs = lastTimestamp ? timestamp - lastTimestamp : 100;
 
-    // 4. Update sliding window
-    window.timestamps.push(timestamp);
-    if (deltaMs > 0 && deltaMs < 10000) { // Ignore gaps > 10 seconds
-      window.deltas.push(deltaMs);
-    }
+    // 3. Push new timestamp and trim to window size (atomic pipeline)
+    const pipeline = this.redis.pipeline();
+    pipeline.rpush(timestampsKey, timestamp.toString());
+    pipeline.ltrim(timestampsKey, -this.WINDOW_SIZE, -1);
+    pipeline.expire(timestampsKey, this.TIMING_TTL);
 
-    // Keep only last N entries
-    if (window.timestamps.length > this.WINDOW_SIZE) {
-      window.timestamps.shift();
+    // Only store delta if it's meaningful (> 0 and < 10 seconds)
+    if (deltaMs > 0 && deltaMs < 10000) {
+      pipeline.rpush(deltasKey, deltaMs.toString());
+      pipeline.ltrim(deltasKey, -(this.WINDOW_SIZE - 1), -1);
+      pipeline.expire(deltasKey, this.TIMING_TTL);
     }
-    if (window.deltas.length > this.WINDOW_SIZE - 1) {
-      window.deltas.shift();
-    }
+    await pipeline.exec();
+
+    // 4. Get current deltas from Redis
+    const deltaStrs = await this.redis.lrange(deltasKey, 0, -1);
+    const deltas = deltaStrs.map((d) => parseInt(d, 10));
 
     // 5. Need at least 5 samples for meaningful analysis
-    if (window.deltas.length < 5) {
+    if (deltas.length < 5) {
       return { allowed: true, humanScore: 0.5 };
     }
 
     // 6. Calculate metrics
-    const metrics = this.calculateMetrics(window.deltas);
+    const metrics = this.calculateMetrics(deltas);
 
     // 7. Run heuristic checks
     return this.evaluateMetrics(metrics, deltaMs);
@@ -189,18 +186,24 @@ export class HeuristicAntiCheatService {
   /**
    * Get current metrics for a user (for debugging/admin)
    */
-  getUserMetrics(userId: string): ITypingMetrics | null {
-    const window = this.userTimings.get(userId);
-    if (!window || window.deltas.length < 5) {
+  async getUserMetrics(userId: string): Promise<ITypingMetrics | null> {
+    const deltasKey = RedisKeys.ANTICHEAT_DELTAS(userId);
+    const deltaStrs = await this.redis.lrange(deltasKey, 0, -1);
+    const deltas = deltaStrs.map((d) => parseInt(d, 10));
+
+    if (deltas.length < 5) {
       return null;
     }
-    return this.calculateMetrics(window.deltas);
+    return this.calculateMetrics(deltas);
   }
 
   /**
    * Clear user timing data (on disconnect or reset)
    */
-  clearUserData(userId: string): void {
-    this.userTimings.delete(userId);
+  async clearUserData(userId: string): Promise<void> {
+    const pipeline = this.redis.pipeline();
+    pipeline.del(RedisKeys.ANTICHEAT_TIMESTAMPS(userId));
+    pipeline.del(RedisKeys.ANTICHEAT_DELTAS(userId));
+    await pipeline.exec();
   }
 }

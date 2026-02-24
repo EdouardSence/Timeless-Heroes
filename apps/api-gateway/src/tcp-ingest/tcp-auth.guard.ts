@@ -25,8 +25,8 @@ export class TcpAuthGuard implements CanActivate {
       return false;
     }
 
-    // Validate session
-    const isValid = this.tcpIngestService.isSessionValid(sessionId);
+    // Validate session (now async - checks Redis)
+    const isValid = await this.tcpIngestService.isSessionValid(sessionId);
 
     if (!isValid) {
       this.logger.warn(`Invalid session: ${sessionId}`);
@@ -34,7 +34,7 @@ export class TcpAuthGuard implements CanActivate {
     }
 
     // Verify userId matches session
-    const expectedUserId = this.tcpIngestService.getUserIdFromSession(sessionId);
+    const expectedUserId = await this.tcpIngestService.getUserIdFromSession(sessionId);
     if (data?.userId && data.userId !== expectedUserId) {
       this.logger.warn(`User ID mismatch: expected ${expectedUserId}, got ${data.userId}`);
       return false;
