@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -52,7 +55,7 @@ jobs:
             apps/*/node_modules
             packages/*/node_modules
             packages/prisma-client/generated
-          key: modules-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
 
   # ============================================================================
   # LINT - Code quality checks
@@ -83,7 +86,7 @@ jobs:
             apps/*/node_modules
             packages/*/node_modules
             packages/prisma-client/generated
-          key: modules-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Run lint
         run: pnpm run lint
@@ -117,7 +120,7 @@ jobs:
             apps/*/node_modules
             packages/*/node_modules
             packages/prisma-client/generated
-          key: modules-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Build all packages
         run: pnpm run build
@@ -151,7 +154,7 @@ jobs:
             apps/*/node_modules
             packages/*/node_modules
             packages/prisma-client/generated
-          key: modules-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          key: modules-${{ runner.os }}-node${{ env.NODE_VERSION }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Run tests
         run: pnpm run test
@@ -162,7 +165,10 @@ jobs:
   docker-build:
     name: Docker build (${{ matrix.service }})
     runs-on: ubuntu-latest
-    needs: build
+    needs:
+      - build
+      - lint
+      - test
     strategy:
       fail-fast: false
       matrix:
