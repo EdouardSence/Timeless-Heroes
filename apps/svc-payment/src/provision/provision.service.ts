@@ -67,19 +67,23 @@ export class ProvisionService {
       };
     }
 
-    const progressionUrl = this.configService.get<string>(
-      'PROGRESSION_SERVICE_URL',
-      `http://localhost:${this.configService.get<string>('PROGRESSION_PORT', '3001')}`
-    );
+    const progressionServiceUrl = this.configService.get<string>('PROGRESSION_SERVICE_URL');
+    const progressionHost = this.configService.get<string>('PROGRESSION_HOST', 'localhost');
+    const progressionPort = this.configService.get<string>('PROGRESSION_PORT', '3001');
+    const progressionUrl = progressionServiceUrl ?? `http://${progressionHost}:${progressionPort}`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(`${progressionUrl}/progression/${userId}/add-currency`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ amount }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Progression service returned status ${response.status}`);

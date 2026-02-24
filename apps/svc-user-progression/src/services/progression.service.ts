@@ -4,6 +4,7 @@
  */
 
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as net from 'net';
 
 import {
@@ -117,6 +118,7 @@ export class ProgressionService {
   constructor(
     private readonly costCalculator: ItemCostCalculatorService,
     private readonly leaderboardSync: LeaderboardSyncService,
+    private readonly configService: ConfigService,
   ) { }
 
   /**
@@ -161,8 +163,10 @@ export class ProgressionService {
 
     // Attempt to notify the local keylogger via TCP (since the keylogger is the source of truth for the local game loop)
     try {
+      const keyloggerHost = this.configService.get<string>('KEYLOGGER_HOST', '127.0.0.1');
+      const keyloggerPort = this.configService.get<number>('KEYLOGGER_PORT', 9999);
       const client = new net.Socket();
-      client.connect(9999, '127.0.0.1', () => {
+      client.connect(keyloggerPort, keyloggerHost, () => {
         client.write(`ADD_LOC:${delta}\n`);
         client.destroy();
       });

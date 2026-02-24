@@ -60,9 +60,17 @@ export class ProgressionController {
   @HttpCode(HttpStatus.OK)
   async addCurrency(
     @Param('userId') userId: string,
-    @Body() body: { amount: string | number },
+    @Body() body: { amount: string },
   ): Promise<IApiResponse<IProgressionData>> {
-    const delta = body.amount.toString();
+    const delta = body.amount;
+    const parsed = BigInt(delta);
+    if (parsed <= 0n) {
+      return {
+        success: false,
+        error: { code: 'INVALID_AMOUNT', message: 'Amount must be greater than 0' },
+        timestamp: new Date().toISOString(),
+      };
+    }
     const data = await this.progressionService.updateBalance(userId, delta);
 
     return {
