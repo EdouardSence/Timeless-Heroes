@@ -26,7 +26,8 @@ export class LinksService {
     },
   ];
 
-  private escapeHtml(input: string): string {
+  private escapeHtml(input: string | null | undefined): string {
+    if (input == null) return '';
     return input.replace(/[&<>"'/]/g, (char) => {
       switch (char) {
         case '&':
