@@ -1,48 +1,56 @@
 # Dockerfile for svc-payment
+# Multi-stage build using turbo prune for optimized Docker images
 
+# ============================================================================
+# PRUNE STAGE - Generate pruned monorepo subset
+# ============================================================================
 FROM node:20-alpine AS builder
 
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
 
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-COPY turbo.json ./
+COPY . .
+RUN pnpm dlx turbo prune @app/svc-payment --docker
 
-COPY apps/svc-payment/package.json ./apps/svc-payment/
-COPY packages/prisma-client/package.json ./packages/prisma-client/
-COPY packages/redis-client/package.json ./packages/redis-client/
-COPY packages/shared-types/package.json ./packages/shared-types/
-COPY packages/typescript-config/package.json ./packages/typescript-config/
-COPY packages/eslint-config/package.json ./packages/eslint-config/
+# ============================================================================
+# INSTALL & BUILD STAGE
+# ============================================================================
+FROM node:20-alpine AS installer
 
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+
+# Install dependencies from pruned lockfile (better Docker cache)
+COPY --from=builder /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 
-COPY packages ./packages
-COPY apps/svc-payment ./apps/svc-payment
+# Copy full source and build
+COPY --from=builder /app/out/full/ .
 
-WORKDIR /app/packages/prisma-client
-RUN pnpm run generate
+# Generate Prisma client
+RUN pnpm -F @repo/prisma-client generate
 
-WORKDIR /app
+# Build the application
 RUN pnpm run build --filter=@app/svc-payment
 
+# ============================================================================
+# PRODUCTION STAGE
+# ============================================================================
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/svc-payment/dist ./apps/svc-payment/dist
-COPY --from=builder /app/apps/svc-payment/package.json ./apps/svc-payment/
-COPY --from=builder /app/packages ./packages
-
-RUN chown -R nestjs:nodejs /app
+COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-payment/dist ./apps/svc-payment/dist
+COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-payment/package.json ./apps/svc-payment/
+COPY --from=installer --chown=nestjs:nodejs /app/packages ./packages
 
 USER nestjs
 

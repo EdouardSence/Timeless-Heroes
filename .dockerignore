@@ -1,0 +1,37 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+dist
+# Prevent copying any pre-existing 'out' directory from the host; Turbo prune will create /app/out/ inside the container.
+out
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Turbo
+.turbo
+
+# Docker
+docker-compose.yml
+docker-compose.*.yml
+
+# Desktop app
+apps/desktop
+apps/keylogger
+
+# Docs
+docs
+README.md
+*.md

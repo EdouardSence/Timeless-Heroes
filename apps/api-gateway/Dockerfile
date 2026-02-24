@@ -1,43 +1,40 @@
-# Base Dockerfile for NestJS services
-# Multi-stage build for optimized production images
+# Dockerfile for api-gateway
+# Multi-stage build using turbo prune for optimized Docker images
 
 # ============================================================================
-# BUILD STAGE
+# PRUNE STAGE - Generate pruned monorepo subset
 # ============================================================================
 FROM node:20-alpine AS builder
 
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm
 RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
 
-# Copy workspace configuration
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-COPY turbo.json ./
+COPY . .
+RUN pnpm dlx turbo prune @app/api-gateway --docker
 
-# Copy package.json files for all packages
-COPY apps/api-gateway/package.json ./apps/api-gateway/
-COPY packages/prisma-client/package.json ./packages/prisma-client/
-COPY packages/redis-client/package.json ./packages/redis-client/
-COPY packages/shared-types/package.json ./packages/shared-types/
-COPY packages/typescript-config/package.json ./packages/typescript-config/
-COPY packages/eslint-config/package.json ./packages/eslint-config/
+# ============================================================================
+# INSTALL & BUILD STAGE
+# ============================================================================
+FROM node:20-alpine AS installer
 
-# Install dependencies
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+
+# Install dependencies from pruned lockfile (better Docker cache)
+COPY --from=builder /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 
-# Copy source code
-COPY packages ./packages
-COPY apps/api-gateway ./apps/api-gateway
+# Copy full source and build
+COPY --from=builder /app/out/full/ .
 
 # Generate Prisma client
-WORKDIR /app/packages/prisma-client
-RUN pnpm run generate
+RUN pnpm -F @repo/prisma-client generate
 
 # Build the application
-WORKDIR /app
 RUN pnpm run build --filter=@app/api-gateway
 
 # ============================================================================
@@ -47,21 +44,15 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
-
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-# Copy built application
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/api-gateway/dist ./apps/api-gateway/dist
-COPY --from=builder /app/apps/api-gateway/package.json ./apps/api-gateway/
-COPY --from=builder /app/packages ./packages
-
-# Set ownership
-RUN chown -R nestjs:nodejs /app
+# Copy built application from installer
+COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=installer --chown=nestjs:nodejs /app/apps/api-gateway/dist ./apps/api-gateway/dist
+COPY --from=installer --chown=nestjs:nodejs /app/apps/api-gateway/package.json ./apps/api-gateway/
+COPY --from=installer --chown=nestjs:nodejs /app/packages ./packages
 
 USER nestjs
 
