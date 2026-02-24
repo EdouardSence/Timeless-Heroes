@@ -2,16 +2,15 @@
  * API Gateway - Main Entry Point
  * Timeless-Heroes Idle Game Backend
  * 
- * This service runs as a HYBRID application:
+ * This service runs as:
  * - HTTP server for REST API (port 3000)
  * - WebSocket server for real-time game updates (same port)
- * - TCP microservice for keylogger ingestion (port 9999)
+ * - REST endpoints for keylogger ingestion (same port)
  */
 
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 import { AppModule } from './app.module';
 
@@ -41,27 +40,13 @@ async function bootstrap() {
   // API prefix
   app.setGlobalPrefix('api/v1');
 
-  // Connect TCP microservice for keylogger ingestion
-  const tcpPort = configService.get<number>('TCP_INGEST_PORT', 9999);
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.TCP,
-    options: {
-      host: '0.0.0.0',
-      port: tcpPort,
-    },
-  });
-
-  // Start all microservices
-  await app.startAllMicroservices();
-  console.log(`📡 TCP Ingest microservice listening on port ${tcpPort}`);
-
   // Start HTTP server
   const httpPort = configService.get<number>('PORT', 3000);
   await app.listen(httpPort);
 
   console.log(`🎮 Timeless-Heroes API Gateway running on port ${httpPort}`);
   console.log(`🔌 WebSocket available at ws://localhost:${httpPort}/game`);
-  console.log(`🔐 TCP Keylogger ingestion at tcp://localhost:${tcpPort}`);
+  console.log(`📡 Keylogger ingest at http://localhost:${httpPort}/api/v1/ingest`);
 }
 
 void bootstrap();

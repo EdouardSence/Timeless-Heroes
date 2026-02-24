@@ -1,21 +1,20 @@
 /**
- * TCP Ingest Controller
- * Handles incoming TCP messages from the PowerShell keylogger
+ * Ingest Controller (HTTP REST)
+ * Handles incoming HTTP requests from the keylogger agent
  * 
- * Message Protocol:
- * - AUTH:<jwt_token> - Authenticate session
- * - KEY_PRESS:<key_type>:<timestamp> - Key press event (anonymized)
- * - PING - Keep-alive
+ * Endpoints:
+ * - POST /ingest/auth    - Authenticate session (JWT)
+ * - POST /ingest/key     - Key press event (anonymized)
+ * - GET  /ingest/ping    - Keep-alive / health check
  */
 
-import { Controller, Logger, UseGuards } from '@nestjs/common';
-import { Ctx, MessagePattern, Payload, TcpContext } from '@nestjs/microservices';
+import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
 
-import { TcpAuthGuard } from './tcp-auth.guard';
+import { IngestAuthGuard } from './tcp-auth.guard';
 import { TcpIngestService } from './tcp-ingest.service';
 import { ITcpAuthRequest, ITcpAuthResponse, ITcpKeyPressEvent, KeyCategory } from './tcp-ingest.types';
 
-@Controller()
+@Controller('ingest')
 export class TcpIngestController {
   private readonly logger = new Logger(TcpIngestController.name);
 
@@ -23,12 +22,11 @@ export class TcpIngestController {
 
   /**
    * Handle authentication request from keylogger
-   * Client sends: AUTH { token: string }
+   * POST /api/v1/ingest/auth
    */
-  @MessagePattern('auth')
+  @Post('auth')
   async handleAuth(
-    @Payload() data: ITcpAuthRequest,
-    @Ctx() context: TcpContext,
+    @Body() data: ITcpAuthRequest,
   ): Promise<ITcpAuthResponse> {
     this.logger.debug('Received auth request');
 
@@ -46,12 +44,12 @@ export class TcpIngestController {
   /**
    * Handle key press event (ANONYMIZED - no actual key value)
    * Only receives category (CHAR, MODIFIER, FUNCTION, ENTER, etc.)
+   * POST /api/v1/ingest/key
    */
-  @MessagePattern('key_press')
-  @UseGuards(TcpAuthGuard)
+  @Post('key')
+  @UseGuards(IngestAuthGuard)
   async handleKeyPress(
-    @Payload() data: ITcpKeyPressEvent,
-    @Ctx() context: TcpContext,
+    @Body() data: ITcpKeyPressEvent,
   ): Promise<{ success: boolean; buffered: boolean }> {
     // Validate the event is properly anonymized
     if (!this.isProperlyAnonymized(data)) {
@@ -69,9 +67,10 @@ export class TcpIngestController {
   }
 
   /**
-   * Handle ping (keep-alive)
+   * Health check / keep-alive endpoint
+   * GET /api/v1/ingest/ping
    */
-  @MessagePattern('ping')
+  @Get('ping')
   async handlePing(): Promise<{ pong: true; timestamp: number }> {
     return {
       pong: true,

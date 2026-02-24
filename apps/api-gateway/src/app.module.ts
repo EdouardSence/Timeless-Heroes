@@ -1,11 +1,10 @@
 /**
  * API Gateway - Main Application Module
  * 
- * This is the main entry point for the API Gateway microservice.
+ * This is the main entry point for the API Gateway.
  * It handles:
- * - HTTP REST API endpoints
+ * - HTTP REST API endpoints (including keylogger ingestion)
  * - WebSocket connections for real-time game updates
- * - TCP ingestion from the keylogger agent
  * - BullMQ job processing
  */
 
@@ -41,7 +40,7 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
     AuthModule,
     ClickProcessorModule,
     GameGatewayModule,
-    TcpIngestModule, // TCP ingestion from keylogger
+    TcpIngestModule, // HTTP REST ingestion from keylogger
   ],
 })
 export class AppModule { }
