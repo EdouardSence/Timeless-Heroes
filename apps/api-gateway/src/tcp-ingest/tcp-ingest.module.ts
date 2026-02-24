@@ -1,9 +1,9 @@
 /**
- * TCP Ingest Module
- * NestJS microservice transport for receiving keylogger events
+ * Ingest Module (HTTP REST)
+ * Receives keylogger events via HTTP endpoints
  * 
- * This replaces the raw Node.js TCP server in the keylogger app
- * and provides proper authentication and validation.
+ * Provides proper authentication and validation
+ * for anonymized key press events.
  */
 
 import { Module } from '@nestjs/common';
@@ -12,7 +12,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { TcpIngestController } from './tcp-ingest.controller';
 import { TcpIngestService } from './tcp-ingest.service';
-import { TcpAuthGuard } from './tcp-auth.guard';
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import { RedisModule } from '../redis/redis.module';
 
@@ -32,7 +31,7 @@ import { RedisModule } from '../redis/redis.module';
     }),
   ],
   controllers: [TcpIngestController],
-  providers: [TcpIngestService, TcpAuthGuard, HeuristicAntiCheatService],
+  providers: [TcpIngestService, HeuristicAntiCheatService],
   exports: [TcpIngestService],
 })
 export class TcpIngestModule { }

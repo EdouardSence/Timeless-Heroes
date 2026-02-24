@@ -1,5 +1,5 @@
 /**
- * TCP Ingest Module Exports
+ * Ingest Module Exports
  */
 
 export * from './tcp-ingest.module';

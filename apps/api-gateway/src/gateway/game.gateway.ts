@@ -56,7 +56,6 @@ export class GameGateway
   server!: Server;
 
   private readonly logger = new Logger(GameGateway.name);
-  private connectedUsers: Map<string, IAuthenticatedSocket> = new Map();
 
   constructor(
     private readonly clickProcessor: ClickProcessorService,
@@ -92,8 +91,12 @@ export class GameGateway
       client.userId = userId;
       client.username = username;
 
-      // Store connected user
-      this.connectedUsers.set(userId, client);
+      // Track connected user in Redis (replaces in-memory Map)
+      await this.redis.hset(
+        RedisKeys.WS_CONNECTED_USERS,
+        userId,
+        client.id,
+      );
 
       // Join user-specific room for targeted messages
       await client.join(`user:${userId}`);
@@ -127,7 +130,8 @@ export class GameGateway
     const userId = client.userId;
 
     if (userId) {
-      this.connectedUsers.delete(userId);
+      // Remove from connected users in Redis
+      await this.redis.hdel(RedisKeys.WS_CONNECTED_USERS, userId);
 
       // Record disconnect time for offline calculation
       await this.redis.set(
@@ -387,9 +391,9 @@ export class GameGateway
   }
 
   /**
-   * Get count of connected users
+   * Get count of connected users (from Redis)
    */
-  getConnectedUsersCount(): number {
-    return this.connectedUsers.size;
+  async getConnectedUsersCount(): Promise<number> {
+    return this.redis.hlen(RedisKeys.WS_CONNECTED_USERS);
   }
 }

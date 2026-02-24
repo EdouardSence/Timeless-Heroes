@@ -11,7 +11,7 @@ echo.
 
 echo [1/2] Démarrage de l'infrastructure Docker...
 docker-compose up -d postgres redis
-
+ 
 echo [2/2] Démarrage du jeu avec le chat (Desktop App)...
 start "Timeless Heroes - Game" cmd /k "cd /d %~dp0apps\desktop && pnpm dev"
 

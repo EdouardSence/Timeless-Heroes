@@ -1,15 +1,15 @@
 /**
  * API Gateway - Main Application Module
  * 
- * This is the main entry point for the API Gateway microservice.
- * It handles:
- * - HTTP REST API endpoints
+ * This gateway handles ONLY routing and real-time communication:
+ * - HTTP REST API endpoints (including keylogger ingestion)
  * - WebSocket connections for real-time game updates
- * - TCP ingestion from the keylogger agent
- * - BullMQ job processing
+ * - JWT authentication and validation
+ * - Click validation and Redis buffering
+ * 
+ * Business logic (buffer flushing, persistence) is in worker-game-loop.
  */
 
-import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
@@ -27,21 +27,20 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
       envFilePath: ['.env.local', '.env'],
     }),
 
-    // BullMQ Queue Configuration
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD || undefined,
-      },
-    }),
-
-    // Feature Modules
+    // Shared infrastructure
     RedisModule,
+
+    // Auth (JWT validation)
     AuthModule,
+
+    // Click receive → validate → buffer in Redis
     ClickProcessorModule,
+
+    // WebSocket real-time gateway
     GameGatewayModule,
-    TcpIngestModule, // TCP ingestion from keylogger
+
+    // HTTP REST ingestion from keylogger
+    TcpIngestModule,
   ],
 })
 export class AppModule { }

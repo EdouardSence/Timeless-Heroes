@@ -8,7 +8,7 @@
  * 3. Atomically buffer click in Redis
  * 4. Return immediate feedback to client
  * 
- * The buffer is flushed to PostgreSQL by the ClickBufferProcessor
+ * The buffer is flushed to PostgreSQL by the worker-game-loop service
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -27,9 +27,8 @@ import {
 export class ClickProcessorService {
   private readonly logger = new Logger(ClickProcessorService.name);
   
-  // Cache for user progression (to avoid DB calls on every click)
-  private progressionCache: Map<string, { data: IProgressionData; expiry: number }> = new Map();
-  private readonly CACHE_TTL = 5000; // 5 seconds
+  // TTL for Redis progression cache (seconds)
+  private readonly CACHE_TTL_SECONDS = 60;
   
   constructor(
     private readonly clickBufferService: ClickBufferService,
@@ -121,53 +120,32 @@ export class ClickProcessorService {
   }
   
   /**
-   * Get user progression from cache or prepare default
+   * Get user progression from Redis cache
    * In production, this would fetch from the progression service via gRPC
    */
   async getProgressionCached(userId: string): Promise<IProgressionData | null> {
-    // Check memory cache first
-    const cached = this.progressionCache.get(userId);
-    if (cached && cached.expiry > Date.now()) {
-      return cached.data;
-    }
-    
-    // Check Redis cache
     const redisKey = RedisKeys.CACHE_USER_PROGRESSION(userId);
     const redisData = await this.redis.get(redisKey);
     
     if (redisData) {
-      const data = JSON.parse(redisData) as IProgressionData;
-      this.progressionCache.set(userId, {
-        data,
-        expiry: Date.now() + this.CACHE_TTL,
-      });
-      return data;
+      return JSON.parse(redisData) as IProgressionData;
     }
     
     return null;
   }
   
   /**
-   * Cache user progression data
+   * Cache user progression data in Redis
    */
   async cacheProgression(progression: IProgressionData): Promise<void> {
     const redisKey = RedisKeys.CACHE_USER_PROGRESSION(progression.userId);
-    
-    // Cache in Redis (longer TTL)
-    await this.redis.setex(redisKey, 60, JSON.stringify(progression));
-    
-    // Cache in memory (shorter TTL)
-    this.progressionCache.set(progression.userId, {
-      data: progression,
-      expiry: Date.now() + this.CACHE_TTL,
-    });
+    await this.redis.setex(redisKey, this.CACHE_TTL_SECONDS, JSON.stringify(progression));
   }
   
   /**
    * Invalidate cache for user
    */
   async invalidateCache(userId: string): Promise<void> {
-    this.progressionCache.delete(userId);
     await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
   }
 }

@@ -3,7 +3,7 @@
  * Handles authentication and key press processing from keylogger
  */
 
-import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
@@ -22,9 +22,6 @@ import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 export class TcpIngestService {
   private readonly logger = new Logger(TcpIngestService.name);
 
-  // In-memory session store for authenticated clients
-  private authenticatedSessions: Map<string, { userId: string; expiresAt: number }> = new Map();
-
   constructor(
     private readonly jwtService: JwtService,
     private readonly clickBufferService: ClickBufferService,
@@ -42,17 +39,19 @@ export class TcpIngestService {
 
       const userId = payload.sub;
       const sessionId = this.generateSessionId();
+      const ttlSeconds = 7 * 24 * 60 * 60; // 7 days
 
-      // Store session
-      this.authenticatedSessions.set(sessionId, {
-        userId,
-        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+      // Store session in Redis (replaces in-memory Map)
+      await this.redis.setex(
+        RedisKeys.TCP_SESSION(sessionId),
+        ttlSeconds,
+        JSON.stringify({ userId, expiresAt: Date.now() + ttlSeconds * 1000 }),
+      );
 
-      // Store session in Redis for distributed access
+      // Also store user session reference
       await this.redis.setex(
         RedisKeys.USER_SESSION(userId),
-        7 * 24 * 60 * 60, // 7 days TTL
+        ttlSeconds,
         JSON.stringify({ sessionId, authenticatedAt: Date.now() }),
       );
 
@@ -155,23 +154,28 @@ export class TcpIngestService {
   }
 
   /**
-   * Validate if a session is still valid
+   * Validate if a session is still valid (checks Redis)
    */
-  isSessionValid(sessionId: string): boolean {
-    const session = this.authenticatedSessions.get(sessionId);
-    if (!session) return false;
+  async isSessionValid(sessionId: string): Promise<boolean> {
+    const data = await this.redis.get(RedisKeys.TCP_SESSION(sessionId));
+    if (!data) return false;
+
+    const session = JSON.parse(data) as { userId: string; expiresAt: number };
     if (Date.now() > session.expiresAt) {
-      this.authenticatedSessions.delete(sessionId);
+      await this.redis.del(RedisKeys.TCP_SESSION(sessionId));
       return false;
     }
     return true;
   }
 
   /**
-   * Get user ID from session
+   * Get user ID from session (from Redis)
    */
-  getUserIdFromSession(sessionId: string): string | null {
-    const session = this.authenticatedSessions.get(sessionId);
-    return session?.userId || null;
+  async getUserIdFromSession(sessionId: string): Promise<string | null> {
+    const data = await this.redis.get(RedisKeys.TCP_SESSION(sessionId));
+    if (!data) return null;
+
+    const session = JSON.parse(data) as { userId: string; expiresAt: number };
+    return session.userId;
   }
 }

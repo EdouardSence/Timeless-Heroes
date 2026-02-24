@@ -107,6 +107,18 @@ export const RedisKeys = {
   CACHE_USER_PROGRESSION: (userId: string) => `cache:progression:${userId}`,
   CACHE_ITEM_COSTS: (userId: string) => `cache:items:${userId}`,
 
+  // TCP authenticated sessions (replaces in-memory Map)
+  TCP_SESSION: (sessionId: string) => `tcp:session:${sessionId}`,
+  TCP_SESSION_PATTERN: 'tcp:session:*',
+
+  // Anti-cheat timing windows (replaces in-memory Map)
+  ANTICHEAT_TIMESTAMPS: (userId: string) => `anticheat:timestamps:${userId}`,
+  ANTICHEAT_DELTAS: (userId: string) => `anticheat:deltas:${userId}`,
+
+  // Connected WebSocket users (replaces in-memory Map)
+  WS_CONNECTED_USERS: 'ws:connected:users',
+  WS_CONNECTED_USER: (userId: string) => `ws:connected:${userId}`,
+
   // Locks (for distributed operations)
   LOCK_USER: (userId: string) => `lock:user:${userId}`,
   LOCK_PAYMENT: (paymentId: string) => `lock:payment:${paymentId}`,

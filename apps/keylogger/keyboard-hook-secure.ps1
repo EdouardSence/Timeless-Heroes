@@ -1,26 +1,27 @@
-# Timeless Heroes - Secure Keyboard Hook Agent
+# Timeless Heroes - Secure Keyboard Hook Agent (HTTP REST)
 # 
 # SECURITY FEATURES:
 # 1. ANONYMIZATION: Never sends actual key codes or characters
 #    Only sends key CATEGORIES (CHAR, MODIFIER, FUNCTION, etc.)
 # 2. JWT Authentication: Authenticates with server before sending events
 # 3. Anti-cheat timing: Includes timing data for heuristic analysis
+# 4. AUTO-RECONNECTION: Retries on server failure with exponential backoff
 #
 # This script is designed to be PRIVACY-SAFE for educational purposes
 
 param(
     [string]$ServerHost = "127.0.0.1",
-    [int]$ServerPort = 9999,
+    [int]$ServerPort = 3000,
     [string]$Token = ""
 )
 
 Add-Type -TypeDefinition @"
 using System;
-using System.IO;
-using System.Net.Sockets;
+using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using System.Text.Json;
 
@@ -30,8 +31,7 @@ public class SecureKeyboardHook {
     
     private static LowLevelKeyboardProc _proc = HookCallback;
     private static IntPtr _hookID = IntPtr.Zero;
-    private static TcpClient client;
-    private static NetworkStream stream;
+    private static HttpClient httpClient;
     private static int keyCount = 0;
     private static DateTime startTime = DateTime.Now;
     private static long lastKeyTime = 0;
@@ -39,6 +39,11 @@ public class SecureKeyboardHook {
     private static string userId = "";
     private static string jwtToken = "";
     private static bool isAuthenticated = false;
+    private static string baseUrl = "";
+    
+    // Reconnection state
+    private static int reconnectAttempts = 0;
+    private static bool isReconnecting = false;
     
     // Key categories - ANONYMIZED
     private const string CAT_CHAR = "CHAR";
@@ -68,19 +73,25 @@ public class SecureKeyboardHook {
     
     public static void Main(string[] args) {
         string serverHost = args.Length > 0 ? args[0] : "127.0.0.1";
-        int serverPort = args.Length > 1 ? int.Parse(args[1]) : 9999;
+        int serverPort = args.Length > 1 ? int.Parse(args[1]) : 3000;
         jwtToken = args.Length > 2 ? args[2] : "";
+        baseUrl = "http://" + serverHost + ":" + serverPort + "/api/v1/ingest";
+        
+        // Configure HttpClient with timeout
+        httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(5);
         
         Console.Clear();
         Console.ForegroundColor = ConsoleColor.Cyan;
         Console.WriteLine("");
-        Console.WriteLine("  ╔════════════════════════════════════════════════════════╗");
-        Console.WriteLine("  ║           TIMELESS HEROES - SECURE AGENT               ║");
-        Console.WriteLine("  ║              ~ Code Your Way to Glory ~                ║");
-        Console.WriteLine("  ╠════════════════════════════════════════════════════════╣");
-        Console.WriteLine("  ║  🔐 PRIVACY MODE: Key values are NEVER transmitted    ║");
-        Console.WriteLine("  ║  📊 Only anonymized categories (CHAR, ENTER, etc.)    ║");
-        Console.WriteLine("  ╚════════════════════════════════════════════════════════╝");
+        Console.WriteLine("  +========================================================+");
+        Console.WriteLine("  |           TIMELESS HEROES - SECURE AGENT  (HTTP)        |");
+        Console.WriteLine("  |              ~ Code Your Way to Glory ~                 |");
+        Console.WriteLine("  +========================================================+");
+        Console.WriteLine("  |  PRIVACY MODE: Key values are NEVER transmitted         |");
+        Console.WriteLine("  |  Only anonymized categories (CHAR, ENTER, etc.)         |");
+        Console.WriteLine("  |  AUTO-RECONNECT: Will retry if server is down           |");
+        Console.WriteLine("  +========================================================+");
         Console.WriteLine("");
         Console.ResetColor();
         
@@ -94,76 +105,122 @@ public class SecureKeyboardHook {
             return;
         }
         
-        // Connect and authenticate
-        if (!ConnectAndAuth(serverHost, serverPort)) {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("  [ERROR] Failed to connect or authenticate");
+        // Connect and authenticate (with retry)
+        AuthenticateWithRetry();
+        
+        if (!isAuthenticated) {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("  [WARN] Starting in offline mode - will retry in background");
             Console.ResetColor();
-            return;
+        } else {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine("  [OK] Authenticated as: " + userId);
+            Console.WriteLine("  [OK] Session: " + sessionId.Substring(0, Math.Min(20, sessionId.Length)) + "...");
+            Console.ResetColor();
         }
         
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("  [OK] Authenticated as: " + userId);
-        Console.WriteLine("  [OK] Session: " + sessionId.Substring(0, Math.Min(20, sessionId.Length)) + "...");
-        Console.ResetColor();
         Console.WriteLine("");
         Console.WriteLine("  Dashboard: http://localhost:3001/game");
         Console.WriteLine("  Press Ctrl+C to quit");
         Console.WriteLine("");
-        Console.WriteLine("  ══════════════════════════════════════════════════════════");
+        Console.WriteLine("  ==========================================================");
         
         _hookID = SetHook(_proc);
         
         // Update display timer
-        var timer = new System.Threading.Timer(UpdateDisplay, null, 0, 500);
+        var displayTimer = new System.Threading.Timer(UpdateDisplay, null, 0, 500);
+        
+        // Background reconnection timer (every 5 seconds)
+        var reconnectTimer = new System.Threading.Timer(ReconnectTick, null, 5000, 5000);
         
         Application.Run();
         
         UnhookWindowsHookEx(_hookID);
     }
     
-    private static bool ConnectAndAuth(string host, int port) {
+    /// <summary>
+    /// Background reconnection tick - retries auth if disconnected
+    /// </summary>
+    private static void ReconnectTick(object state) {
+        if (!isAuthenticated && !isReconnecting) {
+            AuthenticateWithRetry();
+        }
+        
+        // Periodic ping to check connection health
+        if (isAuthenticated) {
+            try {
+                var response = httpClient.GetAsync(baseUrl + "/ping").Result;
+                if (!response.IsSuccessStatusCode) {
+                    isAuthenticated = false;
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine("\n  [WARN] Server unreachable, will reconnect...");
+                    Console.ResetColor();
+                }
+            } catch {
+                isAuthenticated = false;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Authenticate with exponential backoff retry
+    /// </summary>
+    private static void AuthenticateWithRetry() {
+        isReconnecting = true;
+        
+        for (int attempt = 0; attempt < 3; attempt++) {
+            if (Authenticate()) {
+                reconnectAttempts = 0;
+                isReconnecting = false;
+                return;
+            }
+            
+            // Exponential backoff: 1s, 2s, 4s
+            int delayMs = (int)Math.Pow(2, attempt) * 1000;
+            Thread.Sleep(delayMs);
+        }
+        
+        reconnectAttempts++;
+        isReconnecting = false;
+    }
+    
+    /// <summary>
+    /// Authenticate via HTTP POST /api/v1/ingest/auth
+    /// </summary>
+    private static bool Authenticate() {
         try {
-            client = new TcpClient(host, port);
-            stream = client.GetStream();
+            var authPayload = new { token = jwtToken };
+            string json = JsonSerializer.Serialize(authPayload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
             
-            // Send auth request (NestJS TCP protocol format)
-            var authRequest = new {
-                pattern = "auth",
-                data = new { token = jwtToken }
-            };
+            var response = httpClient.PostAsync(baseUrl + "/auth", content).Result;
             
-            string json = JsonSerializer.Serialize(authRequest);
-            byte[] data = Encoding.UTF8.GetBytes(json + "\n");
-            stream.Write(data, 0, data.Length);
+            if (!response.IsSuccessStatusCode) return false;
             
-            // Read response
-            byte[] buffer = new byte[4096];
-            int bytesRead = stream.Read(buffer, 0, buffer.Length);
-            string response = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+            string responseBody = response.Content.ReadAsStringAsync().Result;
             
-            // Parse response (simplified)
-            if (response.Contains("\"success\":true")) {
-                // Extract sessionId and userId from response
-                int sidStart = response.IndexOf("\"sessionId\":\"") + 13;
-                int sidEnd = response.IndexOf("\"", sidStart);
+            if (responseBody.Contains("\"success\":true")) {
+                // Extract sessionId
+                int sidStart = responseBody.IndexOf("\"sessionId\":\"") + 13;
+                int sidEnd = responseBody.IndexOf("\"", sidStart);
                 if (sidStart > 12 && sidEnd > sidStart) {
-                    sessionId = response.Substring(sidStart, sidEnd - sidStart);
+                    sessionId = responseBody.Substring(sidStart, sidEnd - sidStart);
                 }
                 
-                int uidStart = response.IndexOf("\"userId\":\"") + 10;
-                int uidEnd = response.IndexOf("\"", uidStart);
+                // Extract userId
+                int uidStart = responseBody.IndexOf("\"userId\":\"") + 10;
+                int uidEnd = responseBody.IndexOf("\"", uidStart);
                 if (uidStart > 9 && uidEnd > uidStart) {
-                    userId = response.Substring(uidStart, uidEnd - uidStart);
+                    userId = responseBody.Substring(uidStart, uidEnd - uidStart);
                 }
                 
                 isAuthenticated = true;
+                reconnectAttempts = 0;
                 return true;
             }
             
             return false;
-        } catch (Exception ex) {
-            Console.WriteLine("  Connection error: " + ex.Message);
+        } catch {
             return false;
         }
     }
@@ -181,8 +238,18 @@ public class SecureKeyboardHook {
         Console.Write("  Rate: ");
         Console.ForegroundColor = ConsoleColor.Magenta;
         Console.Write((rate.ToString("F1") + " /min").PadRight(15));
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine(isAuthenticated ? "[CONNECTED]" : "[DISCONNECTED]");
+        
+        if (isAuthenticated) {
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.Write("[CONNECTED]   ");
+        } else if (isReconnecting) {
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.Write("[RECONNECTING]");
+        } else {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write("[OFFLINE]     ");
+        }
+        Console.WriteLine("");
         Console.ResetColor();
     }
     
@@ -219,7 +286,7 @@ public class SecureKeyboardHook {
         // Special keys
         if (vkCode == 13) return CAT_ENTER;
         if (vkCode == 32) return CAT_SPACE;
-        if (vkCode == 8 || vkCode == 46) return CAT_BACKSPACE; // Backspace or Delete
+        if (vkCode == 8 || vkCode == 46) return CAT_BACKSPACE;
         if (vkCode == 9) return CAT_TAB;
         
         // Alphanumeric (48-57 = 0-9, 65-90 = A-Z)
@@ -235,8 +302,42 @@ public class SecureKeyboardHook {
         return CAT_UNKNOWN;
     }
     
+    /// <summary>
+    /// Send key press via HTTP POST - non-blocking with auto-disconnect on failure
+    /// </summary>
+    private static void SendKeyPress(string category, long timestamp, long deltaMs) {
+        if (!isAuthenticated) return;
+        
+        try {
+            var keyEvent = new {
+                userId = userId,
+                sessionId = sessionId,
+                keyCategory = category,
+                timestamp = timestamp,
+                deltaMs = deltaMs
+            };
+            
+            string json = JsonSerializer.Serialize(keyEvent);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            // Fire-and-forget (don't block the hook callback)
+            Task.Run(async () => {
+                try {
+                    var response = await httpClient.PostAsync(baseUrl + "/key", content);
+                    if (!response.IsSuccessStatusCode) {
+                        isAuthenticated = false;
+                    }
+                } catch {
+                    isAuthenticated = false;
+                }
+            });
+        } catch {
+            isAuthenticated = false;
+        }
+    }
+    
     private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam) {
-        if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN && isAuthenticated) {
+        if (nCode >= 0 && wParam == (IntPtr)WM_KEYDOWN) {
             int vkCode = Marshal.ReadInt32(lParam);
             keyCount++;
             
@@ -248,33 +349,13 @@ public class SecureKeyboardHook {
             // ANONYMIZE: Convert key code to category
             string category = CategorizeKey(vkCode);
             
-            // Send ONLY the category, NEVER the actual key
-            if (stream != null && client.Connected) {
-                try {
-                    var keyEvent = new {
-                        pattern = "key_press",
-                        data = new {
-                            userId = userId,
-                            sessionId = sessionId,
-                            keyCategory = category,  // ANONYMIZED!
-                            timestamp = currentTime,
-                            deltaMs = deltaMs
-                            // NOTE: vkCode is intentionally NOT included
-                        }
-                    };
-                    
-                    string json = JsonSerializer.Serialize(keyEvent);
-                    byte[] data = Encoding.UTF8.GetBytes(json + "\n");
-                    stream.Write(data, 0, data.Length);
-                } catch {
-                    isAuthenticated = false;
-                }
-            }
+            // Send via HTTP (non-blocking)
+            SendKeyPress(category, currentTime, deltaMs);
         }
         return CallNextHookEx(_hookID, nCode, wParam, lParam);
     }
 }
-"@ -ReferencedAssemblies System.Windows.Forms, System.Text.Json
+"@ -ReferencedAssemblies System.Windows.Forms, System.Text.Json, System.Net.Http
 
 # Run the secure keyboard hook
 [SecureKeyboardHook]::Main(@($ServerHost, $ServerPort.ToString(), $Token))
