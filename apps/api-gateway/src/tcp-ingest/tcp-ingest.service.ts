@@ -6,6 +6,7 @@
 import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import Redis from 'ioredis';
+import * as crypto from 'crypto';
 
 import { ClickBufferService, RedisKeys } from '@repo/redis-client';
 import { KeyType } from '@repo/shared-types';
@@ -148,7 +149,9 @@ export class TcpIngestService {
    * Generate a unique session ID
    */
   private generateSessionId(): string {
-    return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    // Use cryptographically secure randomness for session identifiers
+    const randomPart = crypto.randomBytes(16).toString('hex');
+    return `sess_${randomPart}`;
   }
 
   /**
