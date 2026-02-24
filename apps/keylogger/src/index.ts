@@ -217,6 +217,13 @@ function startTCPServer(): void {
       lines.forEach(line => {
         if (line.startsWith('KEY:')) {
           onKeyPress();
+        } else if (line.startsWith('ADD_LOC:')) {
+          const amount = parseInt(line.split(':')[1], 10);
+          if (!isNaN(amount) && amount > 0) {
+            console.log(chalk.yellow(`💰 Achat validé ! Ajout de ${amount} LoC.`));
+            gameData.linesOfCode += amount;
+            broadcastState();
+          }
         }
       });
     });

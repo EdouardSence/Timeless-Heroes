@@ -4,22 +4,22 @@
  */
 
 import {
-    Body,
-    Controller,
-    Get,
-    HttpCode,
-    HttpStatus,
-    Logger,
-    Param,
-    Post,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
 } from '@nestjs/common';
 
 import {
-    IApiResponse,
-    IItemPurchaseRequest,
-    IItemPurchaseResult,
-    IProgressionData,
-    LeaderboardType,
+  IApiResponse,
+  IItemPurchaseRequest,
+  IItemPurchaseResult,
+  IProgressionData,
+  LeaderboardType,
 } from '@repo/shared-types';
 import { ItemCostCalculatorService } from '../services/item-cost-calculator.service';
 import { LeaderboardSyncService } from '../services/leaderboard-sync.service';
@@ -28,13 +28,13 @@ import { ProgressionService } from '../services/progression.service';
 @Controller('progression')
 export class ProgressionController {
   private readonly logger = new Logger(ProgressionController.name);
-  
+
   constructor(
     private readonly progressionService: ProgressionService,
     private readonly costCalculator: ItemCostCalculatorService,
     private readonly leaderboardSync: LeaderboardSyncService,
-  ) {}
-  
+  ) { }
+
   /**
    * Get user progression
    * GET /progression/:userId
@@ -44,14 +44,42 @@ export class ProgressionController {
     @Param('userId') userId: string,
   ): Promise<IApiResponse<IProgressionData>> {
     const data = await this.progressionService.getProgression(userId);
-    
+
     return {
       success: true,
       data,
       timestamp: new Date().toISOString(),
     };
   }
-  
+
+  /**
+   * Add currency to a user
+   * POST /progression/:userId/add-currency
+   */
+  @Post(':userId/add-currency')
+  @HttpCode(HttpStatus.OK)
+  async addCurrency(
+    @Param('userId') userId: string,
+    @Body() body: { amount: string },
+  ): Promise<IApiResponse<IProgressionData>> {
+    const delta = body.amount;
+    const parsed = BigInt(delta);
+    if (parsed <= 0n) {
+      return {
+        success: false,
+        error: { code: 'INVALID_AMOUNT', message: 'Amount must be greater than 0' },
+        timestamp: new Date().toISOString(),
+      };
+    }
+    const data = await this.progressionService.updateBalance(userId, delta);
+
+    return {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   /**
    * Purchase an item
    * POST /progression/purchase
@@ -62,7 +90,7 @@ export class ProgressionController {
     @Body() request: IItemPurchaseRequest,
   ): Promise<IApiResponse<IItemPurchaseResult>> {
     const result = await this.progressionService.purchaseItem(request);
-    
+
     return {
       success: result.success,
       data: result,
@@ -73,7 +101,7 @@ export class ProgressionController {
       timestamp: new Date().toISOString(),
     };
   }
-  
+
   /**
    * Get available items for a user
    * GET /progression/:userId/items
@@ -90,7 +118,7 @@ export class ProgressionController {
     timestamp: string;
   }> {
     const items = this.progressionService.getAvailableItems(userId);
-    
+
     return {
       success: true,
       data: items.map(i => ({
@@ -110,7 +138,7 @@ export class ProgressionController {
       timestamp: new Date().toISOString(),
     };
   }
-  
+
   /**
    * Calculate item cost
    * POST /progression/calculate-cost
@@ -126,7 +154,7 @@ export class ProgressionController {
     },
   ) {
     const { baseCost, amountOwned, quantity = 1, multiplier } = body;
-    
+
     if (quantity === 1) {
       const cost = this.costCalculator.calculateNextCost(
         baseCost,
@@ -135,17 +163,17 @@ export class ProgressionController {
       );
       return { cost, quantity: 1 };
     }
-    
+
     const cost = this.costCalculator.calculateBulkCost(
       baseCost,
       amountOwned,
       quantity,
       multiplier,
     );
-    
+
     return { cost, quantity };
   }
-  
+
   /**
    * Get leaderboard
    * GET /progression/leaderboard/:type
@@ -156,7 +184,7 @@ export class ProgressionController {
   ) {
     const leaderboardType = (type.toUpperCase() as LeaderboardType) || LeaderboardType.GLOBAL;
     const entries = await this.leaderboardSync.getLeaderboard(leaderboardType);
-    
+
     return {
       success: true,
       data: {
@@ -166,7 +194,7 @@ export class ProgressionController {
       timestamp: new Date().toISOString(),
     };
   }
-  
+
   /**
    * Get user's ranks across leaderboards
    * GET /progression/:userId/ranks
@@ -174,7 +202,7 @@ export class ProgressionController {
   @Get(':userId/ranks')
   async getUserRanks(@Param('userId') userId: string) {
     const ranks = await this.leaderboardSync.getUserRanks(userId);
-    
+
     return {
       success: true,
       data: ranks,

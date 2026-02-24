@@ -5,7 +5,7 @@
 
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { QueueName } from '@repo/shared-types';
 import { ProgressionController } from './controllers/progression.controller';
@@ -17,17 +17,21 @@ import { ProgressionService } from './services/progression.service';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['../../.env.local', '../../.env', '.env.local', '.env'],
     }),
-    
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        password: process.env.REDIS_PASSWORD || undefined,
-      },
+
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
+        },
+      }),
+      inject: [ConfigService],
     }),
-    
+
     BullModule.registerQueue({
       name: QueueName.LEADERBOARD_UPDATE,
     }),
@@ -40,4 +44,4 @@ import { ProgressionService } from './services/progression.service';
   ],
   exports: [ProgressionService, ItemCostCalculatorService],
 })
-export class ProgressionModule {}
+export class ProgressionModule { }

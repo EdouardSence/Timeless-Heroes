@@ -57,6 +57,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+apps/keylogger/game-data.json
+
 # Misc
 .DS_Store
 *.pem
