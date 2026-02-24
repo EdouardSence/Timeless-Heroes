@@ -1,7 +1,7 @@
 /**
  * Program Processor Service
  * Manages program (expedition) lifecycle with BullMQ delayed jobs
- * 
+ *
  * Flow:
  * 1. Player starts a program (e.g., "compile_kernel")
  * 2. A delayed BullMQ job is created with duration N minutes
@@ -12,261 +12,305 @@
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import {
+  IProgramRewards,
+  IStartProgramRequest,
+  IStartProgramResult,
+  ProgramError,
+  QueueName,
+} from '@repo/shared-types';
 import { Queue } from 'bullmq';
 
-import {
-    IProgramRewards,
-    IStartProgramRequest,
-    IStartProgramResult,
-    ProgramError,
-    QueueName
-} from '@repo/shared-types';
-
 interface IProgramType {
-  slug: string;
-  name: string;
-  description: string;
   baseDurationSecs: number;
   baseReward: string;
+  category: string;
+  description: string;
   experienceReward: string;
-  rewardMultiplier: number;
-  unlockLevel: number;
-  lootTable: Array<{
+  lootTable: {
     itemSlug: string;
     dropRate: number;
     minQuantity: number;
     maxQuantity: number;
-  }>;
-  category: string;
+  }[];
+  name: string;
+  rewardMultiplier: number;
+  slug: string;
+  unlockLevel: number;
 }
 
 // Hardcoded program types for now (in production, from DB)
 const PROGRAM_TYPES: IProgramType[] = [
   {
-    slug: 'fix_typo',
-    name: 'Fix a Typo',
-    description: 'Quick fix for a minor bug in the code.',
     baseDurationSecs: 60, // 1 minute
     baseReward: '100',
-    experienceReward: '10',
-    rewardMultiplier: 1.0,
-    unlockLevel: 1,
-    lootTable: [],
     category: 'BUG_FIX',
+    description: 'Quick fix for a minor bug in the code.',
+    experienceReward: '10',
+    lootTable: [],
+    name: 'Fix a Typo',
+    rewardMultiplier: 1,
+    slug: 'fix_typo',
+    unlockLevel: 1,
   },
   {
-    slug: 'compile_kernel',
-    name: 'Compile the Kernel',
-    description: 'A lengthy compilation process that yields great rewards.',
     baseDurationSecs: 600, // 10 minutes
     baseReward: '5000',
-    experienceReward: '500',
-    rewardMultiplier: 1.5,
-    unlockLevel: 5,
-    lootTable: [
-      { itemSlug: 'coffee-cup', dropRate: 0.3, minQuantity: 1, maxQuantity: 3 },
-      { itemSlug: 'energy-drink', dropRate: 0.1, minQuantity: 1, maxQuantity: 1 },
-    ],
     category: 'ARCHITECTURE',
+    description: 'A lengthy compilation process that yields great rewards.',
+    experienceReward: '500',
+    lootTable: [
+      { dropRate: 0.3, itemSlug: 'coffee-cup', maxQuantity: 3, minQuantity: 1 },
+      {
+        dropRate: 0.1,
+        itemSlug: 'energy-drink',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+    ],
+    name: 'Compile the Kernel',
+    rewardMultiplier: 1.5,
+    slug: 'compile_kernel',
+    unlockLevel: 5,
   },
   {
-    slug: 'deploy_microservices',
-    name: 'Deploy Microservices',
-    description: 'Deploy a fleet of microservices to production.',
     baseDurationSecs: 1800, // 30 minutes
     baseReward: '25000',
-    experienceReward: '2000',
-    rewardMultiplier: 2.0,
-    unlockLevel: 10,
-    lootTable: [
-      { itemSlug: 'golden-keyboard', dropRate: 0.05, minQuantity: 1, maxQuantity: 1 },
-      { itemSlug: 'mechanical-keyboard', dropRate: 0.2, minQuantity: 1, maxQuantity: 1 },
-      { itemSlug: 'monitor-upgrade', dropRate: 0.15, minQuantity: 1, maxQuantity: 1 },
-    ],
     category: 'DEPLOYMENT',
+    description: 'Deploy a fleet of microservices to production.',
+    experienceReward: '2000',
+    lootTable: [
+      {
+        dropRate: 0.05,
+        itemSlug: 'golden-keyboard',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+      {
+        dropRate: 0.2,
+        itemSlug: 'mechanical-keyboard',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+      {
+        dropRate: 0.15,
+        itemSlug: 'monitor-upgrade',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+    ],
+    name: 'Deploy Microservices',
+    rewardMultiplier: 2,
+    slug: 'deploy_microservices',
+    unlockLevel: 10,
   },
   {
-    slug: 'refactor_legacy',
-    name: 'Refactor Legacy Code',
-    description: 'Brave the depths of legacy code to bring it to modern standards.',
     baseDurationSecs: 3600, // 1 hour
     baseReward: '100000',
-    experienceReward: '5000',
-    rewardMultiplier: 2.5,
-    unlockLevel: 20,
-    lootTable: [
-      { itemSlug: 'ancient-floppy', dropRate: 0.1, minQuantity: 1, maxQuantity: 1 },
-      { itemSlug: 'senior-dev-badge', dropRate: 0.02, minQuantity: 1, maxQuantity: 1 },
-    ],
     category: 'REFACTORING',
+    description:
+      'Brave the depths of legacy code to bring it to modern standards.',
+    experienceReward: '5000',
+    lootTable: [
+      {
+        dropRate: 0.1,
+        itemSlug: 'ancient-floppy',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+      {
+        dropRate: 0.02,
+        itemSlug: 'senior-dev-badge',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+    ],
+    name: 'Refactor Legacy Code',
+    rewardMultiplier: 2.5,
+    slug: 'refactor_legacy',
+    unlockLevel: 20,
   },
   {
-    slug: 'research_ai',
-    name: 'Research AI Integration',
-    description: 'Explore cutting-edge AI technologies for integration.',
     baseDurationSecs: 7200, // 2 hours
     baseReward: '500000',
-    experienceReward: '20000',
-    rewardMultiplier: 3.0,
-    unlockLevel: 30,
-    lootTable: [
-      { itemSlug: 'neural-network-chip', dropRate: 0.1, minQuantity: 1, maxQuantity: 1 },
-      { itemSlug: 'quantum-processor', dropRate: 0.01, minQuantity: 1, maxQuantity: 1 },
-    ],
     category: 'RESEARCH',
+    description: 'Explore cutting-edge AI technologies for integration.',
+    experienceReward: '20000',
+    lootTable: [
+      {
+        dropRate: 0.1,
+        itemSlug: 'neural-network-chip',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+      {
+        dropRate: 0.01,
+        itemSlug: 'quantum-processor',
+        maxQuantity: 1,
+        minQuantity: 1,
+      },
+    ],
+    name: 'Research AI Integration',
+    rewardMultiplier: 3,
+    slug: 'research_ai',
+    unlockLevel: 30,
   },
 ];
 
 interface IProgramJobData {
   programId: string;
-  userId: string;
   programSlug: string;
   startedAt: string;
+  userId: string;
 }
 
 @Injectable()
 export class ProgramProcessorService {
   private readonly logger = new Logger(ProgramProcessorService.name);
-  
+
   // Track active programs per user (in production, use Redis)
-  private activePrograms: Map<string, Set<string>> = new Map();
+  private activePrograms = new Map<string, Set<string>>();
   private readonly MAX_CONCURRENT_PROGRAMS = 3;
-  
+
   constructor(
     @InjectQueue(QueueName.PROGRAM_COMPLETION)
     private readonly programQueue: Queue<IProgramJobData>,
   ) {}
-  
+
   /**
    * Start a new program for a user
    */
-  async startProgram(request: IStartProgramRequest): Promise<IStartProgramResult> {
-    const { userId, programSlug } = request;
-    
+  async startProgram(
+    request: IStartProgramRequest,
+  ): Promise<IStartProgramResult> {
+    const { programSlug, userId } = request;
+
     // 1. Find the program type
     const programType = PROGRAM_TYPES.find((p) => p.slug === programSlug);
-    
+
     if (!programType) {
       return {
-        success: false,
+        durationSeconds: 0,
+        error: ProgramError.PROGRAM_NOT_FOUND,
+        estimatedEndAt: new Date(),
+        expectedRewards: { expReward: '0', locReward: '0', possibleLoot: [] },
         programSlug,
         startedAt: new Date(),
-        estimatedEndAt: new Date(),
-        durationSeconds: 0,
-        expectedRewards: { locReward: '0', expReward: '0', possibleLoot: [] },
-        error: ProgramError.PROGRAM_NOT_FOUND,
+        success: false,
       };
     }
-    
+
     // 2. Check user level (mock for now)
     const userLevel = 1; // TODO: Get from progression service
     if (userLevel < programType.unlockLevel) {
       return {
-        success: false,
+        durationSeconds: 0,
+        error: ProgramError.PROGRAM_LOCKED,
+        estimatedEndAt: new Date(),
+        expectedRewards: { expReward: '0', locReward: '0', possibleLoot: [] },
         programSlug,
         startedAt: new Date(),
-        estimatedEndAt: new Date(),
-        durationSeconds: 0,
-        expectedRewards: { locReward: '0', expReward: '0', possibleLoot: [] },
-        error: ProgramError.PROGRAM_LOCKED,
+        success: false,
       };
     }
-    
+
     // 3. Check concurrent program limit
     const userActivePrograms = this.activePrograms.get(userId) || new Set();
     if (userActivePrograms.size >= this.MAX_CONCURRENT_PROGRAMS) {
       return {
-        success: false,
+        durationSeconds: 0,
+        error: ProgramError.NO_AVAILABLE_SLOTS,
+        estimatedEndAt: new Date(),
+        expectedRewards: { expReward: '0', locReward: '0', possibleLoot: [] },
         programSlug,
         startedAt: new Date(),
-        estimatedEndAt: new Date(),
-        durationSeconds: 0,
-        expectedRewards: { locReward: '0', expReward: '0', possibleLoot: [] },
-        error: ProgramError.NO_AVAILABLE_SLOTS,
+        success: false,
       };
     }
-    
+
     // 4. Check if already running this program
     if (userActivePrograms.has(programSlug)) {
       return {
-        success: false,
+        durationSeconds: 0,
+        error: ProgramError.ALREADY_RUNNING,
+        estimatedEndAt: new Date(),
+        expectedRewards: { expReward: '0', locReward: '0', possibleLoot: [] },
         programSlug,
         startedAt: new Date(),
-        estimatedEndAt: new Date(),
-        durationSeconds: 0,
-        expectedRewards: { locReward: '0', expReward: '0', possibleLoot: [] },
-        error: ProgramError.ALREADY_RUNNING,
+        success: false,
       };
     }
-    
+
     // 5. Calculate timing
     const startedAt = new Date();
     const durationMs = programType.baseDurationSecs * 1000;
     const estimatedEndAt = new Date(startedAt.getTime() + durationMs);
-    
+
     // 6. Generate program ID
     const programId = `prog-${userId}-${programSlug}-${Date.now()}`;
-    
+
     // 7. Create delayed BullMQ job
     const jobData: IProgramJobData = {
       programId,
-      userId,
       programSlug,
       startedAt: startedAt.toISOString(),
+      userId,
     };
-    
-    const job = await this.programQueue.add(
-      `program-${programId}`,
-      jobData,
-      {
-        delay: durationMs,
-        jobId: programId, // For cancellation
-        removeOnComplete: true,
-        removeOnFail: false, // Keep for debugging
-      },
-    );
-    
+
+    const job = await this.programQueue.add(`program-${programId}`, jobData, {
+      delay: durationMs,
+      jobId: programId, // For cancellation
+      removeOnComplete: true,
+      removeOnFail: false, // Keep for debugging
+    });
+
     // 8. Track active program
     userActivePrograms.add(programSlug);
     this.activePrograms.set(userId, userActivePrograms);
-    
+
     this.logger.log(
       `Program started: ${programSlug} for user ${userId}, completes in ${programType.baseDurationSecs}s`,
     );
-    
+
     // 9. Calculate expected rewards
     const expectedRewards: IProgramRewards = {
-      locReward: (BigInt(programType.baseReward) * BigInt(Math.floor(programType.rewardMultiplier * 100)) / 100n).toString(),
       expReward: programType.experienceReward,
+      locReward: (
+        (BigInt(programType.baseReward) *
+          BigInt(Math.floor(programType.rewardMultiplier * 100))) /
+        100n
+      ).toString(),
       possibleLoot: programType.lootTable.map((item) => ({
-        itemSlug: item.itemSlug,
-        itemName: item.itemSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
         dropChance: item.dropRate,
-        quantity: { min: item.minQuantity, max: item.maxQuantity },
+        itemName: item.itemSlug
+          .replaceAll('-', ' ')
+          .replaceAll(/\b\w/g, (c) => c.toUpperCase()),
+        itemSlug: item.itemSlug,
+        quantity: { max: item.maxQuantity, min: item.minQuantity },
       })),
     };
-    
+
     return {
-      success: true,
+      durationSeconds: programType.baseDurationSecs,
+      estimatedEndAt,
+      expectedRewards,
       programId,
       programSlug,
       startedAt,
-      estimatedEndAt,
-      durationSeconds: programType.baseDurationSecs,
-      expectedRewards,
+      success: true,
     };
   }
-  
+
   /**
    * Cancel a running program
    */
   async cancelProgram(userId: string, programSlug: string): Promise<boolean> {
     const userActivePrograms = this.activePrograms.get(userId);
-    
-    if (!userActivePrograms || !userActivePrograms.has(programSlug)) {
+
+    if (!userActivePrograms?.has(programSlug)) {
       return false;
     }
-    
+
     // Find and remove the job
     const jobs = await this.programQueue.getJobs(['delayed']);
     for (const job of jobs) {
@@ -275,23 +319,23 @@ export class ProgramProcessorService {
         break;
       }
     }
-    
+
     // Remove from tracking
     userActivePrograms.delete(programSlug);
-    
+
     this.logger.log(`Program cancelled: ${programSlug} for user ${userId}`);
-    
+
     return true;
   }
-  
+
   /**
    * Get active programs for a user
    */
   async getActivePrograms(userId: string): Promise<string[]> {
     const userActivePrograms = this.activePrograms.get(userId);
-    return userActivePrograms ? Array.from(userActivePrograms) : [];
+    return userActivePrograms ? [...userActivePrograms] : [];
   }
-  
+
   /**
    * Remove program from tracking (called after completion)
    */
@@ -301,14 +345,14 @@ export class ProgramProcessorService {
       userActivePrograms.delete(programSlug);
     }
   }
-  
+
   /**
    * Get all available program types
    */
   getProgramTypes(): IProgramType[] {
     return PROGRAM_TYPES;
   }
-  
+
   /**
    * Get program type by slug
    */

@@ -8,7 +8,7 @@
  * 3. Atomically buffer click in Redis
  * 4. Return immediate feedback to client
  * 
- * The buffer is flushed to PostgreSQL by the ClickBufferProcessor
+ * The buffer is flushed to PostgreSQL by the worker-game-loop service
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
