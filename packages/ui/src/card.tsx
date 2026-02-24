@@ -1,16 +1,16 @@
 import { type JSX } from 'react';
 
 export function Card({
-  className,
-  title,
   children,
+  className,
   href,
-}: {
-  className?: string;
-  title: string;
+  title,
+}: Readonly<{
   children: React.ReactNode;
+  className?: string;
   href: string;
-}): JSX.Element {
+  title: string;
+}>): JSX.Element {
   return (
     <a
       className={className}
