@@ -16,12 +16,12 @@ export default function StorePage() {
         setError('');
         try {
             // In a real app, you would pass the item details here
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/payments/create-intent`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/payments/create-intent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    // TODO: Replace with real JWT token from user session
-                    'Authorization': 'Bearer YOUR_TEST_TOKEN',
+                    // NOTE: Add an Authorization header here using the authenticated user's session/JWT
+                    // once your authentication flow is wired up.
                 },
                 body: JSON.stringify({
                     amountCents: 1500, // $15.00

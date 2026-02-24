@@ -1,6 +1,6 @@
-import { Body, Controller, HttpCode, HttpStatus, Logger, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, InternalServerErrorException, Logger, Post, Req } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ProductType } from '@repo/shared-types';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 import { IsEnum, IsInt, IsNotEmpty, IsObject, IsString, Min } from 'class-validator';
 
@@ -24,10 +24,11 @@ export class CreatePaymentIntentDto {
 // @UseGuards(JwtAuthGuard) // TODO: Re-enable when frontend auth is ready
 export class PaymentController {
     private readonly logger = new Logger(PaymentController.name);
+    private readonly paymentServiceUrl: string;
 
-    // Note: Hardcoded for localhost based on your monorepo setup. 
-    // In production, use ConfigService to get the internal payment service URL.
-    private readonly paymentServiceUrl = process.env.PAYMENT_SERVICE_URL || 'http://localhost:3003';
+    constructor(private readonly configService: ConfigService) {
+        this.paymentServiceUrl = this.configService.get<string>('PAYMENT_SERVICE_URL', 'http://localhost:3003');
+    }
 
     @Post('create-intent')
     @HttpCode(HttpStatus.OK)
@@ -58,14 +59,17 @@ export class PaymentController {
                     const errBody = await response.json();
                     errorMsg = errBody.message || errorMsg;
                 } catch (e) { }
-                throw new Error(errorMsg);
+                throw new InternalServerErrorException(errorMsg);
             }
 
             const data = await response.json();
             return data;
         } catch (error) {
             this.logger.error(`Failed to create payment intent: ${error}`);
-            throw error;
+            if (error instanceof InternalServerErrorException) {
+                throw error;
+            }
+            throw new InternalServerErrorException('Failed to process payment request');
         }
     }
 }
