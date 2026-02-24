@@ -10,10 +10,9 @@ RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
-RUN pnpm install -g turbo
 
 COPY . .
-RUN turbo prune @app/svc-payment --docker
+RUN pnpm dlx turbo prune @app/svc-payment --docker
 
 # ============================================================================
 # INSTALL & BUILD STAGE

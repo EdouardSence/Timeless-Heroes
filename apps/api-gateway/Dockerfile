@@ -10,10 +10,9 @@ RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
-RUN pnpm install -g turbo
 
 COPY . .
-RUN turbo prune @app/api-gateway --docker
+RUN pnpm dlx turbo prune @app/api-gateway --docker
 
 # ============================================================================
 # INSTALL & BUILD STAGE
