@@ -1,48 +1,57 @@
 # Dockerfile for svc-user-progression
+# Multi-stage build using turbo prune for optimized Docker images
 
+# ============================================================================
+# PRUNE STAGE - Generate pruned monorepo subset
+# ============================================================================
 FROM node:20-alpine AS builder
 
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+RUN pnpm install -g turbo
+
+COPY . .
+RUN turbo prune @app/svc-user-progression --docker
+
+# ============================================================================
+# INSTALL & BUILD STAGE
+# ============================================================================
+FROM node:20-alpine AS installer
+
+RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
 
 RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
 
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-COPY turbo.json ./
-
-COPY apps/svc-user-progression/package.json ./apps/svc-user-progression/
-COPY packages/prisma-client/package.json ./packages/prisma-client/
-COPY packages/redis-client/package.json ./packages/redis-client/
-COPY packages/shared-types/package.json ./packages/shared-types/
-COPY packages/typescript-config/package.json ./packages/typescript-config/
-COPY packages/eslint-config/package.json ./packages/eslint-config/
-
+# Install dependencies from pruned lockfile (better Docker cache)
+COPY --from=builder /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 
-COPY packages ./packages
-COPY apps/svc-user-progression ./apps/svc-user-progression
+# Copy full source and build
+COPY --from=builder /app/out/full/ .
 
-WORKDIR /app/packages/prisma-client
-RUN pnpm run generate
+# Generate Prisma client
+RUN pnpm -F @repo/prisma-client generate
 
-WORKDIR /app
+# Build the application
 RUN pnpm run build --filter=@app/svc-user-progression
 
+# ============================================================================
+# PRODUCTION STAGE
+# ============================================================================
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nestjs
 
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/svc-user-progression/dist ./apps/svc-user-progression/dist
-COPY --from=builder /app/apps/svc-user-progression/package.json ./apps/svc-user-progression/
-COPY --from=builder /app/packages ./packages
-
-RUN chown -R nestjs:nodejs /app
+COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-user-progression/dist ./apps/svc-user-progression/dist
+COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-user-progression/package.json ./apps/svc-user-progression/
+COPY --from=installer --chown=nestjs:nodejs /app/packages ./packages
 
 USER nestjs
 
