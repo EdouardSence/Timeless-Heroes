@@ -15,6 +15,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 import { NATS_SERVICE } from '@repo/shared-types';
+import { validate } from './config/env.validation';
 import { AuthModule } from './auth/auth.module';
 import { ClickProcessorModule } from './click-processor/click-processor.module';
 import { GameGatewayModule } from './gateway/game-gateway.module';
@@ -24,10 +25,11 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
 
 @Module({
   imports: [
-    // Configuration
+    // Configuration with validation - fails fast if required env vars missing
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
+      validate,
     }),
 
     // ── NATS ClientProxy — transport-agnostic microservice communication ──
