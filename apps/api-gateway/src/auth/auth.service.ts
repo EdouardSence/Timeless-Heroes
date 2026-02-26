@@ -110,7 +110,7 @@ export class AuthService {
       data: {
         userId: newUser.id,
         linesOfCode: 0,
-        totalKeyPresses: BigInt(0),
+        totalClicks: BigInt(0),
         level: 1,
         experience: 0,
         experienceToNext: 100,
