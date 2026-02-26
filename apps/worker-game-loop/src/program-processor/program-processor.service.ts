@@ -19,6 +19,7 @@ import {
   ProgramError,
   QueueName,
 } from '@repo/shared-types';
+import { prisma } from '@repo/prisma-client';
 import { Queue } from 'bullmq';
 
 interface IProgramType {
@@ -168,8 +169,7 @@ interface IProgramJobData {
 export class ProgramProcessorService {
   private readonly logger = new Logger(ProgramProcessorService.name);
 
-  // Track active programs per user (in production, use Redis)
-  private activePrograms = new Map<string, Set<string>>();
+  // Using Prisma ActiveProgram model instead of in-memory Map
   private readonly MAX_CONCURRENT_PROGRAMS = 3;
 
   constructor(
@@ -185,10 +185,10 @@ export class ProgramProcessorService {
   ): Promise<IStartProgramResult> {
     const { programSlug, userId } = request;
 
-    // 1. Find the program type
-    const programType = PROGRAM_TYPES.find((p) => p.slug === programSlug);
+    // 1. Find the program type definition
+    const programTypeDef = PROGRAM_TYPES.find((p) => p.slug === programSlug);
 
-    if (!programType) {
+    if (!programTypeDef) {
       return {
         durationSeconds: 0,
         error: ProgramError.PROGRAM_NOT_FOUND,
@@ -200,9 +200,13 @@ export class ProgramProcessorService {
       };
     }
 
-    // 2. Check user level (mock for now)
-    const userLevel = 1; // TODO: Get from progression service
-    if (userLevel < programType.unlockLevel) {
+    // 2. Check user level from progression DB
+    const progression = await prisma.progression.findUnique({
+      where: { userId },
+    });
+    const userLevel = progression?.level ?? 1;
+    
+    if (userLevel < programTypeDef.unlockLevel) {
       return {
         durationSeconds: 0,
         error: ProgramError.PROGRAM_LOCKED,
@@ -214,9 +218,15 @@ export class ProgramProcessorService {
       };
     }
 
-    // 3. Check concurrent program limit
-    const userActivePrograms = this.activePrograms.get(userId) || new Set();
-    if (userActivePrograms.size >= this.MAX_CONCURRENT_PROGRAMS) {
+    // 3. Get active programs count from DB
+    const activeCount = await prisma.activeProgram.count({
+      where: { 
+        userId, 
+        status: 'RUNNING',
+      },
+    });
+    
+    if (activeCount >= this.MAX_CONCURRENT_PROGRAMS) {
       return {
         durationSeconds: 0,
         error: ProgramError.NO_AVAILABLE_SLOTS,
@@ -228,8 +238,34 @@ export class ProgramProcessorService {
       };
     }
 
-    // 4. Check if already running this program
-    if (userActivePrograms.has(programSlug)) {
+    // 4. Check if already running this program (via programType slug)
+    // First ensure programType exists in DB
+    const programType = await prisma.programType.upsert({
+      where: { slug: programSlug },
+      create: {
+        slug: programSlug,
+        name: programTypeDef.name,
+        description: programTypeDef.description,
+        category: 'CODING',
+        baseDurationSeconds: programTypeDef.baseDurationSecs,
+        baseReward: programTypeDef.baseReward,
+        experienceReward: programTypeDef.experienceReward,
+        rewardMultiplier: programTypeDef.rewardMultiplier,
+        unlockLevel: programTypeDef.unlockLevel,
+        lootTable: programTypeDef.lootTable,
+      },
+      update: {},
+    });
+    
+    const alreadyRunning = await prisma.activeProgram.findFirst({
+      where: {
+        userId,
+        programTypeId: programType.id,
+        status: 'RUNNING',
+      },
+    });
+    
+    if (alreadyRunning) {
       return {
         durationSeconds: 0,
         error: ProgramError.ALREADY_RUNNING,
@@ -243,7 +279,7 @@ export class ProgramProcessorService {
 
     // 5. Calculate timing
     const startedAt = new Date();
-    const durationMs = programType.baseDurationSecs * 1000;
+    const durationMs = programTypeDef.baseDurationSecs * 1000;
     const estimatedEndAt = new Date(startedAt.getTime() + durationMs);
 
     // 6. Generate program ID
@@ -257,30 +293,38 @@ export class ProgramProcessorService {
       userId,
     };
 
-    const job = await this.programQueue.add(`program-${programId}`, jobData, {
+    await this.programQueue.add(`program-${programId}`, jobData, {
       delay: durationMs,
       jobId: programId, // For cancellation
       removeOnComplete: true,
       removeOnFail: false, // Keep for debugging
     });
 
-    // 8. Track active program
-    userActivePrograms.add(programSlug);
-    this.activePrograms.set(userId, userActivePrograms);
+    // 8. Track active program in DB
+    await prisma.activeProgram.create({
+      data: {
+        userId,
+        programTypeId: programType.id,
+        startedAt,
+        estimatedEndAt,
+        status: 'RUNNING',
+        bullJobId: programId,
+      },
+    });
 
     this.logger.log(
-      `Program started: ${programSlug} for user ${userId}, completes in ${programType.baseDurationSecs}s`,
+      `Program started: ${programSlug} for user ${userId}, completes in ${programTypeDef.baseDurationSecs}s`,
     );
 
     // 9. Calculate expected rewards
     const expectedRewards: IProgramRewards = {
-      expReward: programType.experienceReward,
+      expReward: programTypeDef.experienceReward,
       locReward: (
-        (BigInt(programType.baseReward) *
-          BigInt(Math.floor(programType.rewardMultiplier * 100))) /
+        (BigInt(programTypeDef.baseReward) *
+          BigInt(Math.floor(programTypeDef.rewardMultiplier * 100))) /
         100n
       ).toString(),
-      possibleLoot: programType.lootTable.map((item) => ({
+      possibleLoot: programTypeDef.lootTable.map((item) => ({
         dropChance: item.dropRate,
         itemName: item.itemSlug
           .replaceAll('-', ' ')
@@ -291,7 +335,7 @@ export class ProgramProcessorService {
     };
 
     return {
-      durationSeconds: programType.baseDurationSecs,
+      durationSeconds: programTypeDef.baseDurationSecs,
       estimatedEndAt,
       expectedRewards,
       programId,
@@ -305,23 +349,39 @@ export class ProgramProcessorService {
    * Cancel a running program
    */
   async cancelProgram(userId: string, programSlug: string): Promise<boolean> {
-    const userActivePrograms = this.activePrograms.get(userId);
+    // Find the active program in DB
+    const activeProgram = await prisma.activeProgram.findFirst({
+      where: {
+        userId,
+        programType: { slug: programSlug },
+        status: 'RUNNING',
+      },
+    });
 
-    if (!userActivePrograms?.has(programSlug)) {
+    if (!activeProgram) {
       return false;
     }
 
-    // Find and remove the job
-    const jobs = await this.programQueue.getJobs(['delayed']);
-    for (const job of jobs) {
-      if (job.data.userId === userId && job.data.programSlug === programSlug) {
-        await job.remove();
-        break;
+    // Remove the BullMQ job if it exists
+    if (activeProgram.bullJobId) {
+      try {
+        const job = await this.programQueue.getJob(activeProgram.bullJobId);
+        if (job) {
+          await job.remove();
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to remove job ${activeProgram.bullJobId}: ${err}`);
       }
     }
 
-    // Remove from tracking
-    userActivePrograms.delete(programSlug);
+    // Update status in DB
+    await prisma.activeProgram.update({
+      where: { id: activeProgram.id },
+      data: { 
+        status: 'CANCELLED',
+        completedAt: new Date(),
+      },
+    });
 
     this.logger.log(`Program cancelled: ${programSlug} for user ${userId}`);
 
@@ -332,18 +392,32 @@ export class ProgramProcessorService {
    * Get active programs for a user
    */
   async getActivePrograms(userId: string): Promise<string[]> {
-    const userActivePrograms = this.activePrograms.get(userId);
-    return userActivePrograms ? [...userActivePrograms] : [];
+    const activePrograms = await prisma.activeProgram.findMany({
+      where: {
+        userId,
+        status: 'RUNNING',
+      },
+      include: { programType: true },
+    });
+    
+    return activePrograms.map((ap) => ap.programType.slug);
   }
 
   /**
    * Remove program from tracking (called after completion)
    */
-  markProgramCompleted(userId: string, programSlug: string): void {
-    const userActivePrograms = this.activePrograms.get(userId);
-    if (userActivePrograms) {
-      userActivePrograms.delete(programSlug);
-    }
+  async markProgramCompleted(userId: string, programSlug: string): Promise<void> {
+    await prisma.activeProgram.updateMany({
+      where: {
+        userId,
+        programType: { slug: programSlug },
+        status: 'RUNNING',
+      },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+      },
+    });
   }
 
   /**

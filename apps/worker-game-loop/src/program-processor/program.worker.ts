@@ -100,8 +100,8 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
     }
     */
     
-    // 5. Mark program as completed
-    this.programProcessor.markProgramCompleted(userId, programSlug);
+    // 5. Mark program as completed in DB
+    await this.programProcessor.markProgramCompleted(userId, programSlug);
     
     // 6. Create completion payload
     const completedAt = new Date();
