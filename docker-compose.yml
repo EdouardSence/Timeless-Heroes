@@ -123,11 +123,8 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    volumes:
-      - ./apps/api-gateway:/app/apps/api-gateway:delegated
-      - ./packages:/app/packages:delegated
-      - /app/node_modules
-      - /app/apps/api-gateway/node_modules
+    # Note: Volume mounts removed for production build
+    # For hot-reload development, run services locally with `pnpm dev`
   
   svc-user-progression:
     build:
@@ -152,11 +149,6 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    volumes:
-      - ./apps/svc-user-progression:/app/apps/svc-user-progression:delegated
-      - ./packages:/app/packages:delegated
-      - /app/node_modules
-      - /app/apps/svc-user-progression/node_modules
   
   worker-game-loop:
     build:
@@ -179,11 +171,6 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    volumes:
-      - ./apps/worker-game-loop:/app/apps/worker-game-loop:delegated
-      - ./packages:/app/packages:delegated
-      - /app/node_modules
-      - /app/apps/worker-game-loop/node_modules
   
   svc-payment:
     build:
@@ -210,11 +197,6 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    volumes:
-      - ./apps/svc-payment:/app/apps/svc-payment:delegated
-      - ./packages:/app/packages:delegated
-      - /app/node_modules
-      - /app/apps/svc-payment/node_modules
 
 volumes:
   postgres_data:
