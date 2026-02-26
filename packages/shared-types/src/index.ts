@@ -20,6 +20,9 @@ export const NatsPattern = {
   PROGRESSION_GET_RANKS: 'progression.getRanks',
   PROGRESSION_CALCULATE_COST: 'progression.calculateCost',
 
+  // ── Shop Catalog ──
+  SHOP_GET_CATALOG: 'shop.getCatalog',
+
   // ── Payment Service ──
   PAYMENT_CREATE_INTENT: 'payment.createIntent',
   PAYMENT_PROVISION: 'payment.provision',
@@ -48,6 +51,7 @@ export const WebSocketEvent = {
   START_PROGRAM: 'START_PROGRAM',
   CANCEL_PROGRAM: 'CANCEL_PROGRAM',
   CLAIM_OFFLINE_REWARDS: 'CLAIM_OFFLINE_REWARDS',
+  GET_SHOP_CATALOG: 'GET_SHOP_CATALOG',
 
   // Server -> Client
   CLICK_PROCESSED: 'CLICK_PROCESSED',
@@ -58,6 +62,7 @@ export const WebSocketEvent = {
   ACHIEVEMENT_UNLOCKED: 'ACHIEVEMENT_UNLOCKED',
   LEADERBOARD_UPDATE: 'LEADERBOARD_UPDATE',
   OFFLINE_REWARDS: 'OFFLINE_REWARDS',
+  SHOP_CATALOG: 'SHOP_CATALOG',
   ERROR: 'ERROR',
 } as const;
 
@@ -466,3 +471,105 @@ export interface IPaginatedResponse<T> extends IApiResponse<T[]> {
     totalPages: number;
   };
 }
+
+// ============================================================================
+// SHOP ITEMS CATALOG (Single Source of Truth)
+// ============================================================================
+
+export interface IShopItem {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  baseCost: number;
+  costMultiplier: number;
+  effect: {
+    type: 'click' | 'passive' | 'multiplier';
+    value: number;
+  };
+  unlockLevel: number;
+  maxQuantity?: number;
+}
+
+export const SHOP_ITEMS: IShopItem[] = [
+  {
+    id: 'mechanical-keyboard',
+    name: 'Clavier Mécanique',
+    description: '+1 LoC par frappe',
+    icon: '⌨️',
+    baseCost: 100,
+    costMultiplier: 1.15,
+    effect: { type: 'click', value: 1 },
+    unlockLevel: 1,
+  },
+  {
+    id: 'monitor-4k',
+    name: 'Écran 4K',
+    description: '+2 LoC par frappe',
+    icon: '🖥️',
+    baseCost: 500,
+    costMultiplier: 1.15,
+    effect: { type: 'click', value: 2 },
+    unlockLevel: 3,
+  },
+  {
+    id: 'coffee-machine',
+    name: 'Machine à Café',
+    description: '+10% multiplicateur',
+    icon: '☕',
+    baseCost: 2500,
+    costMultiplier: 1.2,
+    effect: { type: 'multiplier', value: 0.1 },
+    unlockLevel: 7,
+  },
+  {
+    id: 'junior-dev',
+    name: 'Dev Junior',
+    description: '+0.5 keys/sec auto',
+    icon: '👨‍💻',
+    baseCost: 1000,
+    costMultiplier: 1.15,
+    effect: { type: 'passive', value: 0.5 },
+    unlockLevel: 5,
+  },
+  {
+    id: 'senior-dev',
+    name: 'Dev Senior',
+    description: '+5 keys/sec auto',
+    icon: '👩‍💻',
+    baseCost: 10000,
+    costMultiplier: 1.15,
+    effect: { type: 'passive', value: 5 },
+    unlockLevel: 10,
+  },
+  {
+    id: 'cloud-server',
+    name: 'Serveur Cloud',
+    description: '+50 keys/sec auto',
+    icon: '☁️',
+    baseCost: 50000,
+    costMultiplier: 1.15,
+    effect: { type: 'passive', value: 50 },
+    unlockLevel: 15,
+  },
+  {
+    id: 'ai-copilot',
+    name: 'AI Copilot',
+    description: '+200 keys/sec auto',
+    icon: '🤖',
+    baseCost: 250000,
+    costMultiplier: 1.15,
+    effect: { type: 'passive', value: 200 },
+    unlockLevel: 20,
+  },
+  {
+    id: 'quantum-computer',
+    name: 'Ordinateur Quantique',
+    description: 'x2 multiplicateur global',
+    icon: '⚛️',
+    baseCost: 1000000,
+    costMultiplier: 1.25,
+    effect: { type: 'multiplier', value: 1.0 },
+    unlockLevel: 25,
+  },
+];

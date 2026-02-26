@@ -3,93 +3,19 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { SHOP_ITEMS as SHOP_CATALOG, IShopItem } from '@repo/shared-types';
 import type { GameState } from '../types/electron';
 import './Menu.css';
 
-interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  baseCost: number;
+interface ShopItemWithOwned extends IShopItem {
   owned: number;
-  effect: { type: 'multiplier' | 'passive' | 'click'; value: number };
 }
 
-const SHOP_ITEMS: ShopItem[] = [
-  {
-    id: 'mechanical-keyboard',
-    name: 'Clavier Mécanique',
-    description: '+1 LoC par frappe',
-    icon: '⌨️',
-    baseCost: 100,
-    owned: 0,
-    effect: { type: 'click', value: 1 },
-  },
-  {
-    id: 'monitor-4k',
-    name: 'Écran 4K',
-    description: '+2 LoC par frappe',
-    icon: '🖥️',
-    baseCost: 500,
-    owned: 0,
-    effect: { type: 'click', value: 2 },
-  },
-  {
-    id: 'coffee-machine',
-    name: 'Machine à Café',
-    description: '+10% multiplicateur',
-    icon: '☕',
-    baseCost: 2500,
-    owned: 0,
-    effect: { type: 'multiplier', value: 0.1 },
-  },
-  {
-    id: 'junior-dev',
-    name: 'Dev Junior',
-    description: '+0.5 keys/sec auto',
-    icon: '👨‍💻',
-    baseCost: 1000,
-    owned: 0,
-    effect: { type: 'passive', value: 0.5 },
-  },
-  {
-    id: 'senior-dev',
-    name: 'Dev Senior',
-    description: '+5 keys/sec auto',
-    icon: '👩‍💻',
-    baseCost: 10000,
-    owned: 0,
-    effect: { type: 'passive', value: 5 },
-  },
-  {
-    id: 'cloud-server',
-    name: 'Serveur Cloud',
-    description: '+50 keys/sec auto',
-    icon: '☁️',
-    baseCost: 50000,
-    owned: 0,
-    effect: { type: 'passive', value: 50 },
-  },
-  {
-    id: 'ai-copilot',
-    name: 'AI Copilot',
-    description: '+200 keys/sec auto',
-    icon: '🤖',
-    baseCost: 250000,
-    owned: 0,
-    effect: { type: 'passive', value: 200 },
-  },
-  {
-    id: 'quantum-computer',
-    name: 'Ordinateur Quantique',
-    description: 'x2 multiplicateur global',
-    icon: '⚛️',
-    baseCost: 1000000,
-    owned: 0,
-    effect: { type: 'multiplier', value: 1.0 },
-  },
-];
+// Initialize shop items from shared catalog
+const SHOP_ITEMS: ShopItemWithOwned[] = SHOP_CATALOG.map((item) => ({
+  ...item,
+  owned: 0,
+}));
 
 function formatNumber(num: number): string {
   if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B';
@@ -113,7 +39,7 @@ export default function Menu() {
     passiveRate: 0.0,
   });
 
-  const [items, setItems] = useState<ShopItem[]>(SHOP_ITEMS);
+  const [items, setItems] = useState<ShopItemWithOwned[]>(SHOP_ITEMS);
   const [activeTab, setActiveTab] = useState<'shop' | 'stats' | 'leaderboard'>(
     'shop',
   );

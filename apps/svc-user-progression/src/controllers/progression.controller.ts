@@ -195,4 +195,57 @@ export class ProgressionController {
       timestamp: new Date().toISOString(),
     };
   }
+
+  // ── NATS: Get shop catalog ────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.SHOP_GET_CATALOG)
+  getShopCatalog() {
+    const items = this.progressionService.getShopCatalog();
+    
+    return {
+      success: true,
+      data: items.map((item) => ({
+        id: item.slug,
+        name: item.name,
+        description: this.getItemDescription(item),
+        icon: this.getItemIcon(item.slug),
+        baseCost: parseInt(item.baseCost, 10),
+        costMultiplier: item.costMultiplier,
+        effect: {
+          type: item.effectType === 'CLICK_BONUS' ? 'click' :
+                item.effectType === 'PASSIVE_BONUS' ? 'passive' : 'multiplier',
+          value: item.baseEffect,
+        },
+        unlockLevel: item.unlockLevel,
+      })),
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  private getItemDescription(item: { effectType: string; baseEffect: number }): string {
+    switch (item.effectType) {
+      case 'CLICK_BONUS':
+        return `+${item.baseEffect} LoC par frappe`;
+      case 'PASSIVE_BONUS':
+        return `+${item.baseEffect} keys/sec auto`;
+      case 'CLICK_MULTIPLIER':
+        return `+${Math.round(item.baseEffect * 100)}% multiplicateur`;
+      default:
+        return 'Effect unknown';
+    }
+  }
+
+  private getItemIcon(slug: string): string {
+    const icons: Record<string, string> = {
+      'mechanical-keyboard': '⌨️',
+      'monitor-4k': '🖥️',
+      'coffee-machine': '☕',
+      'junior-dev': '👨‍💻',
+      'senior-dev': '👩‍💻',
+      'cloud-server': '☁️',
+      'ai-copilot': '🤖',
+      'quantum-computer': '⚛️',
+    };
+    return icons[slug] || '📦';
+  }
 }

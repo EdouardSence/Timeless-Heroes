@@ -12,6 +12,7 @@ import {
     IItemPurchaseResult,
     IProgressionData,
     ItemPurchaseError,
+    SHOP_ITEMS,
 } from '@repo/shared-types';
 import { prisma, Progression, OwnedItem } from '@repo/prisma-client';
 import { ItemCostCalculatorService } from './item-cost-calculator.service';
@@ -32,63 +33,18 @@ interface IItem {
 export class ProgressionService {
   private readonly logger = new Logger(ProgressionService.name);
   
-  // Hardcoded items for now (in production, from DB)
-  private readonly ITEMS: IItem[] = [
-    {
-      slug: 'mechanical-keyboard',
-      name: 'Mechanical Keyboard',
-      baseCost: '100',
-      costMultiplier: 1.15,
-      baseEffect: 1,
-      effectType: 'CLICK_BONUS',
-      unlockLevel: 1,
-    },
-    {
-      slug: 'monitor-4k',
-      name: '4K Monitor',
-      baseCost: '500',
-      costMultiplier: 1.15,
-      baseEffect: 2,
-      effectType: 'CLICK_BONUS',
-      unlockLevel: 3,
-    },
-    {
-      slug: 'junior-dev',
-      name: 'Junior Developer',
-      baseCost: '1000',
-      costMultiplier: 1.15,
-      baseEffect: 0.5,
-      effectType: 'PASSIVE_BONUS',
-      unlockLevel: 5,
-    },
-    {
-      slug: 'senior-dev',
-      name: 'Senior Developer',
-      baseCost: '10000',
-      costMultiplier: 1.15,
-      baseEffect: 5,
-      effectType: 'PASSIVE_BONUS',
-      unlockLevel: 10,
-    },
-    {
-      slug: 'coffee-machine',
-      name: 'Coffee Machine',
-      baseCost: '2500',
-      costMultiplier: 1.2,
-      baseEffect: 0.1,
-      effectType: 'CLICK_MULTIPLIER',
-      unlockLevel: 7,
-    },
-    {
-      slug: 'cloud-server',
-      name: 'Cloud Server',
-      baseCost: '50000',
-      costMultiplier: 1.15,
-      baseEffect: 50,
-      effectType: 'PASSIVE_BONUS',
-      unlockLevel: 15,
-    },
-  ];
+  // Derive items from shared catalog (single source of truth)
+  private readonly ITEMS: IItem[] = SHOP_ITEMS.map((item) => ({
+    slug: item.id,
+    name: item.name,
+    baseCost: item.baseCost.toString(),
+    costMultiplier: item.costMultiplier,
+    baseEffect: item.effect.value,
+    effectType: item.effect.type === 'click' ? 'CLICK_BONUS' :
+                item.effect.type === 'passive' ? 'PASSIVE_BONUS' : 'CLICK_MULTIPLIER',
+    unlockLevel: item.unlockLevel,
+    maxQuantity: item.maxQuantity,
+  }));
   
   constructor(
     private readonly costCalculator: ItemCostCalculatorService,
@@ -576,5 +532,13 @@ export class ProgressionService {
           canAfford: balance.gte(nextCost),
         };
       });
+  }
+
+  /**
+   * Get shop catalog (all items, regardless of user)
+   * Returns item definitions that can be displayed in the shop UI
+   */
+  getShopCatalog(): IItem[] {
+    return this.ITEMS;
   }
 }

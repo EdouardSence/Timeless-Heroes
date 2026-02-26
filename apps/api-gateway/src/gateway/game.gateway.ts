@@ -278,6 +278,26 @@ export class GameGateway
   }
 
   /**
+   * Get shop catalog from progression service
+   */
+  @SubscribeMessage(WebSocketEvent.GET_SHOP_CATALOG)
+  async handleGetShopCatalog(
+    @ConnectedSocket() client: IAuthenticatedSocket,
+  ) {
+    try {
+      const result = await firstValueFrom(
+        this.progressionClient.send(NatsPattern.SHOP_GET_CATALOG, {}),
+      );
+
+      client.emit(WebSocketEvent.SHOP_CATALOG, result);
+      return result;
+    } catch (error) {
+      this.logger.error('Failed to fetch shop catalog:', error);
+      return { success: false, error: 'Failed to fetch shop catalog' };
+    }
+  }
+
+  /**
    * Send initial game data to newly connected client
    */
   private async sendInitialData(client: IAuthenticatedSocket): Promise<void> {
