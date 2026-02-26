@@ -37,6 +37,12 @@ RUN pnpm -F @repo/prisma-client generate
 # Build shared-types first (required by all services)
 RUN pnpm run build --filter=@repo/shared-types
 
+# Build prisma-client
+RUN pnpm run build --filter=@repo/prisma-client
+
+# Build redis-client
+RUN pnpm run build --filter=@repo/redis-client
+
 # Build the application
 RUN pnpm run build --filter=@app/api-gateway
 
