@@ -12,6 +12,7 @@
  */
 
 import { Inject, Logger, UseGuards } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import {
   ConnectedSocket,
   MessageBody,
@@ -23,6 +24,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 import { Server } from 'socket.io';
 
 import { LeaderboardService, RedisKeys } from '@repo/redis-client';
@@ -32,6 +34,8 @@ import {
   ILeaderboardUpdate,
   IProgressionData,
   LeaderboardType,
+  NATS_SERVICE,
+  NatsPattern,
   WebSocketEvent,
 } from '@repo/shared-types';
 import { AuthService } from '../auth/auth.service';
@@ -60,6 +64,7 @@ export class GameGateway
     private readonly leaderboardService: LeaderboardService,
     private readonly authService: AuthService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
   ) { }
 
   afterInit() {
@@ -197,13 +202,14 @@ export class GameGateway
       return { error: validation.reason || 'Click rejected' };
     }
 
-    // 2. Get user progression (cached)
+    // 2. Get user progression (cached or from microservice)
     let progression = await this.clickProcessor.getProgressionCached(userId);
 
     if (!progression) {
-      // Create default progression for new users
-      // In production, this would fetch from the progression service
-      progression = this.getDefaultProgression(userId);
+      // Fetch from progression microservice via NATS
+      progression = await firstValueFrom(
+        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+      );
       await this.clickProcessor.cacheProgression(progression);
     }
 
@@ -279,11 +285,14 @@ export class GameGateway
     const userId = client.userId;
     if (!userId) return;
 
-    // Get or create progression
+    // Get or create progression from microservice
     let progression = await this.clickProcessor.getProgressionCached(userId);
 
     if (!progression) {
-      progression = this.getDefaultProgression(userId);
+      // Fetch from progression microservice via NATS
+      progression = await firstValueFrom(
+        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+      );
       await this.clickProcessor.cacheProgression(progression);
     }
 
@@ -370,22 +379,6 @@ export class GameGateway
 
     // Clear the disconnect timestamp
     await this.redis.del(`offline:disconnect:${userId}`);
-  }
-
-  /**
-   * Get default progression for new users
-   */
-  private getDefaultProgression(userId: string): IProgressionData {
-    return {
-      userId,
-      linesOfCode: '0',
-      level: 1,
-      experience: '0',
-      clickMultiplier: 1.0,
-      passiveMultiplier: 0.0,
-      criticalChance: 0.05,
-      criticalMultiplier: 2.0,
-    };
   }
 
   /**
