@@ -111,7 +111,7 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required - set it in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       MAX_CPS: ${MAX_CPS:-20}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
