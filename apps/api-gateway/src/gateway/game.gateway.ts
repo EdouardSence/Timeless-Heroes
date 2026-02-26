@@ -43,6 +43,7 @@ import { IAuthenticatedSocket, WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ClickProcessorService } from '../click-processor/click-processor.service';
 import { ClickValidatorService } from '../click-processor/click-validator.service';
 
+@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -166,7 +167,6 @@ export class GameGateway
   /**
    * Handle KEY_PRESS event (main click handler)
    */
-  @UseGuards(WsJwtGuard)
   @SubscribeMessage(WebSocketEvent.KEY_PRESS)
   async handleKeyPress(
     @ConnectedSocket() client: IAuthenticatedSocket,
@@ -228,7 +228,6 @@ export class GameGateway
   /**
    * Get leaderboard data
    */
-  @UseGuards(WsJwtGuard)
   @SubscribeMessage('GET_LEADERBOARD')
   async handleGetLeaderboard(
     @ConnectedSocket() client: IAuthenticatedSocket,
