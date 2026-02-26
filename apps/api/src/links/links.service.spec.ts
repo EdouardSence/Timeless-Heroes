@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { CreateLinkDto } from '@repo/api';
 import { LinksService } from './links.service';
 
 describe('LinksService', () => {
@@ -19,7 +20,7 @@ describe('LinksService', () => {
 
   describe('create (escapeHtml)', () => {
     const createResult = (title: string | null | undefined) =>
-      service.create({ title } as any);
+      service.create({ title } as Pick<CreateLinkDto, 'title'> as CreateLinkDto);
 
     it('should return the title unmodified when no special characters', () => {
       expect(createResult('My Link')).toContain("'My Link'");

@@ -10,6 +10,15 @@ import { Socket } from 'socket.io';
 
 import { IJwtPayload } from './jwt.strategy';
 
+/**
+ * Extended Socket interface with authenticated user data
+ */
+export interface IAuthenticatedSocket extends Socket {
+  userId?: string;
+  email?: string;
+  username?: string;
+}
+
 @Injectable()
 export class WsJwtGuard implements CanActivate {
   private readonly logger = new Logger(WsJwtGuard.name);
@@ -18,7 +27,7 @@ export class WsJwtGuard implements CanActivate {
   
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      const client: Socket = context.switchToWs().getClient();
+      const client = context.switchToWs().getClient<IAuthenticatedSocket>();
       const token = this.extractToken(client);
       
       if (!token) {
@@ -28,9 +37,9 @@ export class WsJwtGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync<IJwtPayload>(token);
       
       // Attach user info to socket for later use
-      (client as any).userId = payload.sub;
-      (client as any).email = payload.email;
-      (client as any).username = payload.username;
+      client.userId = payload.sub;
+      client.email = payload.email;
+      client.username = payload.username;
       
       return true;
     } catch (error) {

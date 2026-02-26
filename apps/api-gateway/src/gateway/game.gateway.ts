@@ -11,7 +11,7 @@
  * - Offline rewards
  */
 
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, UseGuards } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -23,7 +23,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import Redis from 'ioredis';
-import { Server, Socket } from 'socket.io';
+import { Server } from 'socket.io';
 
 import { LeaderboardService, RedisKeys } from '@repo/redis-client';
 import {
@@ -34,13 +34,10 @@ import {
   LeaderboardType,
   WebSocketEvent,
 } from '@repo/shared-types';
+import { AuthService } from '../auth/auth.service';
+import { IAuthenticatedSocket, WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ClickProcessorService } from '../click-processor/click-processor.service';
 import { ClickValidatorService } from '../click-processor/click-validator.service';
-
-interface IAuthenticatedSocket extends Socket {
-  userId?: string;
-  username?: string;
-}
 
 @WebSocketGateway({
   cors: {
@@ -61,6 +58,7 @@ export class GameGateway
     private readonly clickProcessor: ClickProcessorService,
     private readonly clickValidator: ClickValidatorService,
     private readonly leaderboardService: LeaderboardService,
+    private readonly authService: AuthService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) { }
 
@@ -70,23 +68,33 @@ export class GameGateway
 
   /**
    * Handle new client connection
+   * Verifies JWT token and rejects unauthenticated clients
    */
   async handleConnection(client: IAuthenticatedSocket) {
     try {
-      // Extract and verify JWT from handshake
-      const token = client.handshake.auth?.token || client.handshake.headers?.authorization;
+      // Extract token from handshake (auth object, header, or query)
+      const rawToken =
+        client.handshake.auth?.token ||
+        client.handshake.headers?.authorization ||
+        (client.handshake.query?.token as string);
 
-      if (!token) {
-        this.logger.warn(`Client ${client.id} connected without auth token`);
-        // Allow connection but mark as unauthenticated
-        // In production, you might want to disconnect
+      if (!rawToken) {
+        this.logger.warn(`Client ${client.id} rejected: no auth token`);
+        client.emit(WebSocketEvent.ERROR, { code: 'AUTH_REQUIRED', message: 'JWT token required' });
+        client.disconnect(true);
         return;
       }
 
-      // TODO: Verify JWT and extract user info
-      // For now, use a mock user ID from the token
-      const userId = client.handshake.auth?.userId || 'anonymous';
-      const username = client.handshake.auth?.username || 'Player';
+      // Strip "Bearer " prefix if present
+      const token = typeof rawToken === 'string' && rawToken.startsWith('Bearer ')
+        ? rawToken.slice(7)
+        : rawToken;
+
+      // Verify JWT and extract payload
+      const payload = await this.authService.verifyToken(token as string);
+
+      const userId = payload.sub;
+      const username = payload.username || 'Player';
 
       client.userId = userId;
       client.username = username;
@@ -119,7 +127,9 @@ export class GameGateway
       await this.calculateOfflineRewards(client);
 
     } catch (error) {
-      this.logger.error(`Connection error: ${error}`);
+      this.logger.warn(`Client ${client.id} rejected: invalid token — ${error}`);
+      client.emit(WebSocketEvent.ERROR, { code: 'AUTH_FAILED', message: 'Invalid or expired JWT token' });
+      client.disconnect(true);
     }
   }
 
@@ -151,6 +161,7 @@ export class GameGateway
   /**
    * Handle KEY_PRESS event (main click handler)
    */
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage(WebSocketEvent.KEY_PRESS)
   async handleKeyPress(
     @ConnectedSocket() client: IAuthenticatedSocket,
@@ -211,6 +222,7 @@ export class GameGateway
   /**
    * Get leaderboard data
    */
+  @UseGuards(WsJwtGuard)
   @SubscribeMessage('GET_LEADERBOARD')
   async handleGetLeaderboard(
     @ConnectedSocket() client: IAuthenticatedSocket,

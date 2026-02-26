@@ -12,7 +12,27 @@ import Store from 'electron-store';
 import * as path from 'path';
 import { uIOhook } from 'uiohook-napi';
 
-// ... (other imports remain, but remove node-global-key-listener)
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface IGameState {
+  linesOfCode: number;
+  totalKeyPresses: number;
+  level: number;
+  experience: number;
+  experienceToNext: number;
+  multiplier: number;
+  passiveRate: number;
+}
+
+interface IStoreSchema {
+  gameState: IGameState;
+  items: Record<string, number>;
+  settings: {
+    widgetPosition: { x: number; y: number };
+  };
+}
 
 // ============================================================================
 // KEYBOARD LISTENER
@@ -23,15 +43,7 @@ function startKeyboardListener(): void {
     uIOhook.on('keyup', (e) => {
       // process.stdout.write(`[KEY: ${e.keycode}] `); // Debug log
       
-      const gameState = store.get('gameState') as {
-        linesOfCode: number;
-        totalKeyPresses: number;
-        level: number;
-        experience: number;
-        experienceToNext: number;
-        multiplier: number;
-        passiveRate: number;
-      };
+      const gameState = store.get('gameState');
 
       if (!gameState) return;
 
@@ -86,7 +98,7 @@ function startKeyboardListener(): void {
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged;
 
 // Store for game data persistence
-const store = new Store({
+const store = new Store<IStoreSchema>({
   name: 'timeless-heroes-data',
   defaults: {
     gameState: {
@@ -287,26 +299,24 @@ function setupIpcHandlers(): void {
 
   // Update multiplier
   ipcMain.handle('update-multiplier', (_, multiplier: number) => {
-    const gameState = store.get('gameState') as any;
+    const gameState = store.get('gameState');
     gameState.multiplier = multiplier;
     store.set('gameState', gameState);
   });
 
   // Update passive rate
   ipcMain.handle('update-passive-rate', (_, passiveRate: number) => {
-    const gameState = store.get('gameState') as any;
+    const gameState = store.get('gameState');
     gameState.passiveRate = passiveRate;
     store.set('gameState', gameState);
   });
 
   // Subtract LoC (for purchases)
   ipcMain.handle('subtract-loc', (_, amount: number) => {
-    const gameState = store.get('gameState') as { linesOfCode: number };
+    const gameState = store.get('gameState');
     if (gameState.linesOfCode >= amount) {
-      // Don't modify partial object, read full state
-      const fullState = store.get('gameState') as any;
-      fullState.linesOfCode -= amount;
-      store.set('gameState', fullState);
+      gameState.linesOfCode -= amount;
+      store.set('gameState', gameState);
       return true;
     }
     return false;
@@ -325,7 +335,7 @@ function setupIpcHandlers(): void {
       menuWindow.focus();
     } else {
       createMenuWindow();
-      (menuWindow as any)?.show();
+      menuWindow?.show();
     }
   });
 
