@@ -247,7 +247,7 @@ export class ProgramProcessorService {
         name: programTypeDef.name,
         description: programTypeDef.description,
         category: programTypeDef.category,
-        baseDurationSeconds: programTypeDef.baseDurationSecs,
+        baseDurationSecs: programTypeDef.baseDurationSecs,
         baseReward: programTypeDef.baseReward,
         experienceReward: programTypeDef.experienceReward,
         rewardMultiplier: programTypeDef.rewardMultiplier,
