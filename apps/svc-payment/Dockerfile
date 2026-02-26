@@ -31,7 +31,8 @@ RUN pnpm install --frozen-lockfile
 # Copy full source and build
 COPY --from=builder /app/out/full/ .
 
-# Generate Prisma client
+# Clean pre-generated Prisma client and regenerate for Alpine
+RUN rm -rf packages/prisma-client/generated/client/*.node
 RUN pnpm -F @repo/prisma-client generate
 
 # Build shared-types first (required by all services)
