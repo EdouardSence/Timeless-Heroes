@@ -9,6 +9,7 @@ import { ConfigModule } from '@nestjs/config';
 
 import { QueueName } from '@repo/shared-types';
 import { IdempotencyService } from './idempotency/idempotency.service';
+import { PaymentHealthController } from './payment-health.controller';
 import { ProvisionOrderProcessor } from './provision/provision-order.processor';
 import { ProvisionService } from './provision/provision.service';
 import { StripeWebhookController } from './stripe/stripe-webhook.controller';
@@ -33,7 +34,7 @@ import { StripeService } from './stripe/stripe.service';
       name: QueueName.PROVISION_ORDER,
     }),
   ],
-  controllers: [StripeWebhookController],
+  controllers: [StripeWebhookController, PaymentHealthController],
   providers: [
     StripeService,
     ProvisionOrderProcessor,

@@ -7,15 +7,18 @@
  * - JWT authentication and validation
  * - Click validation and Redis buffering
  * 
- * Business logic (buffer flushing, persistence) is in worker-game-loop.
+ * Delegates business logic to downstream services via NATS (ClientProxy).
  */
 
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 
+import { NATS_SERVICE } from '@repo/shared-types';
 import { AuthModule } from './auth/auth.module';
 import { ClickProcessorModule } from './click-processor/click-processor.module';
 import { GameGatewayModule } from './gateway/game-gateway.module';
+import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
 
@@ -26,6 +29,43 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
+
+    // ── NATS ClientProxy — transport-agnostic microservice communication ──
+    ClientsModule.registerAsync([
+      {
+        name: NATS_SERVICE.PROGRESSION,
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.NATS,
+          options: {
+            servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: NATS_SERVICE.PAYMENT,
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.NATS,
+          options: {
+            servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: NATS_SERVICE.WORKER,
+        imports: [ConfigModule],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.NATS,
+          options: {
+            servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
 
     // Shared infrastructure
     RedisModule,
@@ -41,6 +81,9 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
 
     // HTTP REST ingestion from keylogger
     TcpIngestModule,
+
+    // Aggregated health checks via NATS
+    HealthModule,
   ],
 })
 export class AppModule { }

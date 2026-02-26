@@ -1,26 +1,30 @@
 # Timeless-Heroes Docker Compose
 # Distributed Architecture for Developer Idle Game
-# 
+#
 # ARCHITECTURE:
 # ┌──────────────────┐    ┌───────────────────┐    ┌──────────────────┐
-# │ PowerShell Agent │───>│  API Gateway      │───>│  Redis           │
-# │ (Local PC)       │TCP │  (NestJS)         │    │  (Hot Storage)   │
+# │ PowerShell Agent │───>│  API Gateway      │───>│  NATS            │
+# │ (Local PC)       │HTTP│  (NestJS Hybrid)  │    │  (Message Bus)   │
 # └──────────────────┘    └───────────────────┘    └────────┬─────────┘
 #                                │                          │
-#                         WebSocket                         │ BullMQ Jobs
-#                                │                          ▼
-#                                ▼                 ┌──────────────────┐
-#                         ┌──────────────┐         │  Worker Game Loop│
-#                         │ Frontend     │         │  (BullMQ Worker) │
-#                         │ (Next.js)    │         └────────┬─────────┘
-#                         └──────────────┘                  │
-#                                                           ▼
-#                                                  ┌──────────────────┐
-#                                                  │  PostgreSQL      │
-#                                                  │  (Persistence)   │
-#                                                  └──────────────────┘
-
-version: '3.8'
+#                         WebSocket + NATS          ClientProxy
+#                                │                   ┌──────┴─────────┐
+#                                ▼                   ▼                ▼
+#                         ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+#                         │ Frontend     │  │ svc-progress │  │ svc-payment  │
+#                         │ (Electron)   │  │  (NATS MS)   │  │  (Hybrid)    │
+#                         └──────────────┘  └──────────────┘  └──────────────┘
+#                                                  │
+#                                           Redis + BullMQ
+#                                                  │
+#                                           ┌──────────────┐
+#                                           │ worker-loop  │
+#                                           │ (BullMQ+NATS)│
+#                                           └──────┬───────┘
+#                                                  ▼
+#                                           ┌──────────────┐
+#                                           │  PostgreSQL  │
+#                                           └──────────────┘
 
 services:
   # ============================================================================
@@ -60,6 +64,20 @@ services:
       timeout: 5s
       retries: 5
   
+  nats:
+    image: nats:2-alpine
+    container_name: timeless-nats
+    restart: unless-stopped
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    healthcheck:
+      test: ["CMD", "nats-server", "--signal", "ldm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
   # Redis Commander - Redis GUI (development only)
   redis-commander:
     image: rediscommander/redis-commander:latest
@@ -97,10 +115,13 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       MAX_CPS: ${MAX_CPS:-20}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     volumes:
       - ./apps/api-gateway:/app/apps/api-gateway:delegated
@@ -123,10 +144,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     volumes:
       - ./apps/svc-user-progression:/app/apps/svc-user-progression:delegated
@@ -140,19 +164,20 @@ services:
       dockerfile: ./apps/worker-game-loop/Dockerfile
     container_name: timeless-worker-game-loop
     restart: unless-stopped
-    ports:
-      - "3002:3002"
+    # No HTTP port exposed — pure NATS microservice + BullMQ worker
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      WORKER_PORT: 3002
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     volumes:
       - ./apps/worker-game-loop:/app/apps/worker-game-loop:delegated
@@ -177,10 +202,13 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     volumes:
       - ./apps/svc-payment:/app/apps/svc-payment:delegated

@@ -22,6 +22,7 @@
         "@repo/shared-types": "workspace:*",
         "bullmq": "^5.25.0",
         "ioredis": "^5.4.1",
+        "nats": "^2.29.1",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2"
     },

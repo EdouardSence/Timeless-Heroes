@@ -18,6 +18,7 @@ import { QueueName } from '@repo/shared-types';
 import { ClickBufferModule } from './click-buffer/click-buffer.module';
 import { OfflineCalculatorModule } from './offline-calculator/offline-calculator.module';
 import { ProgramProcessorModule } from './program-processor/program-processor.module';
+import { WorkerHealthController } from './worker-health.controller';
 
 @Module({
   imports: [
@@ -44,9 +45,10 @@ import { ProgramProcessorModule } from './program-processor/program-processor.mo
     ),
 
     // Feature Modules
-    ClickBufferModule,      // NEW: Handles Redis -> PostgreSQL flush
+    ClickBufferModule,      // Handles Redis -> PostgreSQL flush
     ProgramProcessorModule,
     OfflineCalculatorModule,
   ],
+  controllers: [WorkerHealthController],
 })
 export class WorkerModule { }

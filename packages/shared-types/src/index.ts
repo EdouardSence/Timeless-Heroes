@@ -5,6 +5,39 @@
  */
 
 // ============================================================================
+// NATS MESSAGE PATTERNS (Transport-agnostic via ClientProxy)
+// ============================================================================
+
+export const NatsPattern = {
+  // ── Progression Service ──
+  PROGRESSION_GET: 'progression.get',
+  PROGRESSION_UPDATE_BALANCE: 'progression.updateBalance',
+  PROGRESSION_ADD_EXPERIENCE: 'progression.addExperience',
+  PROGRESSION_PURCHASE_ITEM: 'progression.purchaseItem',
+  PROGRESSION_ADD_ITEM: 'progression.addItem',
+  PROGRESSION_GET_ITEMS: 'progression.getItems',
+  PROGRESSION_GET_LEADERBOARD: 'progression.getLeaderboard',
+  PROGRESSION_GET_RANKS: 'progression.getRanks',
+  PROGRESSION_CALCULATE_COST: 'progression.calculateCost',
+
+  // ── Payment Service ──
+  PAYMENT_CREATE_INTENT: 'payment.createIntent',
+  PAYMENT_PROVISION: 'payment.provision',
+
+  // ── Health (all services) ──
+  HEALTH_CHECK: 'health.check',
+} as const;
+
+export type NatsPattern = typeof NatsPattern[keyof typeof NatsPattern];
+
+/** Injection tokens for ClientProxy instances in the gateway */
+export const NATS_SERVICE = {
+  PROGRESSION: 'NATS_PROGRESSION_SERVICE',
+  PAYMENT: 'NATS_PAYMENT_SERVICE',
+  WORKER: 'NATS_WORKER_SERVICE',
+} as const;
+
+// ============================================================================
 // WEBSOCKET EVENTS
 // ============================================================================
 
