@@ -34,6 +34,9 @@ COPY --from=builder /app/out/full/ .
 # Generate Prisma client
 RUN pnpm -F @repo/prisma-client generate
 
+# Build shared-types first (required by all services)
+RUN pnpm run build --filter=@repo/shared-types
+
 # Build the application
 RUN pnpm run build --filter=@app/svc-payment
 
