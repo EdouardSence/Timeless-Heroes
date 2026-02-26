@@ -10,7 +10,7 @@
  * Delegates business logic to downstream services via NATS (ClientProxy).
  */
 
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
@@ -23,16 +23,12 @@ import { HealthModule } from './health/health.module';
 import { RedisModule } from './redis/redis.module';
 import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
 
+/**
+ * Global NATS Clients Module - provides NATS client proxies to all modules
+ */
+@Global()
 @Module({
   imports: [
-    // Configuration with validation - fails fast if required env vars missing
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
-      validate,
-    }),
-
-    // ── NATS ClientProxy — transport-agnostic microservice communication ──
     ClientsModule.registerAsync([
       {
         name: NATS_SERVICE.PROGRESSION,
@@ -68,6 +64,22 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
         inject: [ConfigService],
       },
     ]),
+  ],
+  exports: [ClientsModule],
+})
+export class NatsClientsModule {}
+
+@Module({
+  imports: [
+    // Configuration with validation - fails fast if required env vars missing
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env.local', '.env'],
+      validate,
+    }),
+
+    // ── NATS ClientProxy — transport-agnostic microservice communication ──
+    NatsClientsModule,
 
     // Shared infrastructure
     RedisModule,
