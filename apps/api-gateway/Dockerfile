@@ -57,6 +57,12 @@ COPY --from=installer --chown=nestjs:nodejs /app/apps/api-gateway/dist ./apps/ap
 COPY --from=installer --chown=nestjs:nodejs /app/apps/api-gateway/package.json ./apps/api-gateway/
 COPY --from=installer --chown=nestjs:nodejs /app/packages ./packages
 
+# Create missing workspace symlinks
+RUN mkdir -p ./node_modules/@repo && \
+    ln -sf ../../packages/shared-types ./node_modules/@repo/shared-types && \
+    ln -sf ../../packages/prisma-client ./node_modules/@repo/prisma-client && \
+    ln -sf ../../packages/redis-client ./node_modules/@repo/redis-client
+
 USER nestjs
 
 WORKDIR /app/apps/api-gateway
