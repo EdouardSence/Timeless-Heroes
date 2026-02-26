@@ -51,6 +51,8 @@ RUN pnpm run build --filter=@app/svc-user-progression
 # ============================================================================
 FROM node:20-alpine AS runner
 
+RUN apk add --no-cache openssl libssl3
+
 WORKDIR /app
 
 RUN addgroup --system --gid 1001 nodejs
