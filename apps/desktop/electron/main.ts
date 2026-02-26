@@ -330,12 +330,12 @@ function setupIpcHandlers(): void {
   // Show menu
   ipcMain.on('show-menu', () => {
     console.log('Opening menu window...');
+    if (!menuWindow) {
+      createMenuWindow();
+    }
     if (menuWindow) {
       menuWindow.show();
       menuWindow.focus();
-    } else {
-      createMenuWindow();
-      menuWindow?.show();
     }
   });
 

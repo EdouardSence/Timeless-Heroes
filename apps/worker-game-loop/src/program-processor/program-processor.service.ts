@@ -19,13 +19,13 @@ import {
   ProgramError,
   QueueName,
 } from '@repo/shared-types';
-import { prisma } from '@repo/prisma-client';
+import { prisma, ProgramCategory } from '@repo/prisma-client';
 import { Queue } from 'bullmq';
 
 interface IProgramType {
   baseDurationSecs: number;
   baseReward: string;
-  category: string;
+  category: ProgramCategory;
   description: string;
   experienceReward: string;
   lootTable: {
@@ -246,7 +246,7 @@ export class ProgramProcessorService {
         slug: programSlug,
         name: programTypeDef.name,
         description: programTypeDef.description,
-        category: 'CODING',
+        category: programTypeDef.category,
         baseDurationSeconds: programTypeDef.baseDurationSecs,
         baseReward: programTypeDef.baseReward,
         experienceReward: programTypeDef.experienceReward,
