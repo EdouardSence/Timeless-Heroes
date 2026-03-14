@@ -3,13 +3,16 @@
  * BullMQ worker that processes program completion jobs
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { Job, Worker } from 'bullmq';
+import { firstValueFrom } from 'rxjs';
 
-import { getRedisConfig } from '@repo/redis-client';
-import { IProgramCompletionPayload, QueueName } from '@repo/shared-types';
+import { getRedisConfig, RedisKeys } from '@repo/redis-client';
+import { IProgramCompletionPayload, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 import { LootCalculatorService } from './loot-calculator.service';
 import { ProgramProcessorService } from './program-processor.service';
+import Redis from 'ioredis';
 
 interface IProgramJobData {
   programId: string;
@@ -22,11 +25,15 @@ interface IProgramJobData {
 export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ProgramWorker.name);
   private worker!: Worker<IProgramJobData, IProgramCompletionPayload>;
+  private redis: Redis;
   
   constructor(
     private readonly programProcessor: ProgramProcessorService,
     private readonly lootCalculator: LootCalculatorService,
-  ) {}
+    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+  ) {
+    this.redis = new Redis(getRedisConfig());
+  }
   
   async onModuleInit() {
     this.logger.log('Initializing Program Worker...');
@@ -62,6 +69,7 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
   
   async onModuleDestroy() {
     await this.worker.close();
+    await this.redis.quit();
     this.logger.log('Program Worker destroyed');
   }
   
@@ -89,21 +97,36 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
     // 3. Roll for loot
     const lootDropped = this.lootCalculator.rollLoot(programType.lootTable);
     
-    // 4. Update user progression (via gRPC or direct DB in production)
-    // TODO: Implement gRPC call to svc-user-progression
-    /*
-    await progressionClient.updateBalance(userId, earnedLoc);
-    await progressionClient.addExperience(userId, earnedExp);
-    
+    // 4. Credit rewards via NATS -> svc-user-progression
+    await firstValueFrom(
+      this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+        userId,
+        delta: earnedLoc,
+      }),
+    );
+
+    await firstValueFrom(
+      this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+        userId,
+        experience: earnedExp,
+      }),
+    );
+
+    // 5. Add loot items via NATS
     for (const loot of lootDropped) {
-      await progressionClient.addItem(userId, loot.itemSlug, loot.quantity);
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_ADD_ITEM, {
+          userId,
+          itemSlug: loot.itemSlug,
+          quantity: loot.quantity,
+        }),
+      );
     }
-    */
     
-    // 5. Mark program as completed in DB
+    // 6. Mark program as completed in DB
     await this.programProcessor.markProgramCompleted(userId, programSlug);
     
-    // 6. Create completion payload
+    // 7. Create completion payload
     const completedAt = new Date();
     const completion: IProgramCompletionPayload = {
       programId,
@@ -115,9 +138,14 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
       completedAt,
     };
     
-    // 7. Notify user (via Redis Pub/Sub in production)
-    // This would be picked up by the API Gateway and sent to the user via WebSocket
-    // await redis.publish('channel:program-complete', JSON.stringify(completion));
+    // 8. Notify user via Redis Pub/Sub (picked up by API Gateway -> WebSocket)
+    await this.redis.publish(
+      RedisKeys.CHANNEL_ACHIEVEMENT,
+      JSON.stringify({
+        type: 'PROGRAM_COMPLETED',
+        ...completion,
+      }),
+    );
     
     this.logger.log(
       `Program ${programSlug} completed for ${userId}: +${earnedLoc} LoC, +${earnedExp} XP, ${lootDropped.length} items`,

@@ -1,7 +1,12 @@
 /**
  * Worker Game Loop - Main Entry Point
  * Pure NATS microservice + BullMQ workers
- * NO HTTP exposure — communicates only via NATS and Redis queues
+ *
+ * The worker is NOT exposed via HTTP. It:
+ *   - Listens to NATS message patterns (health.check)
+ *   - Processes BullMQ jobs (click-buffer, offline-calc, program-completion)
+ * All health checking is done through the NATS health.check pattern, queryable
+ * from the api-gateway HealthModule.
  */
 
 import { Logger } from '@nestjs/common';
@@ -14,8 +19,8 @@ async function bootstrap() {
   const logger = new Logger('WorkerGameLoop');
   const natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
 
-  // Create as a pure NATS microservice (no HTTP port)
-  // BullMQ @Processor workers auto-start via module initialization
+  // Pure NATS microservice — no HTTP port exposed
+  // BullMQ @Processor workers auto-start via NestJS module initialization
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     WorkerModule,
     {
@@ -29,9 +34,9 @@ async function bootstrap() {
 
   await app.listen();
 
-  logger.log(`⚙️ Worker Game Loop started (NATS: ${natsUrl})`);
-  logger.log('📦 BullMQ processors active: click-buffer, programs, offline');
-  logger.log('🚫 No HTTP port exposed — pure microservice');
+  logger.log(`Worker Game Loop started (NATS: ${natsUrl})`);
+  logger.log('BullMQ processors active: click-buffer, programs, offline');
+  logger.log('No HTTP port — health check via NATS health.check pattern');
 }
 
 void bootstrap();

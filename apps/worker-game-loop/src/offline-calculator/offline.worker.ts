@@ -1,13 +1,19 @@
 /**
  * Offline Worker
- * BullMQ worker that processes offline calculation jobs
+ * BullMQ worker that processes offline calculation jobs.
+ *
+ * Uses the NestJS-native @Processor / WorkerHost pattern — consistent with
+ * ClickBufferWorker — so that NestJS fully manages the worker lifecycle,
+ * dependency injection, and event hooks instead of a manual `new Worker(...)`.
  */
 
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { Job, Worker } from 'bullmq';
+import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { Inject, Logger } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import { Job } from 'bullmq';
+import { firstValueFrom } from 'rxjs';
 
-import { getRedisConfig } from '@repo/redis-client';
-import { IOfflineCalculation, QueueName } from '@repo/shared-types';
+import { IOfflineCalculation, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 import { OfflineCalculatorService } from './offline-calculator.service';
 
 interface IOfflineJobData {
@@ -22,58 +28,31 @@ interface IOfflineJobData {
   }>;
 }
 
-@Injectable()
-export class OfflineWorker implements OnModuleInit, OnModuleDestroy {
+@Processor(QueueName.OFFLINE_CALCULATION, {
+  concurrency: 10,
+})
+export class OfflineWorker extends WorkerHost {
   private readonly logger = new Logger(OfflineWorker.name);
-  private worker!: Worker<IOfflineJobData, IOfflineCalculation>;
-  
+
   constructor(
     private readonly offlineCalculator: OfflineCalculatorService,
-  ) {}
-  
-  async onModuleInit() {
-    this.logger.log('Initializing Offline Worker...');
-    
-    this.worker = new Worker<IOfflineJobData, IOfflineCalculation>(
-      QueueName.OFFLINE_CALCULATION,
-      async (job: Job<IOfflineJobData>) => this.processOffline(job),
-      {
-        connection: getRedisConfig(),
-        concurrency: 10,
-      },
-    );
-    
-    this.worker.on('completed', (job, result) => {
-      const earnedLoc = BigInt(result.earnedLoc);
-      this.logger.log(
-        `Offline processed for ${job.data.userId}: +${earnedLoc} LoC ` +
-        `(${this.offlineCalculator.formatDuration(result.effectiveDuration)} offline)`,
-      );
-    });
-    
-    this.worker.on('failed', (job, err) => {
-      this.logger.error(`Offline calculation failed for ${job?.data.userId}: ${err.message}`);
-    });
-    
-    this.logger.log('Offline Worker initialized');
+    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+  ) {
+    super();
   }
-  
-  async onModuleDestroy() {
-    await this.worker.close();
-  }
-  
+
   /**
-   * Process offline calculation job
+   * Process a single offline calculation job
    */
-  private async processOffline(job: Job<IOfflineJobData>): Promise<IOfflineCalculation> {
+  async process(job: Job<IOfflineJobData>): Promise<IOfflineCalculation> {
     const { userId, disconnectedAt, reconnectedAt, passiveMultiplier, pendingPrograms } = job.data;
-    
+
     this.logger.debug(`Processing offline calculation for ${userId}`);
-    
+
     // 1. Get user's offline stats
     const stats = await this.offlineCalculator.getUserOfflineStats(userId);
     stats.passiveMultiplier = passiveMultiplier || stats.passiveMultiplier;
-    
+
     // 2. Calculate offline progression
     const calculation = this.offlineCalculator.calculateOfflineProgression(
       new Date(disconnectedAt),
@@ -81,7 +60,7 @@ export class OfflineWorker implements OnModuleInit, OnModuleDestroy {
       stats,
     );
     calculation.userId = userId;
-    
+
     // 3. Check for completed programs
     const completedProgramIds = this.offlineCalculator.checkCompletedPrograms(
       new Date(disconnectedAt),
@@ -91,24 +70,45 @@ export class OfflineWorker implements OnModuleInit, OnModuleDestroy {
         estimatedEndAt: new Date(p.estimatedEndAt),
       })),
     );
-    
-    // 4. Process completed programs (would trigger program completion in production)
-    // For each completed program, we'd call the program processor
-    
-    // 5. Update user progression (via gRPC/DB in production)
-    /*
+
+    // 4. Credit offline rewards via NATS -> svc-user-progression
     if (BigInt(calculation.earnedLoc) > 0n) {
-      await progressionClient.updateBalance(userId, calculation.earnedLoc);
-      await progressionClient.addExperience(userId, calculation.earnedExp);
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+          userId,
+          delta: calculation.earnedLoc,
+        }),
+      );
+
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+          userId,
+          experience: parseInt(calculation.earnedExp, 10),
+        }),
+      );
     }
-    */
-    
-    // 6. Log and return
+
     this.logger.log(
       `Offline rewards for ${userId}: +${calculation.earnedLoc} LoC, ` +
       `${completedProgramIds.length} programs completed`,
     );
-    
+
     return calculation;
+  }
+
+  @OnWorkerEvent('completed')
+  onCompleted(job: Job<IOfflineJobData>, result: IOfflineCalculation) {
+    const earnedLoc = BigInt(result.earnedLoc);
+    this.logger.log(
+      `Offline processed for ${job.data.userId}: +${earnedLoc} LoC ` +
+      `(${this.offlineCalculator.formatDuration(result.effectiveDuration)} offline)`,
+    );
+  }
+
+  @OnWorkerEvent('failed')
+  onFailed(job: Job<IOfflineJobData>, error: Error) {
+    this.logger.error(
+      `Offline calculation failed for ${job?.data.userId}: ${error.message}`,
+    );
   }
 }

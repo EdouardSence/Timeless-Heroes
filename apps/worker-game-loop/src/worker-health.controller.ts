@@ -1,6 +1,7 @@
 /**
  * Worker Health Controller
- * NATS handler for health checks (no HTTP)
+ * NATS handler for health checks — queryable by the api-gateway HealthModule.
+ * No HTTP endpoint: the worker is a pure microservice (no HTTP server).
  */
 
 import { Controller } from '@nestjs/common';
