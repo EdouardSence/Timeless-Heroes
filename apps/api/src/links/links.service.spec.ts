@@ -1,5 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { Test, TestingModule } from '@nestjs/testing';
+
 import { LinksService } from './links.service';
 
 describe('LinksService', () => {
@@ -67,7 +68,7 @@ describe('LinksService', () => {
     });
 
     it('should return empty string when title is undefined', () => {
-      expect(createResult(undefined)).toContain("''");
+      expect(createResult()).toContain("''");
     });
   });
 });

@@ -12,42 +12,43 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import Redis from 'ioredis';
-
 import { ClickBufferService, LeaderboardService } from '@repo/redis-client';
 import { QueueName } from '@repo/shared-types';
-import { ClickBufferWorker } from './click-buffer.worker';
+import Redis from 'ioredis';
+
 import { ClickBufferFlushService } from './click-buffer-flush.service';
+import { ClickBufferWorker } from './click-buffer.worker';
 
 // Redis client provider
 const RedisClientProvider = {
+  inject: [ConfigService],
   provide: 'REDIS_CLIENT',
   useFactory: (configService: ConfigService) => {
     return new Redis({
       host: configService.get<string>('REDIS_HOST', 'localhost'),
-      port: configService.get<number>('REDIS_PORT', 6379),
-      password: configService.get<string>('REDIS_PASSWORD'),
       maxRetriesPerRequest: null,
+      password: configService.get<string>('REDIS_PASSWORD'),
+      port: configService.get<number>('REDIS_PORT', 6379),
     });
   },
-  inject: [ConfigService],
 };
 
 // Click Buffer Service provider
 const ClickBufferServiceProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: ClickBufferService,
   useFactory: (redis: Redis) => new ClickBufferService(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 // Leaderboard Service provider
 const LeaderboardServiceProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: LeaderboardService,
   useFactory: (redis: Redis) => new LeaderboardService(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 @Module({
+  exports: [ClickBufferFlushService],
   imports: [
     ConfigModule,
     ScheduleModule.forRoot(),
@@ -62,6 +63,5 @@ const LeaderboardServiceProvider = {
     ClickBufferWorker,
     ClickBufferFlushService,
   ],
-  exports: [ClickBufferFlushService],
 })
-export class ClickBufferModule { }
+export class ClickBufferModule {}

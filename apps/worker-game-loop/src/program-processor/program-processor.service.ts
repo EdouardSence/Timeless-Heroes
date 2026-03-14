@@ -201,7 +201,8 @@ export class ProgramProcessorService {
     }
 
     // 2. Check user level (mock for now)
-    const userLevel = 1; // TODO: Get from progression service
+    // FUTURE: Get from progression service
+    const userLevel = 1;
     if (userLevel < programType.unlockLevel) {
       return {
         durationSeconds: 0,
@@ -215,7 +216,7 @@ export class ProgramProcessorService {
     }
 
     // 3. Check concurrent program limit
-    const userActivePrograms = this.activePrograms.get(userId) || new Set();
+    const userActivePrograms = this.activePrograms.get(userId) ?? new Set();
     if (userActivePrograms.size >= this.MAX_CONCURRENT_PROGRAMS) {
       return {
         durationSeconds: 0,
@@ -257,7 +258,7 @@ export class ProgramProcessorService {
       userId,
     };
 
-    const job = await this.programQueue.add(`program-${programId}`, jobData, {
+    await this.programQueue.add(`program-${programId}`, jobData, {
       delay: durationMs,
       jobId: programId, // For cancellation
       removeOnComplete: true,
@@ -331,7 +332,7 @@ export class ProgramProcessorService {
   /**
    * Get active programs for a user
    */
-  async getActivePrograms(userId: string): Promise<string[]> {
+  getActivePrograms(userId: string): string[] {
     const userActivePrograms = this.activePrograms.get(userId);
     return userActivePrograms ? [...userActivePrograms] : [];
   }

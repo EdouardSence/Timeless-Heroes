@@ -1,4 +1,5 @@
 import Image, { type ImageProps } from 'next/image';
+
 import styles from './page.module.css';
 
 type Props = Omit<ImageProps, 'src'> & {
@@ -7,7 +8,7 @@ type Props = Omit<ImageProps, 'src'> & {
 };
 
 const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+  const { srcDark, srcLight, ...rest } = props;
 
   return (
     <>
@@ -17,12 +18,12 @@ const ThemeImage = (props: Props) => {
   );
 };
 
-type Link = {
+interface Link {
+  description: string;
   id: number;
   title: string;
   url: string;
-  description: string;
-};
+}
 
 async function getLinks(): Promise<Link[]> {
   try {
@@ -34,7 +35,7 @@ async function getLinks(): Promise<Link[]> {
       throw new Error('Failed to fetch links');
     }
 
-    return res.json();
+    return (await res.json()) as Link[];
   } catch (error) {
     console.error('Error fetching links:', error);
     return [];
@@ -54,7 +55,7 @@ export default async function Home() {
           alt="Turborepo logo"
           width={180}
           height={38}
-          priority
+          preload
         />
         <ol>
           <li>

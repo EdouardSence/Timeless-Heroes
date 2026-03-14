@@ -5,13 +5,14 @@
 
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-
 import { QueueName } from '@repo/shared-types';
+
 import { LootCalculatorService } from './loot-calculator.service';
 import { ProgramProcessorService } from './program-processor.service';
 import { ProgramWorker } from './program.worker';
 
 @Module({
+  exports: [ProgramProcessorService],
   imports: [
     BullModule.registerQueue({
       name: QueueName.PROGRAM_COMPLETION,
@@ -22,6 +23,5 @@ import { ProgramWorker } from './program.worker';
     ProgramWorker,
     LootCalculatorService,
   ],
-  exports: [ProgramProcessorService],
 })
 export class ProgramProcessorModule {}

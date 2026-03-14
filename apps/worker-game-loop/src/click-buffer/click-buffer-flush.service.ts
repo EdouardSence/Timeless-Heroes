@@ -1,7 +1,7 @@
 /**
  * Click Buffer Flush Service
  * Schedules periodic buffer flush jobs
- * 
+ *
  * This service runs on a schedule (every 5 seconds) and:
  * 1. Scans Redis for all users with pending click buffers
  * 2. Atomically reads and clears each buffer
@@ -10,17 +10,16 @@
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
+import { ClickBufferService } from '@repo/redis-client';
+import { QueueName } from '@repo/shared-types';
 import { Queue } from 'bullmq';
 
-import { ClickBufferService, getRedisClient } from '@repo/redis-client';
-import { QueueName } from '@repo/shared-types';
-
 interface IBufferFlushJob {
-  userId: string;
   clicks: number;
   locToAdd: string;
   timestamp: number;
+  userId: string;
 }
 
 @Injectable()
@@ -32,7 +31,7 @@ export class ClickBufferFlushService implements OnModuleInit {
     @InjectQueue(QueueName.CLICK_BUFFER)
     private readonly bufferQueue: Queue<IBufferFlushJob>,
     private readonly clickBufferService: ClickBufferService,
-  ) { }
+  ) {}
 
   onModuleInit() {
     this.logger.log('📦 Click Buffer Flush Service initialized');
@@ -77,13 +76,13 @@ export class ClickBufferFlushService implements OnModuleInit {
         }
 
         jobs.push({
-          name: `flush-${userId}-${Date.now()}`,
           data: {
-            userId,
             clicks: buffer.clicks,
             locToAdd: buffer.locToAdd,
             timestamp: Date.now(),
+            userId,
           },
+          name: `flush-${userId}-${Date.now()}`,
         });
       }
 
@@ -117,14 +116,18 @@ export class ClickBufferFlushService implements OnModuleInit {
       return;
     }
 
-    await this.bufferQueue.add(`flush-${userId}-immediate`, {
-      userId,
-      clicks: buffer.clicks,
-      locToAdd: buffer.locToAdd,
-      timestamp: Date.now(),
-    }, {
-      priority: 1, // High priority for immediate flush
-    });
+    await this.bufferQueue.add(
+      `flush-${userId}-immediate`,
+      {
+        clicks: buffer.clicks,
+        locToAdd: buffer.locToAdd,
+        timestamp: Date.now(),
+        userId,
+      },
+      {
+        priority: 1, // High priority for immediate flush
+      },
+    );
 
     this.logger.debug(`Immediate flush queued for ${userId}`);
   }
@@ -145,6 +148,6 @@ export class ClickBufferFlushService implements OnModuleInit {
       this.bufferQueue.getFailedCount(),
     ]);
 
-    return { waiting, active, completed, failed };
+    return { active, completed, failed, waiting };
   }
 }

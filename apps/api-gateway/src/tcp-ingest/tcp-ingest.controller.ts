@@ -1,7 +1,7 @@
 /**
  * Ingest Controller (HTTP REST)
  * Handles incoming HTTP requests from the keylogger agent
- * 
+ *
  * Endpoints:
  * - POST /ingest/auth    - Authenticate session (JWT)
  * - POST /ingest/key     - Key press event (anonymized)
@@ -12,22 +12,25 @@ import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
 
 import { IngestAuthGuard } from './tcp-auth.guard';
 import { TcpIngestService } from './tcp-ingest.service';
-import { ITcpAuthRequest, ITcpAuthResponse, ITcpKeyPressEvent, KeyCategory } from './tcp-ingest.types';
+import {
+  ITcpAuthRequest,
+  ITcpAuthResponse,
+  ITcpKeyPressEvent,
+  KeyCategory,
+} from './tcp-ingest.types';
 
 @Controller('ingest')
 export class TcpIngestController {
   private readonly logger = new Logger(TcpIngestController.name);
 
-  constructor(private readonly tcpIngestService: TcpIngestService) { }
+  constructor(private readonly tcpIngestService: TcpIngestService) {}
 
   /**
    * Handle authentication request from keylogger
    * POST /api/v1/ingest/auth
    */
   @Post('auth')
-  async handleAuth(
-    @Body() data: ITcpAuthRequest,
-  ): Promise<ITcpAuthResponse> {
+  async handleAuth(@Body() data: ITcpAuthRequest): Promise<ITcpAuthResponse> {
     this.logger.debug('Received auth request');
 
     const result = await this.tcpIngestService.authenticateClient(data.token);
@@ -54,15 +57,15 @@ export class TcpIngestController {
     // Validate the event is properly anonymized
     if (!this.isProperlyAnonymized(data)) {
       this.logger.warn(`Rejected non-anonymized key event from ${data.userId}`);
-      return { success: false, buffered: false };
+      return { buffered: false, success: false };
     }
 
     // Process the anonymized key press
     const result = await this.tcpIngestService.processKeyPress(data);
 
     return {
-      success: true,
       buffered: result.buffered,
+      success: true,
     };
   }
 
@@ -71,7 +74,7 @@ export class TcpIngestController {
    * GET /api/v1/ingest/ping
    */
   @Get('ping')
-  async handlePing(): Promise<{ pong: true; timestamp: number }> {
+  handlePing(): { pong: true; timestamp: number } {
     return {
       pong: true,
       timestamp: Date.now(),

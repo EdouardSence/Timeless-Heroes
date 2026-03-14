@@ -23,8 +23,8 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
   imports: [
     // Configuration
     ConfigModule.forRoot({
-      isGlobal: true,
       envFilePath: ['.env.local', '.env'],
+      isGlobal: true,
     }),
 
     // Shared infrastructure
@@ -43,4 +43,4 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
     TcpIngestModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

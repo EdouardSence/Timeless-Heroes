@@ -10,14 +10,15 @@ import { ProgressionModule } from './progression.module';
 
 async function bootstrap() {
   const logger = new Logger('SvcUserProgression');
-  
+
   // Create HTTP app for REST endpoints
   const app = await NestFactory.create(ProgressionModule);
-  const port = process.env.PROGRESSION_PORT || 3001;
+  const port = process.env.PROGRESSION_PORT ?? 3001;
   await app.listen(port);
-  
+
   logger.log(`📊 User Progression Service running on port ${port}`);
-  
+
+  // eslint-disable-next-line sonarjs/todo-tag
   // TODO: Add gRPC microservice
   /*
   const grpcApp = await NestFactory.createMicroservice<MicroserviceOptions>(

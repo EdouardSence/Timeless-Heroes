@@ -5,10 +5,9 @@
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { Queue } from 'bullmq';
-
 import { LeaderboardService, RedisKeys, getRedisClient } from '@repo/redis-client';
 import { LeaderboardType, QueueName } from '@repo/shared-types';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class LeaderboardSyncService {
@@ -26,7 +25,7 @@ export class LeaderboardSyncService {
    * Sync user's score to all relevant leaderboards
    */
   async syncUserScore(userId: string, score: string): Promise<void> {
-    const scoreNum = parseFloat(score);
+    const scoreNum = Number.parseFloat(score);
     
     // Update global leaderboard
     await this.leaderboardService.updateScore(
@@ -66,20 +65,23 @@ export class LeaderboardSyncService {
       this.leaderboardService.getUserRank(userId, RedisKeys.LEADERBOARD_DAILY),
     ]);
     
-    return { global, weekly, daily };
+    return { daily, global, weekly };
   }
   
   /**
    * Get leaderboard data
    */
-  async getLeaderboard(type: LeaderboardType, count: number = 100) {
+  async getLeaderboard(type: LeaderboardType, count = 100) {
     switch (type) {
-      case LeaderboardType.WEEKLY:
+      case LeaderboardType.WEEKLY: {
         return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_WEEKLY);
-      case LeaderboardType.DAILY:
+      }
+      case LeaderboardType.DAILY: {
         return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_DAILY);
-      default:
+      }
+      default: {
         return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_GLOBAL);
+      }
     }
   }
   

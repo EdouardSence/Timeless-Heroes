@@ -1,7 +1,7 @@
 /**
  * Click Buffer Worker
  * BullMQ Worker that processes buffer flush jobs
- * 
+ *
  * Architecture:
  * 1. ClickBufferFlushService schedules periodic flush (every 5s)
  * 2. Flush collects all pending clicks from Redis
@@ -10,34 +10,42 @@
 
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
+import { LeaderboardService, RedisKeys } from '@repo/redis-client';
+import { QueueName, IBufferFlushResult } from '@repo/shared-types';
 import { Job } from 'bullmq';
 import Redis from 'ioredis';
 
-import { LeaderboardService, RedisKeys } from '@repo/redis-client';
-import { QueueName, IBufferFlushResult } from '@repo/shared-types';
-
-// TODO: Import PrismaService when available
+// FUTURE: Import PrismaService when available
 // import { PrismaService } from '@repo/prisma-client';
 
 interface IBufferFlushJob {
-  userId: string;
   clicks: number;
   locToAdd: string;
   timestamp: number;
+  userId: string;
+}
+
+interface IRedisProgression {
+  experience: string;
+  experienceToNext: string;
+  level: number;
+  linesOfCode: string;
+  totalClicks: number;
+  totalLinesWritten: string;
 }
 
 @Processor(QueueName.CLICK_BUFFER, {
   concurrency: 10, // Process 10 users in parallel
   limiter: {
-    max: 100,
     duration: 1000, // Max 100 jobs per second
+    max: 100,
   },
 })
 export class ClickBufferWorker extends WorkerHost {
   private readonly logger = new Logger(ClickBufferWorker.name);
 
   constructor(
-    // TODO: Inject PrismaService when available
+    // FUTURE: Inject PrismaService when available
     // private readonly prisma: PrismaService,
     private readonly leaderboardService: LeaderboardService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
@@ -48,11 +56,10 @@ export class ClickBufferWorker extends WorkerHost {
   /**
    * Process a single buffer flush job
    * Updates PostgreSQL with accumulated clicks for a user
-   * 
-   * TODO: This is a simplified version. In production, inject PrismaService.
    */
+  // FUTURE: This is a simplified version. In production, inject PrismaService.
   async process(job: Job<IBufferFlushJob>): Promise<IBufferFlushResult> {
-    const { userId, clicks, locToAdd } = job.data;
+    const { clicks, locToAdd, userId } = job.data;
     const startTime = Date.now();
 
     this.logger.debug(
@@ -60,18 +67,26 @@ export class ClickBufferWorker extends WorkerHost {
     );
 
     try {
-      // TODO: Replace with actual Prisma calls when PrismaService is available
+      // FUTURE: Replace with actual Prisma calls when PrismaService is available
       // For now, we'll use Redis to store progression (demo purposes)
 
       const progressionKey = `progression:${userId}`;
       const progressionData = await this.redis.get(progressionKey);
 
-      let progression = progressionData
-        ? JSON.parse(progressionData)
-        : { linesOfCode: '0', totalLinesWritten: '0', totalClicks: 0, level: 1, experience: '0', experienceToNext: '100' };
+      const defaultProgression: IRedisProgression = {
+        experience: '0',
+        experienceToNext: '100',
+        level: 1,
+        linesOfCode: '0',
+        totalClicks: 0,
+        totalLinesWritten: '0',
+      };
+      const progression: IRedisProgression = progressionData
+        ? (JSON.parse(progressionData) as IRedisProgression)
+        : defaultProgression;
 
       // 2. Calculate new values
-      const locAmount = BigInt(Math.floor(parseFloat(locToAdd)));
+      const locAmount = BigInt(Math.floor(Number.parseFloat(locToAdd)));
       const newLinesOfCode = BigInt(progression.linesOfCode) + locAmount;
       const newTotalLines = BigInt(progression.totalLinesWritten) + locAmount;
       const newTotalClicks = BigInt(progression.totalClicks) + BigInt(clicks);
@@ -97,22 +112,19 @@ export class ClickBufferWorker extends WorkerHost {
 
       // 4. Update progression (Redis for demo, Prisma in production)
       const updatedProgression = {
-        linesOfCode: newLinesOfCode.toString(),
-        totalLinesWritten: newTotalLines.toString(),
-        totalClicks: newTotalClicks.toString(),
-        level,
         experience: experience.toString(),
         experienceToNext: experienceToNext.toString(),
+        level,
+        linesOfCode: newLinesOfCode.toString(),
+        totalClicks: newTotalClicks.toString(),
+        totalLinesWritten: newTotalLines.toString(),
         updatedAt: new Date().toISOString(),
       };
 
       await this.redis.set(progressionKey, JSON.stringify(updatedProgression));
 
       // 5. Update leaderboard in Redis
-      await this.leaderboardService.updateScore(
-        userId,
-        Number(newTotalLines),
-      );
+      await this.leaderboardService.updateScore(userId, Number(newTotalLines));
 
       const processingTime = Date.now() - startTime;
       this.logger.debug(
@@ -120,13 +132,13 @@ export class ClickBufferWorker extends WorkerHost {
       );
 
       return {
-        success: true,
-        userId,
         clicksProcessed: clicks,
         locAdded: locAmount.toString(),
         newBalance: newLinesOfCode.toString(),
         newLevel: level,
         processingTimeMs: processingTime,
+        success: true,
+        userId,
       };
     } catch (error) {
       this.logger.error(
@@ -137,11 +149,11 @@ export class ClickBufferWorker extends WorkerHost {
       await this.reAddToBuffer(userId, locToAdd, clicks);
 
       return {
+        clicksProcessed: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        locAdded: '0',
         success: false,
         userId,
-        clicksProcessed: 0,
-        locAdded: '0',
-        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -149,14 +161,17 @@ export class ClickBufferWorker extends WorkerHost {
   /**
    * Publish level up event for real-time notification
    */
-  private async publishLevelUp(userId: string, newLevel: number): Promise<void> {
+  private async publishLevelUp(
+    userId: string,
+    newLevel: number,
+  ): Promise<void> {
     await this.redis.publish(
       RedisKeys.CHANNEL_ACHIEVEMENT,
       JSON.stringify({
-        type: 'LEVEL_UP',
-        userId,
         level: newLevel,
         timestamp: Date.now(),
+        type: 'LEVEL_UP',
+        userId,
       }),
     );
   }
@@ -164,7 +179,11 @@ export class ClickBufferWorker extends WorkerHost {
   /**
    * Re-add to buffer if flush fails (data recovery)
    */
-  private async reAddToBuffer(userId: string, locToAdd: string, clicks: number): Promise<void> {
+  private async reAddToBuffer(
+    userId: string,
+    locToAdd: string,
+    clicks: number,
+  ): Promise<void> {
     const key = RedisKeys.CLICK_BUFFER(userId);
 
     // Use Lua script for atomic re-addition
@@ -184,9 +203,13 @@ export class ClickBufferWorker extends WorkerHost {
 
     try {
       await this.redis.eval(script, 1, key, locToAdd, clicks.toString());
-      this.logger.warn(`Re-added ${clicks} clicks to buffer for ${userId} after flush failure`);
+      this.logger.warn(
+        `Re-added ${clicks} clicks to buffer for ${userId} after flush failure`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to re-add to buffer for ${userId}: ${error}`);
+      this.logger.error(
+        `Failed to re-add to buffer for ${userId}: ${String(error)}`,
+      );
     }
   }
 
@@ -197,6 +220,8 @@ export class ClickBufferWorker extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(job: Job<IBufferFlushJob>, error: Error) {
-    this.logger.error(`Job ${job.id} failed for user ${job.data.userId}: ${error.message}`);
+    this.logger.error(
+      `Job ${job.id} failed for user ${job.data.userId}: ${error.message}`,
+    );
   }
 }

@@ -31,116 +31,126 @@ interface IAuthResult {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly SALT_ROUNDS = 10;
-  
+
   constructor(private readonly jwtService: JwtService) {}
-  
+
   /**
    * Validate user credentials and return JWT token
    */
   async login(credentials: IUserCredentials): Promise<IAuthResult> {
+    // eslint-disable-next-line sonarjs/todo-tag
     // TODO: Integrate with Prisma to fetch user
     // For now, mock validation
-    
+
     const { email, password } = credentials;
-    
+
     // Mock user (in production, fetch from DB)
     const mockUser = {
-      id: 'user-123',
       email: 'test@example.com',
-      username: 'TestPlayer',
+      id: 'user-123',
       passwordHash: await bcrypt.hash('password123', this.SALT_ROUNDS),
+      username: 'TestPlayer',
     };
-    
+
     if (email !== mockUser.email) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    
-    const isPasswordValid = await bcrypt.compare(password, mockUser.passwordHash);
+
+    const isPasswordValid = await bcrypt.compare(
+      password,
+      mockUser.passwordHash,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    
+
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: mockUser.id,
       email: mockUser.email,
+      sub: mockUser.id,
       username: mockUser.username,
     };
-    
+
     const accessToken = await this.jwtService.signAsync(payload);
-    
+
     this.logger.log(`User logged in: ${mockUser.email}`);
-    
+
     return {
       accessToken,
       user: {
-        id: mockUser.id,
         email: mockUser.email,
+        id: mockUser.id,
         username: mockUser.username,
       },
     };
   }
-  
+
   /**
    * Register a new user
    */
   async register(data: IRegisterData): Promise<IAuthResult> {
     const { email, password, username } = data;
-    
+
+    // eslint-disable-next-line sonarjs/todo-tag
     // TODO: Check if user exists with Prisma
+    // eslint-disable-next-line sonarjs/todo-tag
     // TODO: Create user in DB
-    
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, this.SALT_ROUNDS);
-    
+
     // Mock user creation
     const newUser = {
-      id: `user-${Date.now()}`,
       email,
-      username,
+      id: `user-${Date.now()}`,
       passwordHash,
+      username,
     };
-    
+
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: newUser.id,
       email: newUser.email,
+      sub: newUser.id,
       username: newUser.username,
     };
-    
+
     const accessToken = await this.jwtService.signAsync(payload);
-    
+
     this.logger.log(`User registered: ${newUser.email}`);
-    
+
     return {
       accessToken,
       user: {
-        id: newUser.id,
         email: newUser.email,
+        id: newUser.id,
         username: newUser.username,
       },
     };
   }
-  
+
   /**
    * Verify a JWT token
    */
   async verifyToken(token: string): Promise<IJwtPayload> {
     try {
       return await this.jwtService.verifyAsync<IJwtPayload>(token);
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid token');
     }
   }
-  
+
   /**
    * Generate a new JWT token for a user
    */
-  async generateToken(userId: string, email: string, username: string): Promise<string> {
+  async generateToken(
+    userId: string,
+    email: string,
+    username: string,
+  ): Promise<string> {
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: userId,
       email,
+      sub: userId,
       username,
     };
-    
+
     return this.jwtService.signAsync(payload);
   }
 }

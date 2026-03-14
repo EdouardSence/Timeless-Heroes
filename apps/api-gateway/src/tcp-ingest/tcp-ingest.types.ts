@@ -26,51 +26,51 @@ export type KeyCategory =
  * CRITICAL: This must NEVER contain the actual key code or character
  */
 export interface ITcpKeyPressEvent {
-  /** User ID (from authenticated session) */
-  userId: string;
-
-  /** Session ID (from auth) */
-  sessionId: string;
+  /** Time since last key press in ms (for anti-cheat) */
+  deltaMs?: number;
 
   /** Anonymized key category - NOT the actual key */
   keyCategory: KeyCategory;
 
+  /** Session ID (from auth) */
+  sessionId: string;
+
   /** Unix timestamp of the key press (client-side) */
   timestamp: number;
 
-  /** Time since last key press in ms (for anti-cheat) */
-  deltaMs?: number;
+  /** User ID (from authenticated session) */
+  userId: string;
 }
 
 /**
  * Authentication request from keylogger
  */
 export interface ITcpAuthRequest {
-  /** JWT token obtained from web login */
-  token: string;
-
   /** Client version (for compatibility checks) */
   clientVersion?: string;
 
   /** Machine identifier (anonymized hash) */
   machineId?: string;
+
+  /** JWT token obtained from web login */
+  token: string;
 }
 
 /**
  * Authentication response
  */
 export interface ITcpAuthResponse {
-  /** Whether auth was successful */
-  success: boolean;
+  /** Error or success message */
+  message: string;
 
   /** Session ID for subsequent requests */
   sessionId?: string;
 
+  /** Whether auth was successful */
+  success: boolean;
+
   /** User ID (only on success) */
   userId?: string;
-
-  /** Error or success message */
-  message: string;
 }
 
 /**
@@ -80,11 +80,11 @@ export interface IAntiCheatResult {
   /** Whether the action is allowed */
   allowed: boolean;
 
-  /** Reason for blocking (if not allowed) */
-  reason?: AntiCheatReason;
-
   /** Confidence score (0-1) that the user is human */
   humanScore: number;
+
+  /** Reason for blocking (if not allowed) */
+  reason?: AntiCheatReason;
 
   /** Warning flag (suspicious but not blocked) */
   warning?: boolean;
@@ -107,11 +107,11 @@ export interface ITypingMetrics {
   /** Average time between keypresses (ms) */
   averageDeltaMs: number;
 
-  /** Standard deviation of delta times */
-  deltaStdDev: number;
-
   /** Current clicks per second */
   currentCPS: number;
+
+  /** Standard deviation of delta times */
+  deltaStdDev: number;
 
   /** Number of consecutive same-interval presses */
   regularIntervalCount: number;

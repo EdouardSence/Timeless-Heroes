@@ -1,49 +1,55 @@
 import { Injectable } from '@nestjs/common';
-
 import { Link, CreateLinkDto, UpdateLinkDto } from '@repo/api';
 
 @Injectable()
 export class LinksService {
   private readonly _links: Link[] = [
     {
+      description: 'Get started with Turborepo in a few moments using',
       id: 0,
       title: 'Installation',
       url: 'https://turborepo.dev/docs/getting-started/installation',
-      description: 'Get started with Turborepo in a few moments using',
     },
     {
+      description: 'Architecting a monorepo is a careful process.',
       id: 1,
       title: 'Crafting',
       url: 'https://turborepo.dev/docs/crafting-your-repository',
-      description: 'Architecting a monorepo is a careful process.',
     },
     {
+      description:
+        'Turborepo can be incrementally adopted in any repository, single or multi-package, to speed up the developer and CI workflows of the repository.',
       id: 2,
       title: 'Add Repositories',
       url: 'https://turborepo.dev/docs/getting-started/add-to-existing-repository',
-      description:
-        'Turborepo can be incrementally adopted in any repository, single or multi-package, to speed up the developer and CI workflows of the repository.',
     },
   ];
 
   private escapeHtml(input: string | null | undefined): string {
     if (input == null) return '';
-    return input.replace(/[&<>"'/]/g, (char) => {
+    return input.replaceAll(/[&<>"'/]/g, (char) => {
       switch (char) {
-        case '&':
+        case '&': {
           return '&amp;';
-        case '<':
+        }
+        case '<': {
           return '&lt;';
-        case '>':
+        }
+        case '>': {
           return '&gt;';
-        case '"':
+        }
+        case '"': {
           return '&quot;';
-        case "'":
+        }
+        case "'": {
           return '&#39;';
-        case '/':
+        }
+        case '/': {
           return '&#x2F;';
-        default:
+        }
+        default: {
           return char;
+        }
       }
     });
   }
