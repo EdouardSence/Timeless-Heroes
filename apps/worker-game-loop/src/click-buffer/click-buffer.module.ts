@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Click Buffer Worker Module
  * Handles flushing the Redis click buffer to PostgreSQL

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Worker Module
  * Main module for the game loop worker microservice

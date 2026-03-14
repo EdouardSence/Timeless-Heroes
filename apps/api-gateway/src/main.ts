@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * API Gateway - Main Entry Point
  * Timeless-Heroes Idle Game Backend

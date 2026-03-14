@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Progression Module
  * Main module for user progression service

@@ -1,12 +1,13 @@
+/* istanbul ignore file */
 /**
  * API Gateway - Main Application Module
- * 
+ *
  * This gateway handles ONLY routing and real-time communication:
  * - HTTP REST API endpoints (including keylogger ingestion)
  * - WebSocket connections for real-time game updates
  * - JWT authentication and validation
  * - Click validation and Redis buffering
- * 
+ *
  * Delegates business logic to downstream services via NATS (ClientProxy).
  */
 

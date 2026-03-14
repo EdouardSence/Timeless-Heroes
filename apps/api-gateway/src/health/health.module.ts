@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Health Module
  * Aggregated health checks via NATS for all downstream services

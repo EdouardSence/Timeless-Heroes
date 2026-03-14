@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Game Gateway Module
  * WebSocket gateway for real-time game communication

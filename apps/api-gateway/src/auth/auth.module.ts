@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Auth Module
  * JWT authentication for REST and WebSocket

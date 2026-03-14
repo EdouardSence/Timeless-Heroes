@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Offline Calculator Module
  * Handles AFK/offline progression calculation
@@ -26,7 +27,9 @@ import { OfflineWorker } from './offline.worker';
         useFactory: (configService: ConfigService) => ({
           transport: Transport.NATS,
           options: {
-            servers: [configService.get<string>('NATS_URL', 'nats://localhost:4222')],
+            servers: [
+              configService.get<string>('NATS_URL', 'nats://localhost:4222'),
+            ],
           },
         }),
         inject: [ConfigService],

@@ -1,7 +1,8 @@
+/* istanbul ignore file */
 /**
  * Ingest Module (HTTP REST)
  * Receives keylogger events via HTTP endpoints
- * 
+ *
  * Provides proper authentication and validation
  * for anonymized key press events.
  */

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * User Progression Service - Main Entry Point
  * Hybrid app: HTTP for /health + NATS transport for business logic

@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Progression Module
  * HTTP REST endpoints for user progression data

@@ -1,7 +1,8 @@
+/* istanbul ignore file */
 /**
  * TCP Ingest Types
  * Type definitions for the TCP keylogger protocol
- * 
+ *
  * SECURITY: All types are designed to NEVER contain actual key values
  * Only anonymized categories are allowed
  */
@@ -11,15 +12,15 @@
  * These represent the TYPE of key, never the actual key pressed
  */
 export type KeyCategory =
-  | 'CHAR'        // Any alphanumeric character (a-z, 0-9)
-  | 'MODIFIER'    // Shift, Ctrl, Alt, Win
-  | 'FUNCTION'    // F1-F12
-  | 'NAVIGATION'  // Arrow keys, Home, End, PgUp, PgDown
-  | 'ENTER'       // Enter/Return
-  | 'SPACE'       // Spacebar
-  | 'BACKSPACE'   // Backspace/Delete
-  | 'TAB'         // Tab
-  | 'UNKNOWN';    // Unclassified keys
+  | 'CHAR' // Any alphanumeric character (a-z, 0-9)
+  | 'MODIFIER' // Shift, Ctrl, Alt, Win
+  | 'FUNCTION' // F1-F12
+  | 'NAVIGATION' // Arrow keys, Home, End, PgUp, PgDown
+  | 'ENTER' // Enter/Return
+  | 'SPACE' // Spacebar
+  | 'BACKSPACE' // Backspace/Delete
+  | 'TAB' // Tab
+  | 'UNKNOWN'; // Unclassified keys
 
 /**
  * Anonymized key press event
@@ -94,11 +95,11 @@ export interface IAntiCheatResult {
  * Reasons for anti-cheat rejection
  */
 export type AntiCheatReason =
-  | 'RATE_TOO_FAST'        // Inhuman typing speed
-  | 'TIMING_TOO_REGULAR'   // Robot-like consistent timing
-  | 'IMPOSSIBLE_PATTERN'   // Physically impossible key combinations
-  | 'USER_BANNED'          // User is temporarily banned
-  | 'SESSION_INVALID';     // Invalid or expired session
+  | 'RATE_TOO_FAST' // Inhuman typing speed
+  | 'TIMING_TOO_REGULAR' // Robot-like consistent timing
+  | 'IMPOSSIBLE_PATTERN' // Physically impossible key combinations
+  | 'USER_BANNED' // User is temporarily banned
+  | 'SESSION_INVALID'; // Invalid or expired session
 
 /**
  * Typing metrics for anti-cheat analysis

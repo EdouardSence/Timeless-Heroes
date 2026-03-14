@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Worker Game Loop - Main Entry Point
  * Pure NATS microservice + BullMQ workers

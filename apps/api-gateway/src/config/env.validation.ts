@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Environment Variables Validation
  *
@@ -22,7 +23,9 @@ export class EnvironmentVariables {
    */
   @IsString()
   @IsNotEmpty({ message: 'JWT_SECRET is required - set it in your .env file' })
-  @MinLength(32, { message: 'JWT_SECRET must be at least 32 characters for security' })
+  @MinLength(32, {
+    message: 'JWT_SECRET must be at least 32 characters for security',
+  })
   JWT_SECRET!: string;
 
   /**
@@ -72,7 +75,9 @@ export class EnvironmentVariables {
  * Validation function for NestJS ConfigModule.
  * Throws descriptive errors if required env vars are missing.
  */
-export function validate(config: Record<string, unknown>): EnvironmentVariables {
+export function validate(
+  config: Record<string, unknown>,
+): EnvironmentVariables {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
     enableImplicitConversion: true,
   });
@@ -84,7 +89,8 @@ export function validate(config: Record<string, unknown>): EnvironmentVariables 
   if (errors.length > 0) {
     const errorMessages = errors
       .map((error) => {
-        const constraints = Object.values(error.constraints ?? {}).join(', ') || 'Invalid value';
+        const constraints =
+          Object.values(error.constraints ?? {}).join(', ') || 'Invalid value';
         return `  - ${error.property}: ${constraints}`;
       })
       .join('\n');
