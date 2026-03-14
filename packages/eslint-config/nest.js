@@ -1,6 +1,6 @@
-import globals from "globals";
+import globals from 'globals';
 
-import { config as baseConfig } from "./base.js";
+import { config as baseConfig } from './base.js';
 
 /**
  * A custom ESLint configuration for Nest.js.
@@ -15,16 +15,22 @@ export const nestJsConfig = [
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: "commonjs",
+      sourceType: 'commonjs',
     },
   },
   {
     rules: {
-      "@typescript-eslint/no-floating-promises": "warn",
-      "@typescript-eslint/no-unsafe-argument": "warn",
-      "@typescript-eslint/no-extraneous-class": "off",
-      "unicorn/prefer-module": "off",
-      "unicorn/prefer-top-level-await": "off",
+      '@typescript-eslint/no-floating-promises': 'warn',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-extraneous-class': 'off',
+      'unicorn/prefer-module': 'off',
+      'unicorn/prefer-top-level-await': 'off',
+    },
+  },
+  {
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-argument': 'off',
     },
   },
 ];

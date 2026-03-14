@@ -28,7 +28,7 @@ describe('ItemCostCalculatorService', () => {
 
     it('should use a custom multiplier when provided', () => {
       // baseCost=100, amountOwned=2, multiplier=2.0 => 100 * 2^2 = 400
-      const result = service.calculateNextCost('100', 2, 2.0);
+      const result = service.calculateNextCost('100', 2, 2);
       expect(result).toBe('400');
     });
 
@@ -42,12 +42,12 @@ describe('ItemCostCalculatorService', () => {
       // baseCost=10, amountOwned=50 => 10 * 1.15^50 which is ~10838
       const result = service.calculateNextCost('10', 50);
       const value = Number(result);
-      expect(value).toBeGreaterThan(10000);
-      expect(value).toBeLessThan(11000);
+      expect(value).toBeGreaterThan(10_000);
+      expect(value).toBeLessThan(11_000);
     });
 
     it('should return base cost with multiplier of 1.0', () => {
-      const result = service.calculateNextCost('500', 10, 1.0);
+      const result = service.calculateNextCost('500', 10, 1);
       expect(result).toBe('500');
     });
   });
@@ -146,8 +146,8 @@ describe('ItemCostCalculatorService', () => {
     });
 
     it('should use custom multiplier in calculations', () => {
-      const result = service.getItemCostCalculation('test-item', '100', 0, 2.0);
-      expect(result.costMultiplier).toBe(2.0);
+      const result = service.getItemCostCalculation('test-item', '100', 0, 2);
+      expect(result.costMultiplier).toBe(2);
       expect(result.nextCost).toBe('100'); // 100 * 2^0 = 100
       expect(result.bulkCost(2)).toBe('300'); // 100 + 200 = 300
     });

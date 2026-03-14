@@ -19,10 +19,10 @@ describe('LootCalculatorService', () => {
 
       const lootTable = [
         {
-          itemSlug: 'gold-coin',
           dropRate: 0.5,
-          minQuantity: 1,
+          itemSlug: 'gold-coin',
           maxQuantity: 1,
+          minQuantity: 1,
         },
       ];
 
@@ -35,7 +35,7 @@ describe('LootCalculatorService', () => {
       randomSpy.mockReturnValue(0.8); // Will fail any dropRate < 0.8
 
       const lootTable = [
-        { itemSlug: 'rare-gem', dropRate: 0.1, minQuantity: 1, maxQuantity: 1 },
+        { dropRate: 0.1, itemSlug: 'rare-gem', maxQuantity: 1, minQuantity: 1 },
       ];
 
       const drops = service.rollLoot(lootTable);
@@ -46,7 +46,7 @@ describe('LootCalculatorService', () => {
       randomSpy.mockReturnValue(0.5);
 
       const lootTable = [
-        { itemSlug: 'sword', dropRate: 0.5, minQuantity: 1, maxQuantity: 1 },
+        { dropRate: 0.5, itemSlug: 'sword', maxQuantity: 1, minQuantity: 1 },
       ];
 
       const drops = service.rollLoot(lootTable);
@@ -64,8 +64,8 @@ describe('LootCalculatorService', () => {
       });
 
       const lootTable = [
-        { itemSlug: 'item-a', dropRate: 0.5, minQuantity: 1, maxQuantity: 1 },
-        { itemSlug: 'item-b', dropRate: 0.5, minQuantity: 1, maxQuantity: 1 },
+        { dropRate: 0.5, itemSlug: 'item-a', maxQuantity: 1, minQuantity: 1 },
+        { dropRate: 0.5, itemSlug: 'item-b', maxQuantity: 1, minQuantity: 1 },
       ];
 
       const drops = service.rollLoot(lootTable);
@@ -83,7 +83,7 @@ describe('LootCalculatorService', () => {
       });
 
       const lootTable = [
-        { itemSlug: 'gold', dropRate: 1.0, minQuantity: 1, maxQuantity: 10 },
+        { dropRate: 1, itemSlug: 'gold', maxQuantity: 10, minQuantity: 1 },
       ];
 
       const drops = service.rollLoot(lootTable);
@@ -93,14 +93,14 @@ describe('LootCalculatorService', () => {
     });
 
     it('should return exact quantity when min equals max', () => {
-      randomSpy.mockReturnValue(0.0); // Guarantees drop
+      randomSpy.mockReturnValue(0); // Guarantees drop
 
       const lootTable = [
         {
+          dropRate: 1,
           itemSlug: 'fixed-item',
-          dropRate: 1.0,
-          minQuantity: 5,
           maxQuantity: 5,
+          minQuantity: 5,
         },
       ];
 
@@ -115,14 +115,14 @@ describe('LootCalculatorService', () => {
     });
 
     it('should always drop items with 1.0 drop rate when random is 0.0', () => {
-      randomSpy.mockReturnValue(0.0);
+      randomSpy.mockReturnValue(0);
 
       const lootTable = [
         {
+          dropRate: 1,
           itemSlug: 'guaranteed',
-          dropRate: 1.0,
-          minQuantity: 1,
           maxQuantity: 1,
+          minQuantity: 1,
         },
       ];
 
@@ -135,10 +135,10 @@ describe('LootCalculatorService', () => {
 
       const lootTable = [
         {
-          itemSlug: 'legendary',
           dropRate: 0.01,
-          minQuantity: 1,
+          itemSlug: 'legendary',
           maxQuantity: 1,
+          minQuantity: 1,
         },
       ];
 

@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 
 describe('HeuristicAntiCheatService', () => {
@@ -24,22 +25,22 @@ describe('HeuristicAntiCheatService', () => {
 
   beforeEach(() => {
     mockPipeline = {
-      rpush: jest.fn().mockReturnThis(),
-      ltrim: jest.fn().mockReturnThis(),
-      expire: jest.fn().mockReturnThis(),
       del: jest.fn().mockReturnThis(),
       exec: jest.fn().mockResolvedValue([]),
+      expire: jest.fn().mockReturnThis(),
+      ltrim: jest.fn().mockReturnThis(),
+      rpush: jest.fn().mockReturnThis(),
     };
 
     mockRedis = {
+      del: jest.fn(),
+      expire: jest.fn(),
       get: jest.fn().mockResolvedValue(null),
       lindex: jest.fn().mockResolvedValue(null),
       lrange: jest.fn().mockResolvedValue([]),
+      ltrim: jest.fn(),
       pipeline: jest.fn().mockReturnValue(mockPipeline),
       rpush: jest.fn(),
-      ltrim: jest.fn(),
-      expire: jest.fn(),
-      del: jest.fn(),
     };
 
     mockConfigService = {

@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { ClickValidatorService } from './click-validator.service';
 import { ClickRejectionReason } from '@repo/shared-types';
+
+import { ClickValidatorService } from './click-validator.service';
 
 describe('ClickValidatorService', () => {
   let service: ClickValidatorService;
@@ -13,10 +14,10 @@ describe('ClickValidatorService', () => {
 
   beforeEach(() => {
     mockThrottleService = {
-      isUserBanned: jest.fn().mockResolvedValue(false),
       checkClickThrottle: jest
         .fn()
         .mockResolvedValue({ allowed: true, currentCPS: 5 }),
+      isUserBanned: jest.fn().mockResolvedValue(false),
       recordViolation: jest.fn().mockResolvedValue(1),
     };
 
@@ -41,8 +42,8 @@ describe('ClickValidatorService', () => {
   describe('validateClick', () => {
     it('should accept a valid click with a current timestamp', async () => {
       const result = await service.validateClick({
-        userId: 'user-1',
         timestamp: Date.now(),
+        userId: 'user-1',
       });
 
       expect(result.isValid).toBe(true);
@@ -54,8 +55,8 @@ describe('ClickValidatorService', () => {
       mockThrottleService.isUserBanned.mockResolvedValue(true);
 
       const result = await service.validateClick({
-        userId: 'banned-user',
         timestamp: Date.now(),
+        userId: 'banned-user',
       });
 
       expect(result.isValid).toBe(false);
@@ -66,8 +67,8 @@ describe('ClickValidatorService', () => {
       const futureTimestamp = Date.now() + 60_000; // 60 seconds in future
 
       const result = await service.validateClick({
-        userId: 'user-1',
         timestamp: futureTimestamp,
+        userId: 'user-1',
       });
 
       expect(result.isValid).toBe(false);
@@ -78,8 +79,8 @@ describe('ClickValidatorService', () => {
       const oldTimestamp = Date.now() - 15_000; // 15 seconds ago
 
       const result = await service.validateClick({
-        userId: 'user-1',
         timestamp: oldTimestamp,
+        userId: 'user-1',
       });
 
       expect(result.isValid).toBe(false);
@@ -91,8 +92,8 @@ describe('ClickValidatorService', () => {
       const slightFuture = Date.now() + 3000;
 
       const result = await service.validateClick({
-        userId: 'user-1',
         timestamp: slightFuture,
+        userId: 'user-1',
       });
 
       expect(result.isValid).toBe(true);
@@ -105,8 +106,8 @@ describe('ClickValidatorService', () => {
       });
 
       const result = await service.validateClick({
-        userId: 'fast-clicker',
         timestamp: Date.now(),
+        userId: 'fast-clicker',
       });
 
       expect(result.isValid).toBe(false);
@@ -121,8 +122,8 @@ describe('ClickValidatorService', () => {
       });
 
       await service.validateClick({
-        userId: 'fast-clicker',
         timestamp: Date.now(),
+        userId: 'fast-clicker',
       });
 
       expect(mockThrottleService.recordViolation).toHaveBeenCalledWith(
@@ -134,8 +135,8 @@ describe('ClickValidatorService', () => {
       const futureTimestamp = Date.now() + 60_000;
 
       await service.validateClick({
-        userId: 'user-1',
         timestamp: futureTimestamp,
+        userId: 'user-1',
       });
 
       expect(mockThrottleService.recordViolation).toHaveBeenCalledWith(
@@ -145,8 +146,8 @@ describe('ClickValidatorService', () => {
 
     it('should not record a violation for valid clicks', async () => {
       await service.validateClick({
-        userId: 'good-user',
         timestamp: Date.now(),
+        userId: 'good-user',
       });
 
       expect(mockThrottleService.recordViolation).not.toHaveBeenCalled();
@@ -156,8 +157,8 @@ describe('ClickValidatorService', () => {
       mockThrottleService.isUserBanned.mockResolvedValue(true);
 
       await service.validateClick({
-        userId: 'banned-user',
         timestamp: Date.now() + 60_000, // Also invalid timestamp
+        userId: 'banned-user',
       });
 
       // Should return banned, not timestamp error
