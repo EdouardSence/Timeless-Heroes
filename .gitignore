@@ -57,6 +57,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Prisma generated client (regenerated via `prisma generate`)
+packages/prisma-client/generated/
+
 # Misc
 .DS_Store
 *.pem

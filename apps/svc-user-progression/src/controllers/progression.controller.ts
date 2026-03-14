@@ -44,15 +44,17 @@ export class ProgressionController {
   // ========================================================================
 
   @MessagePattern(ProgressionCommand.GET_PROGRESSION)
-  handleGetProgression(@Payload() data: { userId: string }): IProgressionData {
+  async handleGetProgression(
+    @Payload() data: { userId: string },
+  ): Promise<IProgressionData> {
     this.logger.debug(`[MQ] getProgression userId=${data.userId}`);
     return this.progressionService.getProgression(data.userId);
   }
 
   @MessagePattern(ProgressionCommand.GET_DEFAULT_PROGRESSION)
-  handleGetDefaultProgression(
+  async handleGetDefaultProgression(
     @Payload() data: { userId: string },
-  ): IProgressionData {
+  ): Promise<IProgressionData> {
     this.logger.debug(`[MQ] getDefaultProgression userId=${data.userId}`);
     return this.progressionService.getProgression(data.userId);
   }
@@ -94,18 +96,17 @@ export class ProgressionController {
   }
 
   @MessagePattern(ProgressionCommand.ADD_EXPERIENCE)
-  handleAddExperience(@Payload() data: { userId: string; expToAdd: string }): {
-    newLevel: number;
-    leveledUp: boolean;
-  } {
+  async handleAddExperience(
+    @Payload() data: { userId: string; expToAdd: string },
+  ): Promise<{ newLevel: number; leveledUp: boolean }> {
     this.logger.debug(`[MQ] addExperience userId=${data.userId}`);
     return this.progressionService.addExperience(data.userId, data.expToAdd);
   }
 
   @MessagePattern(ProgressionCommand.PURCHASE_ITEM)
-  handlePurchaseItem(
+  async handlePurchaseItem(
     @Payload() data: IItemPurchaseRequest,
-  ): IItemPurchaseResult {
+  ): Promise<IItemPurchaseResult> {
     this.logger.debug(
       `[MQ] purchaseItem userId=${data.userId} item=${data.itemSlug}`,
     );
@@ -113,9 +114,9 @@ export class ProgressionController {
   }
 
   @MessagePattern(ProgressionCommand.ADD_ITEM)
-  handleAddItem(
+  async handleAddItem(
     @Payload() data: { userId: string; itemSlug: string; quantity: number },
-  ): boolean {
+  ): Promise<boolean> {
     this.logger.debug(
       `[MQ] addItem userId=${data.userId} item=${data.itemSlug}`,
     );
@@ -127,7 +128,7 @@ export class ProgressionController {
   }
 
   @MessagePattern(ProgressionCommand.GET_AVAILABLE_ITEMS)
-  handleGetAvailableItems(@Payload() data: { userId: string }) {
+  async handleGetAvailableItems(@Payload() data: { userId: string }) {
     this.logger.debug(`[MQ] getAvailableItems userId=${data.userId}`);
     return this.progressionService.getAvailableItems(data.userId);
   }
@@ -154,10 +155,10 @@ export class ProgressionController {
    * GET /progression/:userId
    */
   @Get(':userId')
-  getProgression(
+  async getProgression(
     @Param('userId') userId: string,
-  ): IApiResponse<IProgressionData> {
-    const data = this.progressionService.getProgression(userId);
+  ): Promise<IApiResponse<IProgressionData>> {
+    const data = await this.progressionService.getProgression(userId);
 
     return {
       data,
@@ -172,10 +173,10 @@ export class ProgressionController {
    */
   @Post('purchase')
   @HttpCode(HttpStatus.OK)
-  purchaseItem(
+  async purchaseItem(
     @Body() request: IItemPurchaseRequest,
-  ): IApiResponse<IItemPurchaseResult> {
-    const result = this.progressionService.purchaseItem(request);
+  ): Promise<IApiResponse<IItemPurchaseResult>> {
+    const result = await this.progressionService.purchaseItem(request);
 
     return {
       data: result,
@@ -195,25 +196,8 @@ export class ProgressionController {
    * GET /progression/:userId/items
    */
   @Get(':userId/items')
-  getAvailableItems(@Param('userId') userId: string): {
-    success: boolean;
-    data: {
-      item: {
-        slug: string;
-        name: string;
-        baseCost: string;
-        costMultiplier: number;
-        baseEffect: number;
-        effectType: string;
-        unlockLevel: number;
-      };
-      owned: number;
-      nextCost: string;
-      canAfford: boolean;
-    }[];
-    timestamp: string;
-  } {
-    const items = this.progressionService.getAvailableItems(userId);
+  async getAvailableItems(@Param('userId') userId: string) {
+    const items = await this.progressionService.getAvailableItems(userId);
 
     return {
       data: items.map((i) => ({
