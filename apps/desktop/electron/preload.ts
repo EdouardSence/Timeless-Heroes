@@ -19,6 +19,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveItems: (items: Record<string, number>) =>
     ipcRenderer.invoke('save-items', items),
 
+  // Backend Auth (BUG-06)
+  backendLogin: (email: string, password: string) =>
+    ipcRenderer.invoke('backend-login', email, password),
+  backendRegister: (username: string, email: string, password: string) =>
+    ipcRenderer.invoke('backend-register', username, email, password),
+  backendLogout: () => ipcRenderer.invoke('backend-logout'),
+  backendStatus: () => ipcRenderer.invoke('backend-status'),
+  // Backend Leaderboard (TD-03)
+  backendLeaderboard: (type?: string) =>
+    ipcRenderer.invoke('backend-leaderboard', type),
+  // Auth flow
+  launchGame: () => ipcRenderer.send('launch-game'),
+  logoutSession: () => ipcRenderer.send('logout-session'),
+
   // Window controls
   showMenu: () => ipcRenderer.send('show-menu'),
   hideMenu: () => ipcRenderer.send('hide-menu'),
@@ -52,11 +66,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('level-up', handler);
     };
   },
+  onBackendStatus: (callback: (status: { online: boolean; username: string | null }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, status: { online: boolean; username: string | null }) =>
+      callback(status);
+    ipcRenderer.on('backend-status', handler);
+    return () => {
+      ipcRenderer.removeListener('backend-status', handler);
+    };
+  },
 
   // Cleanup — nuclear option, removes ALL listeners on every channel
   removeAllListeners: () => {
     ipcRenderer.removeAllListeners('game-state-update');
     ipcRenderer.removeAllListeners('user-keypress');
     ipcRenderer.removeAllListeners('level-up');
+    ipcRenderer.removeAllListeners('backend-status');
   },
 });

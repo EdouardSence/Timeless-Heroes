@@ -1,0 +1,384 @@
+/**
+ * ╔═══════════════════════════════════════════════════════════════════════════╗
+ * ║       AUTH STYLES — Cozy Cyberpunk Login / Register Window               ║
+ * ╚═══════════════════════════════════════════════════════════════════════════╝
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § CONTAINER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth-container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    color: var(--text-primary);
+    border-radius: var(--radius-xl);
+    overflow: hidden;
+    box-sizing: border-box;
+
+    box-shadow:
+        0 0 0 1px rgba(127, 219, 218, 0.15),
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 60px rgba(127, 219, 218, 0.08);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § CIRCUIT BORDER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__circuit-border {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 10;
+    background: linear-gradient(135deg,
+            var(--neon-cyan) 0%,
+            transparent 25%,
+            transparent 75%,
+            var(--neon-lavender) 100%);
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    padding: 1px;
+    opacity: 0.6;
+    animation: auth-border-rotate 6s linear infinite;
+}
+
+@keyframes auth-border-rotate {
+    0%   { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § GLASS BACKGROUND
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__glass {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--cozy-glass-dark);
+    backdrop-filter: blur(var(--cozy-glass-blur));
+    -webkit-backdrop-filter: blur(var(--cozy-glass-blur));
+    z-index: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § HEADER — Terminal title bar
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__header {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    background: var(--cozy-bg-surface);
+    border-bottom: 1px solid rgba(127, 219, 218, 0.12);
+    -webkit-app-region: drag;
+}
+
+.auth__terminal-dots {
+    display: flex;
+    gap: var(--space-1);
+}
+
+.auth__dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.auth__dot--close    { background: #ff6b7a; }
+.auth__dot--minimize { background: var(--neon-gold); }
+.auth__dot--maximize { background: var(--neon-mint); }
+
+.auth__title {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    letter-spacing: 0.04em;
+}
+
+.auth__title-prefix {
+    color: var(--neon-cyan);
+    margin-right: 1px;
+}
+
+.auth__title-text {
+    color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § BODY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__body {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: var(--space-4) var(--space-5);
+    gap: var(--space-4);
+    overflow-y: auto;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § HERO / LOGO
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__hero {
+    text-align: center;
+    padding: var(--space-3) 0;
+}
+
+.auth__logo-icon {
+    font-size: 2.4rem;
+    color: var(--neon-cyan);
+    filter: drop-shadow(0 0 12px var(--neon-cyan-glow));
+    animation: auth-icon-pulse 3s ease-in-out infinite;
+    display: block;
+    margin-bottom: var(--space-2);
+}
+
+@keyframes auth-icon-pulse {
+    0%, 100% { filter: drop-shadow(0 0 8px var(--neon-cyan-glow)); }
+    50%       { filter: drop-shadow(0 0 20px var(--neon-cyan-glow)) drop-shadow(0 0 40px rgba(127, 219, 218, 0.2)); }
+}
+
+.auth__logo-text {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: var(--weight-bold);
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-lavender));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0 0 var(--space-2) 0;
+    letter-spacing: -0.02em;
+}
+
+.auth__tagline {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin: 0;
+    letter-spacing: 0.04em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § MODE TABS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__tabs {
+    display: flex;
+    width: 100%;
+    background: var(--cozy-bg-elevated);
+    border-radius: var(--radius-md);
+    padding: 3px;
+    border: 1px solid rgba(127, 219, 218, 0.1);
+}
+
+.auth__tab {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border: none;
+    border-radius: calc(var(--radius-md) - 2px);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    background: transparent;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+}
+
+.auth__tab:hover {
+    color: var(--text-secondary);
+    background: rgba(127, 219, 218, 0.06);
+}
+
+.auth__tab--active {
+    background: var(--cozy-bg-surface);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 12px rgba(127, 219, 218, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § FORM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__form {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.auth__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.auth__label {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+}
+
+.auth__input {
+    width: 100%;
+    padding: var(--space-2) var(--space-3);
+    background: var(--cozy-bg-elevated);
+    border: 1px solid rgba(127, 219, 218, 0.18);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    box-sizing: border-box;
+    outline: none;
+}
+
+.auth__input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.auth__input:focus {
+    border-color: rgba(127, 219, 218, 0.5);
+    background: var(--cozy-bg-hover);
+    box-shadow: 0 0 0 3px rgba(127, 219, 218, 0.08);
+}
+
+.auth__input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § ERROR MESSAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__error {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: rgba(255, 107, 122, 0.1);
+    border: 1px solid rgba(255, 107, 122, 0.3);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: #ff8c99;
+    animation: auth-shake 0.25s ease-out;
+}
+
+@keyframes auth-shake {
+    0%   { transform: translateX(0); }
+    25%  { transform: translateX(-4px); }
+    75%  { transform: translateX(4px); }
+    100% { transform: translateX(0); }
+}
+
+.auth__error-icon {
+    color: #ff6b7a;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SUBMIT BUTTON
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__submit {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    margin-top: var(--space-1);
+    background: linear-gradient(135deg,
+            rgba(127, 219, 218, 0.15),
+            rgba(180, 167, 214, 0.15));
+    border: 1px solid rgba(127, 219, 218, 0.4);
+    border-radius: var(--radius-md);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-semibold);
+    color: var(--neon-cyan);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: all var(--transition-base);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+}
+
+.auth__submit:hover:not(:disabled) {
+    background: linear-gradient(135deg,
+            rgba(127, 219, 218, 0.25),
+            rgba(180, 167, 214, 0.25));
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 20px rgba(127, 219, 218, 0.2);
+    transform: translateY(-1px);
+}
+
+.auth__submit:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.auth__submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SPINNER
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(127, 219, 218, 0.3);
+    border-top-color: var(--neon-cyan);
+    border-radius: 50%;
+    animation: auth-spin 0.6s linear infinite;
+}
+
+@keyframes auth-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § SCAN LINES OVERLAY
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.auth__scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 5;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.03) 2px,
+        rgba(0, 0, 0, 0.03) 4px
+    );
+    border-radius: inherit;
+}
