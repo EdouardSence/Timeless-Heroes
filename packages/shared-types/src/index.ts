@@ -438,6 +438,8 @@ export interface IProgressionServiceClient {
 export interface IProgressionData {
   userId: string;
   linesOfCode: string;
+  /** Monotonically increasing total — used for leaderboard ranking */
+  totalLinesWritten: string;
   level: number;
   experience: string;
   clickMultiplier: number;

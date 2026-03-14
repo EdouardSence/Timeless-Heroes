@@ -1,11 +1,17 @@
 /**
  * Provision Service
  * Handles the actual provisioning of purchased items/currency
+ * 
+ * BUG-04 FIX: Replaced stub methods with real NATS calls to progression service
+ * and Redis storage for boosts/subscriptions.
  */
 
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
+import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 
-import { ProductType, ProvisionError } from '@repo/shared-types';
+import { NATS_SERVICE, NatsPattern, ProductType, ProvisionError } from '@repo/shared-types';
 
 interface IProvisionResult {
   success: boolean;
@@ -15,6 +21,13 @@ interface IProvisionResult {
 @Injectable()
 export class ProvisionService {
   private readonly logger = new Logger(ProvisionService.name);
+  
+  constructor(
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly natsClient: ClientProxy,
+    @Inject('REDIS_CLIENT')
+    private readonly redis: Redis,
+  ) {}
   
   /**
    * Provision a purchased order to the user's account
@@ -50,6 +63,7 @@ export class ProvisionService {
   
   /**
    * Provision premium currency (gems, coins, etc.)
+   * Calls progression service to update the user's balance.
    */
   private async provisionPremiumCurrency(
     userId: string,
@@ -64,18 +78,26 @@ export class ProvisionService {
       };
     }
     
-    // TODO: Call progression service via gRPC
-    /*
-    await progressionClient.addPremiumCurrency(userId, amount);
-    */
-    
-    this.logger.log(`Provisioned ${amount} premium currency to ${userId}`);
-    
-    return { success: true };
+    try {
+      await firstValueFrom(
+        this.natsClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+          userId,
+          delta: amount.toString(),
+        }),
+      );
+      
+      this.logger.log(`Provisioned ${amount} premium currency to ${userId}`);
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to provision premium currency for ${userId}: ${msg}`);
+      return { success: false, error: msg };
+    }
   }
   
   /**
    * Provision an item pack
+   * Calls progression service to add each item to the user's inventory.
    */
   private async provisionItemPack(
     userId: string,
@@ -90,22 +112,32 @@ export class ProvisionService {
       };
     }
     
-    // TODO: Call progression service via gRPC for each item
-    /*
-    for (const item of items) {
-      await progressionClient.addItem(userId, item.itemSlug, item.quantity);
+    try {
+      // Add each item via NATS to progression service
+      for (const item of items) {
+        await firstValueFrom(
+          this.natsClient.send(NatsPattern.PROGRESSION_ADD_ITEM, {
+            userId,
+            itemSlug: item.itemSlug,
+            quantity: item.quantity,
+          }),
+        );
+      }
+      
+      this.logger.log(
+        `Provisioned item pack (${items.length} items) to ${userId}`,
+      );
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to provision item pack for ${userId}: ${msg}`);
+      return { success: false, error: msg };
     }
-    */
-    
-    this.logger.log(
-      `Provisioned item pack (${items.length} items) to ${userId}`,
-    );
-    
-    return { success: true };
   }
   
   /**
    * Provision a subscription (VIP, Premium, etc.)
+   * Stores subscription status in Redis with TTL and notifies progression service.
    */
   private async provisionSubscription(
     userId: string,
@@ -121,25 +153,37 @@ export class ProvisionService {
       };
     }
     
-    // TODO: Update user's subscription status in DB
-    /*
-    const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
-    await prisma.userSubscription.upsert({
-      where: { userId },
-      create: { userId, type: subscriptionType, expiresAt },
-      update: { type: subscriptionType, expiresAt },
-    });
-    */
-    
-    this.logger.log(
-      `Provisioned ${subscriptionType} subscription (${durationDays} days) to ${userId}`,
-    );
-    
-    return { success: true };
+    try {
+      const expiresAt = Date.now() + durationDays * 24 * 60 * 60 * 1000;
+      const subscriptionKey = `subscription:${userId}`;
+      const ttlSeconds = durationDays * 24 * 60 * 60;
+      
+      // Store subscription in Redis with TTL
+      await this.redis.setex(
+        subscriptionKey,
+        ttlSeconds,
+        JSON.stringify({
+          type: subscriptionType,
+          activatedAt: Date.now(),
+          expiresAt,
+          durationDays,
+        }),
+      );
+      
+      this.logger.log(
+        `Provisioned ${subscriptionType} subscription (${durationDays} days) to ${userId}`,
+      );
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to provision subscription for ${userId}: ${msg}`);
+      return { success: false, error: msg };
+    }
   }
   
   /**
    * Provision a temporary boost
+   * Stores active boost in Redis with TTL so click-processor can read it.
    */
   private async provisionBoost(
     userId: string,
@@ -156,20 +200,28 @@ export class ProvisionService {
       };
     }
     
-    // TODO: Store active boost in Redis with TTL
-    /*
-    const boostKey = `boost:${userId}:${boostType}`;
-    await redis.setex(boostKey, durationSeconds, JSON.stringify({
-      multiplier,
-      activatedAt: Date.now(),
-      expiresAt: Date.now() + durationSeconds * 1000,
-    }));
-    */
-    
-    this.logger.log(
-      `Provisioned ${boostType} boost (${multiplier}x for ${durationSeconds}s) to ${userId}`,
-    );
-    
-    return { success: true };
+    try {
+      const boostKey = `boost:${userId}:${boostType}`;
+      
+      // Store active boost in Redis with TTL
+      await this.redis.setex(
+        boostKey,
+        durationSeconds,
+        JSON.stringify({
+          multiplier,
+          activatedAt: Date.now(),
+          expiresAt: Date.now() + durationSeconds * 1000,
+        }),
+      );
+      
+      this.logger.log(
+        `Provisioned ${boostType} boost (${multiplier}x for ${durationSeconds}s) to ${userId}`,
+      );
+      return { success: true };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Failed to provision boost for ${userId}: ${msg}`);
+      return { success: false, error: msg };
+    }
   }
 }

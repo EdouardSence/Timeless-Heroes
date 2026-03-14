@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { SHOP_ITEMS as SHOP_CATALOG, IShopItem } from '@repo/shared-types';
-import type { GameState } from '../types/electron';
+import type { GameState, LeaderboardEntry } from '../types/electron';
 import './Menu.css';
 
 interface ShopItemWithOwned extends IShopItem {
@@ -44,6 +44,10 @@ export default function Menu() {
     'shop',
   );
   const [notification, setNotification] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const itemsLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -64,17 +68,57 @@ export default function Menu() {
       itemsLoadedRef.current = true;
     });
 
+    // Check backend status on mount
+    window.electronAPI?.backendStatus().then((status) => {
+      setBackendOnline(status?.online ?? false);
+      setUsername(status?.username ?? null);
+    });
+
     // Listen for updates
     const disposeState = window.electronAPI?.onGameStateUpdate(setGameState);
+    const disposeBackend = window.electronAPI?.onBackendStatus((status) => {
+      setBackendOnline(status?.online ?? false);
+      setUsername(status?.username ?? null);
+    });
 
     return () => {
-      if (disposeState) {
-        disposeState();
-      } else {
+      if (disposeState) disposeState();
+      if (disposeBackend) disposeBackend();
+      if (!disposeState && !disposeBackend) {
         window.electronAPI?.removeAllListeners();
       }
     };
   }, []);
+
+  // Fetch leaderboard — always attempt, even if backendOnline state is stale.
+  // The IPC handler will return an error gracefully if not authenticated.
+  const fetchLeaderboard = () => {
+    setLeaderboardLoading(true);
+    window.electronAPI
+      ?.backendLeaderboard('GLOBAL')
+      .then((res) => {
+        if (res?.success && res.data?.entries) {
+          setLeaderboard(res.data.entries);
+        }
+      })
+      .catch(() => {
+        // Silently fail — leaderboard stays at last-known state
+      })
+      .finally(() => {
+        setLeaderboardLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'leaderboard') return;
+    if (!backendOnline) return;
+
+    fetchLeaderboard();
+
+    // Auto-refresh every 15 seconds while on the leaderboard tab
+    const interval = setInterval(fetchLeaderboard, 15000);
+    return () => clearInterval(interval);
+  }, [activeTab, backendOnline]);
 
   // Update multiplier and passive when items change (only after initial load)
   useEffect(() => {
@@ -140,6 +184,10 @@ export default function Menu() {
     window.electronAPI?.hideMenu();
   };
 
+  const handleLogout = () => {
+    window.electronAPI?.logoutSession();
+  };
+
   const expProgress =
     gameState.experienceToNext > 0
       ? (gameState.experience / gameState.experienceToNext) * 100
@@ -157,13 +205,26 @@ export default function Menu() {
           <span className="logo-icon">💎</span>
           <h1>Timeless Heroes</h1>
         </div>
-        <button
-          className="close-button"
-          onClick={handleClose}
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          ✕
-        </button>
+        <div className="menu-header-actions">
+          {username && (
+            <span className="menu-username">@{username}</span>
+          )}
+          <button
+            className="logout-button"
+            onClick={handleLogout}
+            title="Se déconnecter"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            ⏻
+          </button>
+          <button
+            className="close-button"
+            onClick={handleClose}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       <div
@@ -286,20 +347,45 @@ export default function Menu() {
         {activeTab === 'leaderboard' && (
           <div className="leaderboard-panel">
             <div className="leaderboard-card">
-              <h3>🏆 Classement</h3>
-              <p className="coming-soon">
-                Le classement multijoueur arrive bientôt!
-              </p>
-              <p className="hint">
-                Connecte-toi au serveur NestJS pour la compétition.
-              </p>
-              <div className="your-rank">
-                <span className="rank-number">#1</span>
-                <span className="rank-name">Toi 👑</span>
-                <span className="rank-score">
-                  {formatNumber(gameState.linesOfCode)} LoC
-                </span>
+              <div className="leaderboard-header">
+                <h3>🏆 Classement</h3>
+                {backendOnline && (
+                  <button
+                    className="refresh-button"
+                    onClick={fetchLeaderboard}
+                    disabled={leaderboardLoading}
+                    title="Actualiser"
+                  >
+                    {leaderboardLoading ? '⏳' : '🔄'}
+                  </button>
+                )}
               </div>
+              {!backendOnline ? (
+                <>
+                  <p className="coming-soon">
+                    Connecte-toi au backend pour voir le classement.
+                  </p>
+                  <p className="hint">
+                    Utilise le menu de connexion pour te connecter au serveur.
+                  </p>
+                </>
+              ) : leaderboardLoading && leaderboard.length === 0 ? (
+                <p className="coming-soon">Chargement du classement...</p>
+              ) : leaderboard.length === 0 ? (
+                <p className="coming-soon">Aucun joueur dans le classement.</p>
+              ) : (
+                leaderboard.map((entry) => (
+                  <div key={entry.userId} className="your-rank">
+                    <span className="rank-number">#{entry.rank}</span>
+                    <span className="rank-name">
+                      {entry.username}
+                    </span>
+                    <span className="rank-score">
+                      {formatNumber(entry.score)} LoC
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

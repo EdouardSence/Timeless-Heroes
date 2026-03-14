@@ -74,9 +74,7 @@ USER nestjs
 
 WORKDIR /app/apps/worker-game-loop
 
-EXPOSE 3002
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3002/health || exit 1
+# No EXPOSE — this is a pure NATS microservice with no HTTP port.
+# Health is checked via NATS health.check pattern from the api-gateway.
 
 CMD ["node", "dist/main.js"]

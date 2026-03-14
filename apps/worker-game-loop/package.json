@@ -21,7 +21,7 @@
         "@repo/prisma-client": "workspace:*",
         "@repo/redis-client": "workspace:*",
         "@repo/shared-types": "workspace:*",
-        "bullmq": "^5.25.0",
+        "bullmq": "^5.70.1",
         "ioredis": "^5.4.1",
         "nats": "^2.29.1",
         "reflect-metadata": "^0.2.2",

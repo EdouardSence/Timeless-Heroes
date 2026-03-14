@@ -82,6 +82,47 @@
     transform: scale(1.05);
 }
 
+/* ── Header actions group (username + logout + close) ── */
+
+.menu-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.menu-username {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--neon-cyan);
+    opacity: 0.75;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.logout-button {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--cozy-bg-elevated);
+    border: 1px solid rgba(127, 219, 218, 0.3);
+    border-radius: var(--radius-sm);
+    color: var(--neon-cyan);
+    font-size: var(--text-base);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.logout-button:hover {
+    background: rgba(127, 219, 218, 0.15);
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 15px var(--neon-cyan-glow);
+    transform: scale(1.05);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    § STATS BAR - System Monitor
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -391,6 +432,42 @@
     font-weight: var(--weight-bold);
     color: var(--neon-gold);
     margin: 0 0 var(--space-3) 0;
+}
+
+.leaderboard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-3);
+}
+
+.leaderboard-header h3 {
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    color: var(--neon-gold);
+    margin: 0;
+}
+
+.refresh-button {
+    background: transparent;
+    border: 1px solid rgba(127, 219, 218, 0.3);
+    border-radius: var(--radius-sm);
+    color: var(--neon-cyan);
+    cursor: pointer;
+    font-size: var(--text-sm);
+    padding: 2px 6px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.refresh-button:hover:not(:disabled) {
+    background: rgba(127, 219, 218, 0.1);
+    border-color: var(--neon-cyan);
+}
+
+.refresh-button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .coming-soon {

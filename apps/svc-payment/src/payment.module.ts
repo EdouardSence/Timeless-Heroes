@@ -5,15 +5,31 @@
 
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import Redis from 'ioredis';
 
-import { QueueName } from '@repo/shared-types';
+import { NATS_SERVICE, QueueName } from '@repo/shared-types';
 import { IdempotencyService } from './idempotency/idempotency.service';
 import { PaymentHealthController } from './payment-health.controller';
 import { ProvisionOrderProcessor } from './provision/provision-order.processor';
 import { ProvisionService } from './provision/provision.service';
 import { StripeWebhookController } from './stripe/stripe-webhook.controller';
 import { StripeService } from './stripe/stripe.service';
+
+// Redis client provider (for boost storage)
+const RedisClientProvider = {
+  provide: 'REDIS_CLIENT',
+  useFactory: (configService: ConfigService) => {
+    return new Redis({
+      host: configService.get<string>('REDIS_HOST', 'localhost'),
+      port: configService.get<number>('REDIS_PORT', 6379),
+      password: configService.get<string>('REDIS_PASSWORD'),
+      maxRetriesPerRequest: null,
+    });
+  },
+  inject: [ConfigService],
+};
 
 @Module({
   imports: [
@@ -33,9 +49,25 @@ import { StripeService } from './stripe/stripe.service';
     BullModule.registerQueue({
       name: QueueName.PROVISION_ORDER,
     }),
+
+    // NATS ClientProxy for inter-service communication (progression service)
+    ClientsModule.registerAsync([
+      {
+        name: NATS_SERVICE.PROGRESSION,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.NATS,
+          options: {
+            servers: [configService.get<string>('NATS_URL', 'nats://localhost:4222')],
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   controllers: [StripeWebhookController, PaymentHealthController],
   providers: [
+    RedisClientProvider,
     StripeService,
     ProvisionOrderProcessor,
     ProvisionService,

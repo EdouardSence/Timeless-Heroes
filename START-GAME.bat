@@ -14,6 +14,14 @@ REM Kill any existing Timeless Heroes processes
 echo [0/5] Nettoyage des anciens processus...
 taskkill /FI "WINDOWTITLE eq Timeless Heroes*" /T /F >nul 2>&1
 taskkill /IM node.exe /FI "WINDOWTITLE eq *Timeless*" /T /F >nul 2>&1
+
+REM Kill processes occupying ports used by the desktop app (4000-4010)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr ":400[0-9] " ^| findstr "LISTENING"') do (
+    taskkill /PID %%P /F >nul 2>&1
+)
+for /f "tokens=5" %%P in ('netstat -ano 2^>nul ^| findstr ":4010 " ^| findstr "LISTENING"') do (
+    taskkill /PID %%P /F >nul 2>&1
+)
 timeout /t 2 /nobreak
 
 REM Check if Docker is running
