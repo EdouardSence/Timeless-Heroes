@@ -3,11 +3,22 @@
  * Aggregated health check — pings all downstream services via NATS
  */
 
-import { Controller, Get, Inject, Logger } from '@nestjs/common';
+import { Controller, Get, Inject, Logger, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ClientProxy } from '@nestjs/microservices';
-import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { NATS_SERVICE, NatsPattern } from '@repo/shared-types';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+  ApiForbiddenResponse,
+} from '@nestjs/swagger';
+import { NATS_SERVICE, NatsPattern, Role } from '@repo/shared-types';
 import { catchError, firstValueFrom, of, timeout } from 'rxjs';
+
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 
 interface IServiceHealth {
   service: string;
@@ -27,11 +38,18 @@ export class HealthController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'Aggregated health check for all microservices' })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Aggregated health check for all microservices (Admin only)',
+  })
   @ApiOkResponse({
     description:
       'Status of gateway + downstream services (progression, payment, worker)',
   })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
+  @ApiForbiddenResponse({ description: 'Requires ADMIN role' })
   async check() {
     const [payment, progression, worker] = await Promise.all([
       this.ping(this.paymentClient, 'svc-payment'),

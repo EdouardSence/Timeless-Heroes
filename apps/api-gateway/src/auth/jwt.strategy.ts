@@ -6,12 +6,14 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
+import { Role } from '@repo/shared-types';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 
 export interface IJwtPayload {
   email: string;
   exp: number;
   iat: number;
+  role: Role;
   sub: string; // User ID
   username: string;
 }
@@ -33,6 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       email: payload.email,
+      role: payload.role ?? Role.PLAYER, // Default for tokens issued before RBAC
       userId: payload.sub,
       username: payload.username,
     };

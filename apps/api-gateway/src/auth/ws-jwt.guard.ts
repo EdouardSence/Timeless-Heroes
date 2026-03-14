@@ -13,6 +13,8 @@ import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
+import { Role } from '@repo/shared-types';
+
 import { IJwtPayload } from './jwt.strategy';
 
 /**
@@ -22,6 +24,7 @@ export interface IAuthenticatedSocket extends Socket {
   userId?: string;
   email?: string;
   username?: string;
+  role?: Role;
 }
 
 @Injectable()
@@ -45,6 +48,7 @@ export class WsJwtGuard implements CanActivate {
       client.userId = payload.sub;
       client.email = payload.email;
       client.username = payload.username;
+      client.role = payload.role ?? Role.PLAYER;
 
       return true;
     } catch (error) {

@@ -30,10 +30,13 @@ import {
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
+import { Role } from '@repo/shared-types';
+
 import { AuthService, IAuthResult } from './auth.service';
 
 interface IAuthenticatedUser {
   email: string;
+  role: Role;
   userId: string;
   username: string;
 }
@@ -75,6 +78,9 @@ class AuthResultDto {
 
   @ApiProperty({ example: 'PlayerOne' })
   username!: string;
+
+  @ApiProperty({ example: 'PLAYER', enum: ['PLAYER', 'ADMIN'] })
+  role!: string;
 }
 
 class MeResponseDto {
@@ -86,6 +92,9 @@ class MeResponseDto {
 
   @ApiProperty({ example: 'player@example.com' })
   email!: string;
+
+  @ApiProperty({ example: 'PLAYER', enum: ['PLAYER', 'ADMIN'] })
+  role!: string;
 }
 
 @ApiTags('Auth')
@@ -138,6 +147,7 @@ export class AuthController {
   me(@Request() req: { user: IAuthenticatedUser }) {
     return {
       email: req.user.email,
+      role: req.user.role,
       userId: req.user.userId,
       username: req.user.username,
     };
