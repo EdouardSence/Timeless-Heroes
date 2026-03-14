@@ -235,7 +235,7 @@ export class IdempotencyService {
    * Get the Redis key for an idempotency record
    */
   private getRedisKey(idempotencyKey: string): string {
-    return `idempotency:${idempotencyKey}`;
+    return RedisKeys.IDEMPOTENCY_KEY(idempotencyKey);
   }
 
   /**

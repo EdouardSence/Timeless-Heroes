@@ -5,7 +5,8 @@
  * Handles:
  * - KEY_PRESS events (clicks)
  * - Balance updates
- * - Item purchases
+ * - Item purchases (via svc-user-progression)
+ * - Shop item listing (via svc-user-progression)
  * - Leaderboard updates
  * - Offline rewards
  *
@@ -28,6 +29,8 @@ import {
 import { LeaderboardService, RedisKeys } from '@repo/redis-client';
 import {
   IClickResult,
+  IItemPurchaseRequest,
+  IItemPurchaseResult,
   IKeyPressPayload,
   ILeaderboardUpdate,
   IProgressionData,
@@ -71,6 +74,8 @@ export class GameGateway
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     @Inject(ServiceToken.PROGRESSION)
     private readonly progressionClient: ClientProxy,
+    @Inject(ServiceToken.PAYMENT)
+    private readonly paymentClient: ClientProxy,
   ) {}
 
   afterInit() {
@@ -236,6 +241,102 @@ export class GameGateway
     return result;
   }
 
+  // ========================================================================
+  // SHOP & ITEM PURCHASE (delegated to svc-user-progression)
+  // ========================================================================
+
+  /**
+   * Handle GET_SHOP event — fetch available items for the connected user
+   * Delegated to svc-user-progression via ClientProxy
+   */
+  @SubscribeMessage(WebSocketEvent.GET_SHOP)
+  async handleGetShop(
+    @ConnectedSocket() client: IAuthenticatedSocket,
+  ): Promise<{ error: string } | undefined> {
+    const userId = client.userId;
+
+    if (!userId) {
+      return { error: 'Not authenticated' };
+    }
+
+    const items: unknown = await firstValueFrom(
+      this.progressionClient.send(ProgressionCommand.GET_AVAILABLE_ITEMS, {
+        userId,
+      }),
+    );
+
+    client.emit(WebSocketEvent.SHOP_DATA, { items });
+
+    return undefined;
+  }
+
+  /**
+   * Handle PURCHASE_ITEM event
+   * Delegated to svc-user-progression via ClientProxy.
+   * After a successful purchase the gateway invalidates the cached progression
+   * so the next click uses fresh multipliers.
+   */
+  @SubscribeMessage(WebSocketEvent.PURCHASE_ITEM)
+  async handlePurchaseItem(
+    @ConnectedSocket() client: IAuthenticatedSocket,
+    @MessageBody() data: { itemSlug: string; quantity?: number },
+  ): Promise<IItemPurchaseResult | { error: string }> {
+    const userId = client.userId;
+
+    if (!userId) {
+      return { error: 'Not authenticated' };
+    }
+
+    const request: IItemPurchaseRequest = {
+      itemSlug: data.itemSlug,
+      quantity: data.quantity ?? 1,
+      userId,
+    };
+
+    const result = await firstValueFrom(
+      this.progressionClient.send<IItemPurchaseResult>(
+        ProgressionCommand.PURCHASE_ITEM,
+        request,
+      ),
+    );
+
+    if (result.success) {
+      // Invalidate progression cache so next click picks up new multipliers
+      await this.clickProcessor.invalidateCache(userId);
+
+      // Emit purchase confirmation to the client
+      client.emit(WebSocketEvent.ITEM_PURCHASED, result);
+
+      // Also emit updated balance
+      const progression = await firstValueFrom(
+        this.progressionClient.send<IProgressionData>(
+          ProgressionCommand.GET_PROGRESSION,
+          { userId },
+        ),
+      );
+
+      await this.clickProcessor.cacheProgression(progression);
+
+      client.emit(WebSocketEvent.BALANCE_UPDATE, {
+        clickMultiplier: progression.clickMultiplier,
+        level: progression.level,
+        linesOfCode: progression.linesOfCode,
+        passiveMultiplier: progression.passiveMultiplier,
+      });
+    } else {
+      client.emit(WebSocketEvent.ERROR, {
+        code: result.error,
+        message: `Purchase failed: ${result.error}`,
+      });
+    }
+
+    return result;
+  }
+
+  // ========================================================================
+  // LEADERBOARD
+  // ========================================================================
+
   /**
    * Get leaderboard data
    */
@@ -291,6 +392,10 @@ export class GameGateway
 
     return response;
   }
+
+  // ========================================================================
+  // PRIVATE HELPERS
+  // ========================================================================
 
   /**
    * Send initial game data to newly connected client

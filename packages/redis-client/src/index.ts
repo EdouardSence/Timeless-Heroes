@@ -123,6 +123,9 @@ export const RedisKeys = {
   // Locks (for distributed operations)
   LOCK_USER: (userId: string) => `lock:user:${userId}`,
   LOCK_PAYMENT: (paymentId: string) => `lock:payment:${paymentId}`,
+
+  // Idempotency records (payment deduplication)
+  IDEMPOTENCY_KEY: (idempotencyKey: string) => `idempotency:${idempotencyKey}`,
 } as const;
 
 // ============================================================================
