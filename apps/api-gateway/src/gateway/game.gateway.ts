@@ -115,12 +115,13 @@ export class GameGateway
       // Join user-specific room for targeted messages
       await client.join(`user:${userId}`);
 
-      // Track session in Redis
+      // Track session in Redis (include username for leaderboard lookups)
       await this.redis.set(
         RedisKeys.USER_SESSION(userId),
         JSON.stringify({
           socketId: client.id,
           connectedAt: Date.now(),
+          username,
         }),
       );
 
@@ -255,15 +256,47 @@ export class GameGateway
       this.leaderboardService.getTotalPlayers(leaderboardKey),
     ]);
 
-    // Map to response format
-    const entries = topPlayers.map((entry) => ({
-      rank: entry.rank,
-      userId: entry.userId,
-      username: `Player_${entry.userId.slice(0, 8)}`, // TODO: Fetch actual usernames
-      score: entry.score.toString(),
-      level: 1, // TODO: Fetch from progression
-      prestigeLevel: 0,
-    }));
+    // Map to response format — fetch real usernames and levels via NATS
+    const entries = await Promise.all(
+      topPlayers.map(async (entry) => {
+        let username = `Player_${entry.userId.slice(0, 8)}`;
+        let level = 1;
+        let prestigeLevel = 0;
+
+        try {
+          const progression = await firstValueFrom(
+            this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId: entry.userId }),
+          );
+          if (progression) {
+            level = progression.level ?? 1;
+          }
+        } catch {
+          // Fallback to defaults if progression service is unavailable
+        }
+
+        // Try to get username from Redis session data
+        const sessionData = await this.redis.get(RedisKeys.USER_SESSION(entry.userId));
+        if (sessionData) {
+          try {
+            const session = JSON.parse(sessionData);
+            if (session.username) {
+              username = session.username;
+            }
+          } catch {
+            // ignore parse errors
+          }
+        }
+
+        return {
+          rank: entry.rank,
+          userId: entry.userId,
+          username,
+          score: entry.score.toString(),
+          level,
+          prestigeLevel,
+        };
+      }),
+    );
 
     const response: ILeaderboardUpdate = {
       type: leaderboardType,
@@ -330,14 +363,45 @@ export class GameGateway
 
       client.emit(WebSocketEvent.LEADERBOARD_UPDATE, {
         type: LeaderboardType.GLOBAL,
-        entries: entries.map((e) => ({
-          rank: e.rank,
-          userId: e.userId,
-          username: `Player_${e.userId.slice(0, 8)}`,
-          score: e.score.toString(),
-          level: 1,
-          prestigeLevel: 0,
-        })),
+        entries: await Promise.all(
+          entries.map(async (e) => {
+            let username = `Player_${e.userId.slice(0, 8)}`;
+            let level = 1;
+
+            try {
+              const prog = await firstValueFrom(
+                this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId: e.userId }),
+              );
+              if (prog) {
+                level = prog.level ?? 1;
+              }
+            } catch {
+              // fallback
+            }
+
+            // Try to get username from Redis session
+            const sessionData = await this.redis.get(RedisKeys.USER_SESSION(e.userId));
+            if (sessionData) {
+              try {
+                const session = JSON.parse(sessionData);
+                if (session.username) {
+                  username = session.username;
+                }
+              } catch {
+                // ignore
+              }
+            }
+
+            return {
+              rank: e.rank,
+              userId: e.userId,
+              username,
+              score: e.score.toString(),
+              level,
+              prestigeLevel: 0,
+            };
+          }),
+        ),
         userRank,
         totalPlayers: await this.leaderboardService.getTotalPlayers(),
       });
@@ -380,7 +444,22 @@ export class GameGateway
     const earnedLoc = Math.floor(offlineRate * effectiveDuration);
 
     if (earnedLoc > 0) {
-      // TODO: Actually credit the earnings via progression service
+      // Credit offline earnings via NATS -> svc-user-progression
+      const earnedExp = Math.floor(earnedLoc * 0.1);
+
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+          userId,
+          delta: earnedLoc.toString(),
+        }),
+      );
+
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+          userId,
+          experience: earnedExp,
+        }),
+      );
 
       client.emit(WebSocketEvent.OFFLINE_REWARDS, {
         userId,
@@ -391,7 +470,7 @@ export class GameGateway
         effectiveDuration,
         offlineRate,
         earnedLoc: earnedLoc.toString(),
-        earnedExp: '0', // TODO: Calculate EXP
+        earnedExp: earnedExp.toString(),
         completedPrograms: [],
       });
     }
