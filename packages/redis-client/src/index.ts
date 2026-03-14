@@ -3,7 +3,7 @@
  * Centralized Redis configuration and utilities for Timeless-Heroes
  */
 
-import { Job, Queue, QueueEvents, Worker } from 'bullmq';
+import { Job, JobsOptions, Queue, QueueEvents, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import type { RedisOptions } from 'ioredis';
 
@@ -232,8 +232,8 @@ export class LeaderboardService {
     leaderboardKey: string = RedisKeys.LEADERBOARD_GLOBAL,
   ): Promise<number> {
     const numericScore = typeof score === 'string' ? parseFloat(score) : score;
-    // ZADD returns 1 if new member, 0 if existed
-    return this.redis.zadd(leaderboardKey, numericScore, userId);
+    // GT flag: only update if new score > existing score (prevents score regression)
+    return this.redis.zadd(leaderboardKey, 'GT', numericScore, userId);
   }
 
   /**
@@ -441,7 +441,7 @@ export class ThrottleService {
 
 export const createQueue = <T>(
   name: string,
-  defaultJobOptions?: Record<string, any>,
+  defaultJobOptions?: Partial<JobsOptions>,
 ): Queue<T> => {
   return new Queue<T>(name, {
     connection: getRedisConfig() as RedisOptions,
@@ -552,3 +552,4 @@ export class DistributedLock {
 // ============================================================================
 
 export { Job, Queue, QueueEvents, Redis, Worker };
+export type { JobsOptions };

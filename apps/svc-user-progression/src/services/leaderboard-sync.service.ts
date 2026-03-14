@@ -3,11 +3,14 @@
  * Syncs user scores to Redis leaderboards
  */
 
-import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { Queue } from 'bullmq';
-import { LeaderboardService, RedisKeys, getRedisClient } from '@repo/redis-client';
-import { LeaderboardType, QueueName } from '@repo/shared-types';
+import {
+  ILeaderboardEntry,
+  LeaderboardService,
+  RedisKeys,
+  getRedisClient,
+} from '@repo/redis-client';
+import { LeaderboardType } from '@repo/shared-types';
 import { prisma } from '@repo/prisma-client';
 
 @Injectable()
@@ -15,10 +18,7 @@ export class LeaderboardSyncService {
   private readonly logger = new Logger(LeaderboardSyncService.name);
   private leaderboardService: LeaderboardService;
 
-  constructor(
-    @InjectQueue(QueueName.LEADERBOARD_UPDATE)
-    private readonly leaderboardQueue: Queue,
-  ) {
+  constructor() {
     this.leaderboardService = new LeaderboardService(getRedisClient());
   }
 
@@ -72,30 +72,44 @@ export class LeaderboardSyncService {
   /**
    * Get leaderboard data, enriched with usernames from PostgreSQL
    */
-  async getLeaderboard(type: LeaderboardType, count: number = 100) {
-    let rawEntries;
+  async getLeaderboard(
+    type: LeaderboardType,
+    count: number = 100,
+  ): Promise<ILeaderboardEntry[]> {
+    let rawEntries: ILeaderboardEntry[];
     switch (type) {
       case LeaderboardType.WEEKLY:
-        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_WEEKLY);
+        rawEntries = await this.leaderboardService.getTopPlayers(
+          count,
+          RedisKeys.LEADERBOARD_WEEKLY,
+        );
         break;
       case LeaderboardType.DAILY:
-        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_DAILY);
+        rawEntries = await this.leaderboardService.getTopPlayers(
+          count,
+          RedisKeys.LEADERBOARD_DAILY,
+        );
         break;
       default:
-        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_GLOBAL);
+        rawEntries = await this.leaderboardService.getTopPlayers(
+          count,
+          RedisKeys.LEADERBOARD_GLOBAL,
+        );
     }
 
     if (rawEntries.length === 0) return rawEntries;
 
     // Batch-fetch usernames from PostgreSQL
-    const userIds = rawEntries.map((e) => e.userId);
+    const userIds = rawEntries.map((e: ILeaderboardEntry) => e.userId);
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, username: true },
     });
-    const usernameMap = new Map(users.map((u) => [u.id, u.username]));
+    const usernameMap = new Map(
+      users.map((u: { id: string; username: string }) => [u.id, u.username]),
+    );
 
-    return rawEntries.map((entry) => ({
+    return rawEntries.map((entry: ILeaderboardEntry) => ({
       ...entry,
       username: usernameMap.get(entry.userId) ?? entry.userId,
     }));
@@ -106,9 +120,10 @@ export class LeaderboardSyncService {
    */
   async resetPeriodicLeaderboards(type: 'weekly' | 'daily'): Promise<void> {
     const redis = getRedisClient();
-    const key = type === 'weekly'
-      ? RedisKeys.LEADERBOARD_WEEKLY
-      : RedisKeys.LEADERBOARD_DAILY;
+    const key =
+      type === 'weekly'
+        ? RedisKeys.LEADERBOARD_WEEKLY
+        : RedisKeys.LEADERBOARD_DAILY;
 
     // Archive before reset (optional)
     const archiveKey = `${key}:archive:${Date.now()}`;
