@@ -111,14 +111,13 @@ export default function Menu() {
 
   useEffect(() => {
     if (activeTab !== 'leaderboard') return;
-    if (!backendOnline) return;
 
     fetchLeaderboard();
 
     // Auto-refresh every 15 seconds while on the leaderboard tab
     const interval = setInterval(fetchLeaderboard, 15000);
     return () => clearInterval(interval);
-  }, [activeTab, backendOnline]);
+  }, [activeTab]);
 
   // Update multiplier and passive when items change (only after initial load)
   useEffect(() => {
@@ -206,9 +205,7 @@ export default function Menu() {
           <h1>Timeless Heroes</h1>
         </div>
         <div className="menu-header-actions">
-          {username && (
-            <span className="menu-username">@{username}</span>
-          )}
+          {username && <span className="menu-username">@{username}</span>}
           <button
             className="logout-button"
             onClick={handleLogout}
@@ -377,9 +374,7 @@ export default function Menu() {
                 leaderboard.map((entry) => (
                   <div key={entry.userId} className="your-rank">
                     <span className="rank-number">#{entry.rank}</span>
-                    <span className="rank-name">
-                      {entry.username}
-                    </span>
+                    <span className="rank-name">{entry.username}</span>
                     <span className="rank-score">
                       {formatNumber(entry.score)} LoC
                     </span>

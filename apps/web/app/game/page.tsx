@@ -143,8 +143,7 @@ export default function GamePage() {
       }) => {
         setGameState((prev) => ({
           ...prev,
-          linesOfCode:
-            parseFloat(result.newBalance || '0') || prev.linesOfCode,
+          linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
           totalKeyPresses: prev.totalKeyPresses + 1,
           multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
         }));
@@ -219,7 +218,9 @@ export default function GamePage() {
       (err: { code?: string; message?: string }) => {
         console.error('Server error:', err);
         if (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_FAILED') {
-          showNotification('Authentification requise. Veuillez vous connecter.');
+          showNotification(
+            'Authentification requise. Veuillez vous connecter.',
+          );
         }
       },
     );
@@ -295,11 +296,14 @@ export default function GamePage() {
     socketRef.current.emit('GET_LEADERBOARD', { type: 'GLOBAL', count: 50 });
   }, []);
 
-  // Fetch leaderboard when tab is selected
+  // Fetch leaderboard when tab is selected, then poll every 15s
   useEffect(() => {
-    if (activeTab === 'leaderboard') {
-      requestLeaderboard();
-    }
+    if (activeTab !== 'leaderboard') return;
+
+    requestLeaderboard();
+
+    const interval = setInterval(requestLeaderboard, 15_000);
+    return () => clearInterval(interval);
   }, [activeTab, requestLeaderboard]);
 
   const expProgress =
