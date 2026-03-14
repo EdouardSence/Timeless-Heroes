@@ -14,21 +14,21 @@ import { JwtStrategy } from './jwt.strategy';
 import { WsJwtGuard } from './ws-jwt.guard';
 
 @Module({
+  exports: [JwtModule, WsJwtGuard, AuthService],
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
+      inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d'),
         },
       }),
-      inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],
   providers: [JwtStrategy, WsJwtGuard, AuthService],
-  exports: [JwtModule, WsJwtGuard, AuthService],
 })
 export class AuthModule {}

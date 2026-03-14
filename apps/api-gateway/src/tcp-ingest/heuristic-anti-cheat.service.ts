@@ -1,24 +1,24 @@
 /**
  * Heuristic Anti-Cheat Service
  * Detects bot-like behavior through typing pattern analysis
- * 
+ *
  * A human has variable timing between keystrokes.
  * A bot has suspiciously consistent timing (e.g., exactly 10ms between each key).
- * 
+ *
  * This service analyzes:
  * 1. Rate of key presses (CPS)
  * 2. Timing variance (standard deviation)
  * 3. Pattern regularity
- * 
+ *
  * All timing data is stored in Redis (no in-memory Maps).
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { RedisKeys } from '@repo/redis-client';
 import Redis from 'ioredis';
 
-import { RedisKeys } from '@repo/redis-client';
-import { IAntiCheatResult, AntiCheatReason, ITypingMetrics } from './tcp-ingest.types';
+import { IAntiCheatResult, ITypingMetrics } from './tcp-ingest.types';
 
 @Injectable()
 export class HeuristicAntiCheatService {
@@ -44,14 +44,17 @@ export class HeuristicAntiCheatService {
    * Analyze a key press and determine if it's human or bot behavior
    * All timing data is stored in Redis for distributed access.
    */
-  async analyzeKeyPress(userId: string, timestamp: number): Promise<IAntiCheatResult> {
+  async analyzeKeyPress(
+    userId: string,
+    timestamp: number,
+  ): Promise<IAntiCheatResult> {
     // 1. Check if user is banned
     const violations = await this.redis.get(RedisKeys.USER_VIOLATIONS(userId));
-    if (violations && parseInt(violations, 10) >= 10) {
+    if (violations && Number.parseInt(violations, 10) >= 10) {
       return {
         allowed: false,
-        reason: 'USER_BANNED',
         humanScore: 0,
+        reason: 'USER_BANNED',
       };
     }
 
@@ -60,7 +63,9 @@ export class HeuristicAntiCheatService {
 
     // 2. Get last timestamp from Redis list
     const lastTimestampStr = await this.redis.lindex(timestampsKey, -1);
-    const lastTimestamp = lastTimestampStr ? parseInt(lastTimestampStr, 10) : null;
+    const lastTimestamp = lastTimestampStr
+      ? Number.parseInt(lastTimestampStr, 10)
+      : null;
     const deltaMs = lastTimestamp ? timestamp - lastTimestamp : 100;
 
     // 3. Push new timestamp and trim to window size (atomic pipeline)
@@ -70,7 +75,7 @@ export class HeuristicAntiCheatService {
     pipeline.expire(timestampsKey, this.TIMING_TTL);
 
     // Only store delta if it's meaningful (> 0 and < 10 seconds)
-    if (deltaMs > 0 && deltaMs < 10000) {
+    if (deltaMs > 0 && deltaMs < 10_000) {
       pipeline.rpush(deltasKey, deltaMs.toString());
       pipeline.ltrim(deltasKey, -(this.WINDOW_SIZE - 1), -1);
       pipeline.expire(deltasKey, this.TIMING_TTL);
@@ -79,7 +84,7 @@ export class HeuristicAntiCheatService {
 
     // 4. Get current deltas from Redis
     const deltaStrs = await this.redis.lrange(deltasKey, 0, -1);
-    const deltas = deltaStrs.map((d) => parseInt(d, 10));
+    const deltas = deltaStrs.map((d) => Number.parseInt(d, 10));
 
     // 5. Need at least 5 samples for meaningful analysis
     if (deltas.length < 5) {
@@ -103,7 +108,8 @@ export class HeuristicAntiCheatService {
 
     // Standard deviation
     const squareDiffs = deltas.map((d) => Math.pow(d - averageDeltaMs, 2));
-    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / deltas.length;
+    const avgSquareDiff =
+      squareDiffs.reduce((a, b) => a + b, 0) / deltas.length;
     const deltaStdDev = Math.sqrt(avgSquareDiff);
 
     // Current CPS (based on recent average)
@@ -112,15 +118,21 @@ export class HeuristicAntiCheatService {
     // Count regular intervals (same ±5ms)
     let regularIntervalCount = 0;
     for (let i = 1; i < deltas.length; i++) {
-      if (Math.abs(deltas[i] - deltas[i - 1]) < 5) {
+      const current = deltas[i];
+      const previous = deltas[i - 1];
+      if (
+        current !== undefined &&
+        previous !== undefined &&
+        Math.abs(current - previous) < 5
+      ) {
         regularIntervalCount++;
       }
     }
 
     return {
       averageDeltaMs,
-      deltaStdDev,
       currentCPS,
+      deltaStdDev,
       regularIntervalCount,
     };
   }
@@ -128,15 +140,19 @@ export class HeuristicAntiCheatService {
   /**
    * Evaluate metrics and return anti-cheat result
    */
-  private evaluateMetrics(metrics: ITypingMetrics, currentDeltaMs: number): IAntiCheatResult {
-    const { averageDeltaMs, deltaStdDev, currentCPS, regularIntervalCount } = metrics;
+  private evaluateMetrics(
+    metrics: ITypingMetrics,
+    currentDeltaMs: number,
+  ): IAntiCheatResult {
+    const { averageDeltaMs, currentCPS, deltaStdDev, regularIntervalCount } =
+      metrics;
 
     // Check 1: Rate too fast (CPS limit)
     if (currentCPS > this.MAX_CPS) {
       return {
         allowed: false,
-        reason: 'RATE_TOO_FAST',
         humanScore: 0.1,
+        reason: 'RATE_TOO_FAST',
       };
     }
 
@@ -144,8 +160,8 @@ export class HeuristicAntiCheatService {
     if (currentDeltaMs > 0 && currentDeltaMs < this.MIN_DELTA_MS) {
       return {
         allowed: false,
-        reason: 'RATE_TOO_FAST',
         humanScore: 0.1,
+        reason: 'RATE_TOO_FAST',
       };
     }
 
@@ -158,8 +174,8 @@ export class HeuristicAntiCheatService {
       if (regularityScore > this.MAX_REGULARITY_SCORE) {
         return {
           allowed: false,
-          reason: 'TIMING_TOO_REGULAR',
           humanScore: 0.2,
+          reason: 'TIMING_TOO_REGULAR',
         };
       }
 
@@ -175,7 +191,7 @@ export class HeuristicAntiCheatService {
     // More variance = more human-like
     const varianceScore = Math.min(1, deltaStdDev / 50);
     const speedScore = Math.min(1, averageDeltaMs / 100);
-    const humanScore = (varianceScore * 0.6 + speedScore * 0.4);
+    const humanScore = varianceScore * 0.6 + speedScore * 0.4;
 
     return {
       allowed: true,
@@ -189,7 +205,7 @@ export class HeuristicAntiCheatService {
   async getUserMetrics(userId: string): Promise<ITypingMetrics | null> {
     const deltasKey = RedisKeys.ANTICHEAT_DELTAS(userId);
     const deltaStrs = await this.redis.lrange(deltasKey, 0, -1);
-    const deltas = deltaStrs.map((d) => parseInt(d, 10));
+    const deltas = deltaStrs.map((d) => Number.parseInt(d, 10));
 
     if (deltas.length < 5) {
       return null;

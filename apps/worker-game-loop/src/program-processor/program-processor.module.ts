@@ -14,7 +14,9 @@ import { ProgramProcessorService } from './program-processor.service';
 import { ProgramWorker } from './program.worker';
 
 @Module({
+  exports: [ProgramProcessorService],
   imports: [
+    ConfigModule,
     BullModule.registerQueue({
       name: QueueName.PROGRAM_COMPLETION,
     }),
@@ -37,6 +39,5 @@ import { ProgramWorker } from './program.worker';
     ProgramWorker,
     LootCalculatorService,
   ],
-  exports: [ProgramProcessorService],
 })
 export class ProgramProcessorModule {}

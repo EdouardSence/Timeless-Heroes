@@ -3,7 +3,12 @@
  * Validates session authentication for keylogger HTTP requests
  */
 
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 
 import { TcpIngestService } from './tcp-ingest.service';
 
@@ -11,14 +16,16 @@ import { TcpIngestService } from './tcp-ingest.service';
 export class IngestAuthGuard implements CanActivate {
   private readonly logger = new Logger(IngestAuthGuard.name);
 
-  constructor(private readonly tcpIngestService: TcpIngestService) { }
+  constructor(private readonly tcpIngestService: TcpIngestService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ body: { sessionId?: string; userId?: string } }>();
     const data = request.body;
 
     // Extract session ID from the request body
-    const sessionId = data?.sessionId;
+    const sessionId = data.sessionId;
 
     if (!sessionId) {
       this.logger.warn('Ingest request missing sessionId');
@@ -34,9 +41,12 @@ export class IngestAuthGuard implements CanActivate {
     }
 
     // Verify userId matches session
-    const expectedUserId = await this.tcpIngestService.getUserIdFromSession(sessionId);
-    if (data?.userId && data.userId !== expectedUserId) {
-      this.logger.warn(`User ID mismatch: expected ${expectedUserId}, got ${data.userId}`);
+    const expectedUserId =
+      await this.tcpIngestService.getUserIdFromSession(sessionId);
+    if (data.userId && data.userId !== expectedUserId) {
+      this.logger.warn(
+        `User ID mismatch: expected ${expectedUserId}, got ${data.userId}`,
+      );
       return false;
     }
 

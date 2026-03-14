@@ -19,7 +19,6 @@
     "socket.io-client": "^4.8.0"
   },
   "devDependencies": {
-    "@repo/api": "workspace:*",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",

@@ -13,7 +13,9 @@ import { OfflineCalculatorService } from './offline-calculator.service';
 import { OfflineWorker } from './offline.worker';
 
 @Module({
+  exports: [OfflineCalculatorService],
   imports: [
+    ConfigModule,
     BullModule.registerQueue({
       name: QueueName.OFFLINE_CALCULATION,
     }),
@@ -32,6 +34,5 @@ import { OfflineWorker } from './offline.worker';
     ]),
   ],
   providers: [OfflineCalculatorService, OfflineWorker],
-  exports: [OfflineCalculatorService],
 })
 export class OfflineCalculatorModule {}

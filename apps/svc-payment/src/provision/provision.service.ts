@@ -14,21 +14,21 @@ import { firstValueFrom } from 'rxjs';
 import { NATS_SERVICE, NatsPattern, ProductType, ProvisionError } from '@repo/shared-types';
 
 interface IProvisionResult {
-  success: boolean;
   error?: string;
+  success: boolean;
 }
 
 @Injectable()
 export class ProvisionService {
   private readonly logger = new Logger(ProvisionService.name);
-  
+
   constructor(
     @Inject(NATS_SERVICE.PROGRESSION)
     private readonly natsClient: ClientProxy,
     @Inject('REDIS_CLIENT')
     private readonly redis: Redis,
   ) {}
-  
+
   /**
    * Provision a purchased order to the user's account
    */
@@ -38,29 +38,34 @@ export class ProvisionService {
     productData: Record<string, unknown>,
   ): Promise<IProvisionResult> {
     this.logger.log(`Provisioning ${productType} for user ${userId}`);
-    
+
     switch (productType) {
-      case ProductType.PREMIUM_CURRENCY:
+      case ProductType.PREMIUM_CURRENCY: {
         return this.provisionPremiumCurrency(userId, productData);
-        
-      case ProductType.ITEM_PACK:
+      }
+
+      case ProductType.ITEM_PACK: {
         return this.provisionItemPack(userId, productData);
-        
-      case ProductType.SUBSCRIPTION:
+      }
+
+      case ProductType.SUBSCRIPTION: {
         return this.provisionSubscription(userId, productData);
-        
-      case ProductType.BOOST:
+      }
+
+      case ProductType.BOOST: {
         return this.provisionBoost(userId, productData);
-        
-      default:
+      }
+
+      default: {
         this.logger.error(`Unknown product type: ${productType}`);
         return {
-          success: false,
           error: ProvisionError.INVALID_PRODUCT,
+          success: false,
         };
+      }
     }
   }
-  
+
   /**
    * Provision premium currency (gems, coins, etc.)
    * Calls progression service to update the user's balance.
@@ -70,14 +75,14 @@ export class ProvisionService {
     productData: Record<string, unknown>,
   ): Promise<IProvisionResult> {
     const amount = productData.amount as number;
-    
+
     if (!amount || amount <= 0) {
       return {
-        success: false,
         error: 'Invalid currency amount',
+        success: false,
       };
     }
-    
+
     try {
       await firstValueFrom(
         this.natsClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
@@ -85,7 +90,7 @@ export class ProvisionService {
           delta: amount.toString(),
         }),
       );
-      
+
       this.logger.log(`Provisioned ${amount} premium currency to ${userId}`);
       return { success: true };
     } catch (error) {
@@ -94,7 +99,7 @@ export class ProvisionService {
       return { success: false, error: msg };
     }
   }
-  
+
   /**
    * Provision an item pack
    * Calls progression service to add each item to the user's inventory.
@@ -103,15 +108,17 @@ export class ProvisionService {
     userId: string,
     productData: Record<string, unknown>,
   ): Promise<IProvisionResult> {
-    const items = productData.items as Array<{ itemSlug: string; quantity: number }>;
-    
+    const items = productData.items as
+      | { itemSlug: string; quantity: number }[]
+      | undefined;
+
     if (!items || items.length === 0) {
       return {
-        success: false,
         error: 'Invalid item pack data',
+        success: false,
       };
     }
-    
+
     try {
       // Add each item via NATS to progression service
       for (const item of items) {
@@ -123,7 +130,7 @@ export class ProvisionService {
           }),
         );
       }
-      
+
       this.logger.log(
         `Provisioned item pack (${items.length} items) to ${userId}`,
       );
@@ -134,7 +141,7 @@ export class ProvisionService {
       return { success: false, error: msg };
     }
   }
-  
+
   /**
    * Provision a subscription (VIP, Premium, etc.)
    * Stores subscription status in Redis with TTL and notifies progression service.
@@ -145,19 +152,19 @@ export class ProvisionService {
   ): Promise<IProvisionResult> {
     const subscriptionType = productData.subscriptionType as string;
     const durationDays = productData.durationDays as number;
-    
+
     if (!subscriptionType || !durationDays) {
       return {
-        success: false,
         error: 'Invalid subscription data',
+        success: false,
       };
     }
-    
+
     try {
       const expiresAt = Date.now() + durationDays * 24 * 60 * 60 * 1000;
       const subscriptionKey = `subscription:${userId}`;
       const ttlSeconds = durationDays * 24 * 60 * 60;
-      
+
       // Store subscription in Redis with TTL
       await this.redis.setex(
         subscriptionKey,
@@ -169,7 +176,7 @@ export class ProvisionService {
           durationDays,
         }),
       );
-      
+
       this.logger.log(
         `Provisioned ${subscriptionType} subscription (${durationDays} days) to ${userId}`,
       );
@@ -180,7 +187,7 @@ export class ProvisionService {
       return { success: false, error: msg };
     }
   }
-  
+
   /**
    * Provision a temporary boost
    * Stores active boost in Redis with TTL so click-processor can read it.
@@ -192,17 +199,17 @@ export class ProvisionService {
     const boostType = productData.boostType as string;
     const multiplier = productData.multiplier as number;
     const durationSeconds = productData.durationSeconds as number;
-    
+
     if (!boostType || !multiplier || !durationSeconds) {
       return {
-        success: false,
         error: 'Invalid boost data',
+        success: false,
       };
     }
-    
+
     try {
       const boostKey = `boost:${userId}:${boostType}`;
-      
+
       // Store active boost in Redis with TTL
       await this.redis.setex(
         boostKey,
@@ -213,7 +220,7 @@ export class ProvisionService {
           expiresAt: Date.now() + durationSeconds * 1000,
         }),
       );
-      
+
       this.logger.log(
         `Provisioned ${boostType} boost (${multiplier}x for ${durationSeconds}s) to ${userId}`,
       );

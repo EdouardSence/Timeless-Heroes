@@ -8,7 +8,26 @@ export const nestConfig = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
-  collectCoverageFrom: ['**/*.(t|j)s'],
+  collectCoverageFrom: [
+    '**/*.service.ts',
+    '**/*.controller.ts',
+    '**/*.guard.ts',
+    '**/*.gateway.ts',
+    '**/*.worker.ts',
+    '**/*.processor.ts',
+    '!**/*.spec.ts',
+    '!**/*.module.ts',
+    '!**/main.ts',
+    '!**/index.ts',
+  ],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '\\.dto\\.ts$',
+    '\\.entity\\.ts$',
+    '\\.interface\\.ts$',
+    '\\.types\\.ts$',
+  ],
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
 } as const satisfies Config;

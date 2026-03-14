@@ -24,11 +24,15 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "infra:up": "docker-compose up -d postgres redis",
-    "infra:down": "docker-compose down postgres redis"
+    "infra:down": "docker-compose down postgres redis",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.4",
+    "@commitlint/config-conventional": "^20.4.4",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "husky": "^9.1.7",
     "prettier": "^3.2.5",
     "turbo": "^2.8.1"
   },

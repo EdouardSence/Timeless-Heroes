@@ -7,15 +7,18 @@
  */
 
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 
-import { TcpIngestController } from './tcp-ingest.controller';
-import { TcpIngestService } from './tcp-ingest.service';
-import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import { RedisModule } from '../redis/redis.module';
 
+import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
+import { TcpIngestController } from './tcp-ingest.controller';
+import { TcpIngestService } from './tcp-ingest.service';
+
 @Module({
+  controllers: [TcpIngestController],
+  exports: [TcpIngestService],
   imports: [
     ConfigModule,
     RedisModule,
@@ -30,8 +33,6 @@ import { RedisModule } from '../redis/redis.module';
       }),
     }),
   ],
-  controllers: [TcpIngestController],
   providers: [TcpIngestService, HeuristicAntiCheatService],
-  exports: [TcpIngestService],
 })
-export class TcpIngestModule { }
+export class TcpIngestModule {}

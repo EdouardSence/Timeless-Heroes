@@ -5,16 +5,13 @@
     "allowSyntheticDefaultImports": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "forceConsistentCasingInFileNames": false,
+    "forceConsistentCasingInFileNames": true,
     "incremental": true,
     "isolatedModules": false,
     "module": "commonjs",
     "moduleResolution": "Node10",
-    "noFallthroughCasesInSwitch": false,
-    "noImplicitAny": false,
+    "noFallthroughCasesInSwitch": true,
     "removeComments": true,
-    "sourceMap": true,
-    "strictNullChecks": false,
-    "strictBindCallApply": false
+    "sourceMap": true
   }
 }

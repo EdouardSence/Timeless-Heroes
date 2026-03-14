@@ -22,19 +22,19 @@ async function bootstrap() {
   // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,
       },
+      whitelist: true,
     }),
   );
 
   // CORS configuration
   app.enableCors({
-    origin: configService.get<string>('CORS_ORIGIN', '*'),
     credentials: true,
+    origin: configService.get<string>('CORS_ORIGIN', '*'),
   });
 
   // API prefix

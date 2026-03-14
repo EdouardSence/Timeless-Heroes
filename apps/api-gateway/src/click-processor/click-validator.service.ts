@@ -11,7 +11,6 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-
 import { ThrottleService } from '@repo/redis-client';
 import {
     ClickRejectionReason,
@@ -30,10 +29,10 @@ export class ClickValidatorService {
     private readonly configService: ConfigService,
   ) {
     this.config = {
+      banDurationMs: this.configService.get<number>('BAN_DURATION_MS', 300_000), // 5 min
       maxCPS: this.configService.get<number>('MAX_CPS', 20),
-      windowMs: this.configService.get<number>('THROTTLE_WINDOW_MS', 1000),
       maxViolations: this.configService.get<number>('MAX_VIOLATIONS', 10),
-      banDurationMs: this.configService.get<number>('BAN_DURATION_MS', 300000), // 5 min
+      windowMs: this.configService.get<number>('THROTTLE_WINDOW_MS', 1000),
     };
     
     this.logger.log(`Throttle config: maxCPS=${this.config.maxCPS}, maxViolations=${this.config.maxViolations}`);
@@ -44,7 +43,7 @@ export class ClickValidatorService {
    * Returns validation result with reason if rejected
    */
   async validateClick(payload: IKeyPressPayload): Promise<IClickValidation> {
-    const { userId, timestamp } = payload;
+    const { timestamp, userId } = payload;
     
     // 1. Check if user is banned
     const isBanned = await this.throttleService.isUserBanned(
@@ -55,10 +54,10 @@ export class ClickValidatorService {
     if (isBanned) {
       this.logger.warn(`User ${userId} is temporarily banned`);
       return {
-        isValid: false,
-        reason: ClickRejectionReason.USER_BANNED,
         detectedCPS: 0,
+        isValid: false,
         maxAllowedCPS: this.config.maxCPS,
+        reason: ClickRejectionReason.USER_BANNED,
       };
     }
     
@@ -67,10 +66,10 @@ export class ClickValidatorService {
     if (!timestampValidation.isValid) {
       await this.recordViolation(userId);
       return {
-        isValid: false,
-        reason: timestampValidation.reason,
         detectedCPS: 0,
+        isValid: false,
         maxAllowedCPS: this.config.maxCPS,
+        reason: timestampValidation.reason,
       };
     }
     
@@ -87,16 +86,16 @@ export class ClickValidatorService {
       );
       
       return {
-        isValid: false,
-        reason: ClickRejectionReason.RATE_LIMIT_EXCEEDED,
         detectedCPS: throttleResult.currentCPS,
+        isValid: false,
         maxAllowedCPS: this.config.maxCPS,
+        reason: ClickRejectionReason.RATE_LIMIT_EXCEEDED,
       };
     }
     
     return {
-      isValid: true,
       detectedCPS: throttleResult.currentCPS,
+      isValid: true,
       maxAllowedCPS: this.config.maxCPS,
     };
   }
@@ -117,7 +116,7 @@ export class ClickValidatorService {
     }
     
     // Check if timestamp is too old (more than 10 seconds)
-    if (timestamp < now - 10000) {
+    if (timestamp < now - 10_000) {
       return {
         isValid: false,
         reason: ClickRejectionReason.TIMESTAMP_INVALID,

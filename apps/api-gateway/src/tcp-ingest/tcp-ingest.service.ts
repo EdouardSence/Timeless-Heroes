@@ -3,20 +3,21 @@
  * Handles authentication and key press processing from keylogger
  */
 
+import * as crypto from 'node:crypto';
+
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import Redis from 'ioredis';
-import * as crypto from 'crypto';
-
 import { ClickBufferService, RedisKeys } from '@repo/redis-client';
 import { KeyType } from '@repo/shared-types';
+import Redis from 'ioredis';
+
+import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import {
   ITcpKeyPressEvent,
   ITcpAuthResponse,
   KeyCategory,
   IAntiCheatResult,
 } from './tcp-ingest.types';
-import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 
 @Injectable()
 export class TcpIngestService {
@@ -27,7 +28,7 @@ export class TcpIngestService {
     private readonly clickBufferService: ClickBufferService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly antiCheatService: HeuristicAntiCheatService,
-  ) { }
+  ) {}
 
   /**
    * Authenticate a client using JWT token
@@ -35,7 +36,10 @@ export class TcpIngestService {
   async authenticateClient(token: string): Promise<ITcpAuthResponse> {
     try {
       // Verify JWT
-      const payload = await this.jwtService.verifyAsync<{ sub: string; email: string }>(token);
+      const payload = await this.jwtService.verifyAsync<{
+        sub: string;
+        email: string;
+      }>(token);
 
       const userId = payload.sub;
       const sessionId = this.generateSessionId();
@@ -45,27 +49,29 @@ export class TcpIngestService {
       await this.redis.setex(
         RedisKeys.TCP_SESSION(sessionId),
         ttlSeconds,
-        JSON.stringify({ userId, expiresAt: Date.now() + ttlSeconds * 1000 }),
+        JSON.stringify({ expiresAt: Date.now() + ttlSeconds * 1000, userId }),
       );
 
       // Also store user session reference
       await this.redis.setex(
         RedisKeys.USER_SESSION(userId),
         ttlSeconds,
-        JSON.stringify({ sessionId, authenticatedAt: Date.now() }),
+        JSON.stringify({ authenticatedAt: Date.now(), sessionId }),
       );
 
       return {
-        success: true,
-        sessionId,
-        userId,
         message: 'Authentication successful',
+        sessionId,
+        success: true,
+        userId,
       };
     } catch (error) {
-      this.logger.warn(`Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      this.logger.warn(
+        `Authentication failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
       return {
-        success: false,
         message: 'Invalid or expired token',
+        success: false,
       };
     }
   }
@@ -74,11 +80,16 @@ export class TcpIngestService {
    * Process an anonymized key press event
    * This is the core ingestion logic
    */
-  async processKeyPress(event: ITcpKeyPressEvent): Promise<{ buffered: boolean; antiCheat: IAntiCheatResult }> {
-    const { userId, keyCategory, timestamp } = event;
+  async processKeyPress(
+    event: ITcpKeyPressEvent,
+  ): Promise<{ buffered: boolean; antiCheat: IAntiCheatResult }> {
+    const { keyCategory, timestamp, userId } = event;
 
     // 1. Run anti-cheat heuristics
-    const antiCheatResult = await this.antiCheatService.analyzeKeyPress(userId, timestamp);
+    const antiCheatResult = await this.antiCheatService.analyzeKeyPress(
+      userId,
+      timestamp,
+    );
 
     if (!antiCheatResult.allowed) {
       this.logger.warn(
@@ -88,11 +99,11 @@ export class TcpIngestService {
       // Track violations in Redis
       await this.redis.incr(RedisKeys.USER_VIOLATIONS(userId));
 
-      return { buffered: false, antiCheat: antiCheatResult };
+      return { antiCheat: antiCheatResult, buffered: false };
     }
 
     // 2. Convert key category to KeyType for multiplier calculation
-    const keyType = this.categoryToKeyType(keyCategory);
+    this.categoryToKeyType(keyCategory);
 
     // 3. Calculate base value (different key types = different bonuses)
     const baseValue = this.calculateBaseValue(keyCategory);
@@ -105,8 +116,8 @@ export class TcpIngestService {
     );
 
     return {
-      buffered: true,
       antiCheat: antiCheatResult,
+      buffered: true,
     };
   }
 
@@ -116,17 +127,21 @@ export class TcpIngestService {
    */
   private calculateBaseValue(category: KeyCategory): number {
     switch (category) {
-      case 'ENTER':
-        return 3; // Finishing a line of code!
-      case 'FUNCTION':
-        return 2; // Using advanced features
-      case 'MODIFIER':
-        return 1; // Shift, Ctrl, Alt
-      case 'TAB':
-        return 2; // Proper indentation
-      case 'CHAR':
-      default:
+      case 'ENTER': {
+        return 3;
+      } // Finishing a line of code!
+      case 'FUNCTION': {
+        return 2;
+      } // Using advanced features
+      case 'MODIFIER': {
         return 1;
+      } // Shift, Ctrl, Alt
+      case 'TAB': {
+        return 2;
+      } // Proper indentation
+      default: {
+        return 1;
+      }
     }
   }
 
@@ -135,12 +150,15 @@ export class TcpIngestService {
    */
   private categoryToKeyType(category: KeyCategory): KeyType {
     switch (category) {
-      case 'FUNCTION':
+      case 'FUNCTION': {
         return KeyType.FUNCTION;
-      case 'MODIFIER':
+      }
+      case 'MODIFIER': {
         return KeyType.SPECIAL;
-      default:
+      }
+      default: {
         return KeyType.NORMAL;
+      }
     }
   }
 

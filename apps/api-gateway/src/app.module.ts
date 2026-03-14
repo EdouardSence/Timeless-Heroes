@@ -74,9 +74,9 @@ export class NatsClientsModule {}
   imports: [
     // Configuration with validation - fails fast if required env vars missing
     ConfigModule.forRoot({
-      isGlobal: true,
       envFilePath: ['.env.local', '.env'],
       validate,
+      isGlobal: true,
     }),
 
     // ── NATS ClientProxy — transport-agnostic microservice communication ──
@@ -104,4 +104,4 @@ export class NatsClientsModule {}
     HealthModule,
   ],
 })
-export class AppModule { }
+export class AppModule {}

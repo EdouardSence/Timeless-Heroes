@@ -12,10 +12,10 @@ import { ClickProcessorService } from './click-processor.service';
 import { ClickValidatorService } from './click-validator.service';
 
 @Module({
+  exports: [ClickProcessorService, ClickValidatorService],
   providers: [
     ClickProcessorService,
     ClickValidatorService,
   ],
-  exports: [ClickProcessorService, ClickValidatorService],
 })
 export class ClickProcessorModule {}

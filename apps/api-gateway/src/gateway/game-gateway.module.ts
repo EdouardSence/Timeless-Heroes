@@ -10,9 +10,11 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { NATS_SERVICE } from '@repo/shared-types';
 import { AuthModule } from '../auth/auth.module';
 import { ClickProcessorModule } from '../click-processor/click-processor.module';
+
 import { GameGateway } from './game.gateway';
 
 @Module({
+  exports: [GameGateway],
   imports: [
     ClickProcessorModule,
     AuthModule,
@@ -32,6 +34,5 @@ import { GameGateway } from './game.gateway';
     ]),
   ],
   providers: [GameGateway],
-  exports: [GameGateway],
 })
 export class GameGatewayModule {}

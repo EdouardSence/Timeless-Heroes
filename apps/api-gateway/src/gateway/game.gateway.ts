@@ -1,7 +1,7 @@
 /**
  * Game WebSocket Gateway
  * Main real-time communication hub for the game
- * 
+ *
  * Handles:
  * - KEY_PRESS events (clicks)
  * - Balance updates
@@ -46,14 +46,15 @@ import { ClickValidatorService } from '../click-processor/click-validator.servic
 @UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: {
-    origin: '*',
     credentials: true,
+    origin: '*',
   },
   namespace: '/game',
   transports: ['websocket', 'polling'],
 })
 export class GameGateway
-  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
@@ -66,7 +67,7 @@ export class GameGateway
     private readonly authService: AuthService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
-  ) { }
+  ) {}
 
   afterInit() {
     this.logger.log('🎮 Game WebSocket Gateway initialized');
@@ -106,11 +107,7 @@ export class GameGateway
       client.username = username;
 
       // Track connected user in Redis (replaces in-memory Map)
-      await this.redis.hset(
-        RedisKeys.WS_CONNECTED_USERS,
-        userId,
-        client.id,
-      );
+      await this.redis.hset(RedisKeys.WS_CONNECTED_USERS, userId, client.id);
 
       // Join user-specific room for targeted messages
       await client.join(`user:${userId}`);
@@ -119,9 +116,9 @@ export class GameGateway
       await this.redis.set(
         RedisKeys.USER_SESSION(userId),
         JSON.stringify({
-          socketId: client.id,
           connectedAt: Date.now(),
           username,
+          socketId: client.id,
         }),
       );
 
@@ -132,7 +129,6 @@ export class GameGateway
 
       // Calculate and send offline rewards if applicable
       await this.calculateOfflineRewards(client);
-
     } catch (error) {
       this.logger.warn(`Client ${client.id} rejected: invalid token — ${error}`);
       client.emit(WebSocketEvent.ERROR, { code: 'AUTH_FAILED', message: 'Invalid or expired JWT token' });
@@ -155,14 +151,16 @@ export class GameGateway
         `offline:disconnect:${userId}`,
         Date.now().toString(),
         'EX',
-        86400 * 7, // Keep for 7 days
+        86_400 * 7, // Keep for 7 days
       );
 
       // Remove session
       await this.redis.del(RedisKeys.USER_SESSION(userId));
     }
 
-    this.logger.log(`Client disconnected: ${client.id} (User: ${userId || 'unknown'})`);
+    this.logger.log(
+      `Client disconnected: ${client.id} (User: ${userId ?? 'unknown'})`,
+    );
   }
 
   /**
@@ -180,27 +178,25 @@ export class GameGateway
     }
 
     const fullPayload: IKeyPressPayload = {
-      userId,
-      timestamp: payload.timestamp || Date.now(),
       keyType: payload.keyType,
+      timestamp: payload.timestamp ?? Date.now(),
+      userId,
     };
 
     // 1. Validate click (anti-cheat)
     const validation = await this.clickValidator.validateClick(fullPayload);
 
     if (!validation.isValid) {
-      this.logger.warn(
-        `Click rejected for ${userId}: ${validation.reason}`,
-      );
+      this.logger.warn(`Click rejected for ${userId}: ${validation.reason}`);
 
       client.emit(WebSocketEvent.ERROR, {
         code: validation.reason,
-        message: `Click rejected: ${validation.reason}`,
         detectedCPS: validation.detectedCPS,
         maxCPS: validation.maxAllowedCPS,
+        message: `Click rejected: ${validation.reason}`,
       });
 
-      return { error: validation.reason || 'Click rejected' };
+      return { error: validation.reason ?? 'Click rejected' };
     }
 
     // 2. Get user progression (cached or from microservice)
@@ -215,7 +211,10 @@ export class GameGateway
     }
 
     // 3. Process the click
-    const result = await this.clickProcessor.processClick(fullPayload, progression);
+    const result = await this.clickProcessor.processClick(
+      fullPayload,
+      progression,
+    );
 
     // 4. Emit click result
     client.emit(WebSocketEvent.CLICK_PROCESSED, result);
@@ -234,19 +233,21 @@ export class GameGateway
     @ConnectedSocket() client: IAuthenticatedSocket,
     @MessageBody() data: { type?: LeaderboardType; count?: number },
   ): Promise<ILeaderboardUpdate> {
-    const userId = client.userId || 'anonymous';
-    const leaderboardType = data.type || LeaderboardType.GLOBAL;
-    const count = Math.min(data.count || 100, 100);
+    const userId = client.userId ?? 'anonymous';
+    const leaderboardType = data.type ?? LeaderboardType.GLOBAL;
+    const count = Math.min(data.count ?? 100, 100);
 
     // Get leaderboard key based on type
     let leaderboardKey: string = RedisKeys.LEADERBOARD_GLOBAL;
     switch (leaderboardType) {
-      case LeaderboardType.WEEKLY:
+      case LeaderboardType.WEEKLY: {
         leaderboardKey = RedisKeys.LEADERBOARD_WEEKLY;
         break;
-      case LeaderboardType.DAILY:
+      }
+      case LeaderboardType.DAILY: {
         leaderboardKey = RedisKeys.LEADERBOARD_DAILY;
         break;
+      }
     }
 
     // Get top players and user's rank
@@ -299,10 +300,10 @@ export class GameGateway
     );
 
     const response: ILeaderboardUpdate = {
-      type: leaderboardType,
       entries,
-      userRank: userRank || undefined,
       totalPlayers,
+      type: leaderboardType,
+      userRank: userRank ?? undefined,
     };
 
     client.emit(WebSocketEvent.LEADERBOARD_UPDATE, response);
@@ -350,16 +351,19 @@ export class GameGateway
 
     // Send current balance
     client.emit(WebSocketEvent.BALANCE_UPDATE, {
-      linesOfCode: progression.linesOfCode,
-      level: progression.level,
       clickMultiplier: progression.clickMultiplier,
+      level: progression.level,
+      linesOfCode: progression.linesOfCode,
       passiveMultiplier: progression.passiveMultiplier,
     });
 
     // Get and send leaderboard position
     const userRank = await this.leaderboardService.getUserRank(userId);
     if (userRank) {
-      const { entries } = await this.leaderboardService.getPlayersAroundUser(userId, 3);
+      const { entries } = await this.leaderboardService.getPlayersAroundUser(
+        userId,
+        3,
+      );
 
       client.emit(WebSocketEvent.LEADERBOARD_UPDATE, {
         type: LeaderboardType.GLOBAL,
@@ -411,7 +415,9 @@ export class GameGateway
   /**
    * Calculate offline rewards for reconnecting player
    */
-  private async calculateOfflineRewards(client: IAuthenticatedSocket): Promise<void> {
+  private async calculateOfflineRewards(
+    client: IAuthenticatedSocket,
+  ): Promise<void> {
     const userId = client.userId;
     if (!userId) return;
 
@@ -422,7 +428,7 @@ export class GameGateway
       return; // First login or no cached disconnect time
     }
 
-    const disconnectedAt = parseInt(disconnectTime, 10);
+    const disconnectedAt = Number.parseInt(disconnectTime, 10);
     const reconnectedAt = Date.now();
     const offlineDuration = Math.floor((reconnectedAt - disconnectedAt) / 1000);
 
@@ -477,6 +483,22 @@ export class GameGateway
 
     // Clear the disconnect timestamp
     await this.redis.del(`offline:disconnect:${userId}`);
+  }
+
+  /**
+   * Get default progression for new users
+   */
+  private getDefaultProgression(userId: string): IProgressionData {
+    return {
+      clickMultiplier: 1,
+      criticalChance: 0.05,
+      criticalMultiplier: 2,
+      experience: '0',
+      level: 1,
+      linesOfCode: '0',
+      passiveMultiplier: 0,
+      userId,
+    };
   }
 
   /**

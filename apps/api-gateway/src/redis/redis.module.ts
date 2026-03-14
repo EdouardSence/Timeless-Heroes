@@ -4,25 +4,26 @@
 
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
-
 import {
     ClickBufferService,
     DistributedLock,
     LeaderboardService,
     ThrottleService,
 } from '@repo/redis-client';
+import Redis from 'ioredis';
+
 
 // Redis client provider
 const RedisClientProvider = {
+  inject: [ConfigService],
   provide: 'REDIS_CLIENT',
   useFactory: (configService: ConfigService) => {
     const redis = new Redis({
-      host: configService.get<string>('REDIS_HOST', 'localhost'),
-      port: configService.get<number>('REDIS_PORT', 6379),
-      password: configService.get<string>('REDIS_PASSWORD'),
       db: configService.get<number>('REDIS_DB', 0),
+      host: configService.get<string>('REDIS_HOST', 'localhost'),
       maxRetriesPerRequest: null, // Required for BullMQ compatibility
+      password: configService.get<string>('REDIS_PASSWORD'),
+      port: configService.get<number>('REDIS_PORT', 6379),
     });
     
     redis.on('connect', () => {
@@ -35,52 +36,51 @@ const RedisClientProvider = {
     
     return redis;
   },
-  inject: [ConfigService],
 };
 
 // Click Buffer Service provider
 const ClickBufferServiceProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: ClickBufferService,
   useFactory: (redis: Redis) => new ClickBufferService(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 // Leaderboard Service provider
 const LeaderboardServiceProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: LeaderboardService,
   useFactory: (redis: Redis) => new LeaderboardService(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 // Throttle Service provider
 const ThrottleServiceProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: ThrottleService,
   useFactory: (redis: Redis) => new ThrottleService(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 // Distributed Lock provider
 const DistributedLockProvider = {
+  inject: ['REDIS_CLIENT'],
   provide: DistributedLock,
   useFactory: (redis: Redis) => new DistributedLock(redis),
-  inject: ['REDIS_CLIENT'],
 };
 
 @Global()
 @Module({
-  providers: [
-    RedisClientProvider,
-    ClickBufferServiceProvider,
-    LeaderboardServiceProvider,
-    ThrottleServiceProvider,
-    DistributedLockProvider,
-  ],
   exports: [
     'REDIS_CLIENT',
     ClickBufferService,
     LeaderboardService,
     ThrottleService,
     DistributedLock,
+  ],
+  providers: [
+    RedisClientProvider,
+    ClickBufferServiceProvider,
+    LeaderboardServiceProvider,
+    ThrottleServiceProvider,
+    DistributedLockProvider,
   ],
 })
 export class RedisModule {}

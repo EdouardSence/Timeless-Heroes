@@ -101,7 +101,8 @@ export const RedisKeys = {
   CHANNEL_LEADERBOARD: 'channel:leaderboard',
 
   // Rate limiting
-  RATE_LIMIT: (userId: string, action: string) => `ratelimit:${action}:${userId}`,
+  RATE_LIMIT: (userId: string, action: string) =>
+    `ratelimit:${action}:${userId}`,
 
   // Cached data
   CACHE_USER_PROGRESSION: (userId: string) => `cache:progression:${userId}`,
@@ -191,7 +192,7 @@ export class ClickBufferService {
     return {
       clicks: parseInt(data.clicks, 10),
       locToAdd: data.locToAdd || '0',
-      lastUpdate: parseInt(data.lastUpdate, 10) || Date.now(),
+      lastUpdate: parseInt(data.lastUpdate ?? '0', 10) || Date.now(),
     };
   }
 
@@ -263,9 +264,12 @@ export class LeaderboardService {
 
     const entries: ILeaderboardEntry[] = [];
     for (let i = 0; i < results.length; i += 2) {
+      const userId = results[i];
+      const scoreStr = results[i + 1];
+      if (userId === undefined || scoreStr === undefined) continue;
       entries.push({
-        userId: results[i],
-        score: parseFloat(results[i + 1]),
+        userId,
+        score: parseFloat(scoreStr),
         rank: Math.floor(i / 2) + 1,
       });
     }
@@ -299,9 +303,12 @@ export class LeaderboardService {
 
     const entries: ILeaderboardEntry[] = [];
     for (let i = 0; i < results.length; i += 2) {
+      const userId = results[i];
+      const scoreStr = results[i + 1];
+      if (userId === undefined || scoreStr === undefined) continue;
       entries.push({
-        userId: results[i],
-        score: parseFloat(results[i + 1]),
+        userId,
+        score: parseFloat(scoreStr),
         rank: start + Math.floor(i / 2) + 1,
       });
     }
@@ -418,7 +425,10 @@ export class ThrottleService {
   /**
    * Check if user is temporarily banned
    */
-  async isUserBanned(userId: string, maxViolations: number = 10): Promise<boolean> {
+  async isUserBanned(
+    userId: string,
+    maxViolations: number = 10,
+  ): Promise<boolean> {
     const key = RedisKeys.USER_VIOLATIONS(userId);
     const violations = await this.redis.get(key);
     return violations !== null && parseInt(violations, 10) >= maxViolations;

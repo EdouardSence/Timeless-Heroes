@@ -17,15 +17,15 @@ import { IOfflineCalculation, NATS_SERVICE, NatsPattern, QueueName } from '@repo
 import { OfflineCalculatorService } from './offline-calculator.service';
 
 interface IOfflineJobData {
-  userId: string;
   disconnectedAt: string;
-  reconnectedAt: string;
   passiveMultiplier: number;
-  pendingPrograms: Array<{
+  pendingPrograms: {
     programId: string;
     programSlug: string;
     estimatedEndAt: string;
-  }>;
+  }[];
+  reconnectedAt: string;
+  userId: string;
 }
 
 @Processor(QueueName.OFFLINE_CALCULATION, {
@@ -90,7 +90,7 @@ export class OfflineWorker extends WorkerHost {
 
     this.logger.log(
       `Offline rewards for ${userId}: +${calculation.earnedLoc} LoC, ` +
-      `${completedProgramIds.length} programs completed`,
+        `${completedProgramIds.length} programs completed`,
     );
 
     return calculation;

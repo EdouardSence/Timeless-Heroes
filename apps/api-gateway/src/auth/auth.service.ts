@@ -129,8 +129,8 @@ export class AuthService {
     await this.leaderboardService.updateScore(newUser.id, 0);
 
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: newUser.id,
       email: newUser.email,
+      sub: newUser.id,
       username: newUser.username,
     };
 
@@ -141,8 +141,8 @@ export class AuthService {
     return {
       accessToken,
       user: {
-        id: newUser.id,
         email: newUser.email,
+        id: newUser.id,
         username: newUser.username,
       },
     };
@@ -162,10 +162,14 @@ export class AuthService {
   /**
    * Generate a new JWT token for a user
    */
-  async generateToken(userId: string, email: string, username: string): Promise<string> {
+  async generateToken(
+    userId: string,
+    email: string,
+    username: string,
+  ): Promise<string> {
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: userId,
       email,
+      sub: userId,
       username,
     };
 

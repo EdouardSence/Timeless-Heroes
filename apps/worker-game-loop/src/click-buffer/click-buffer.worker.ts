@@ -1,7 +1,7 @@
 /**
  * Click Buffer Worker
  * BullMQ Worker that processes buffer flush jobs
- * 
+ *
  * Architecture:
  * 1. ClickBufferFlushService schedules periodic flush (every 5s)
  * 2. Flush collects all pending clicks from Redis
@@ -18,17 +18,17 @@ import { RedisKeys } from '@repo/redis-client';
 import { IProgressionData, NATS_SERVICE, NatsPattern, QueueName, IBufferFlushResult } from '@repo/shared-types';
 
 interface IBufferFlushJob {
-  userId: string;
   clicks: number;
   locToAdd: string;
   timestamp: number;
+  userId: string;
 }
 
 @Processor(QueueName.CLICK_BUFFER, {
   concurrency: 10, // Process 10 users in parallel
   limiter: {
-    max: 100,
     duration: 1000, // Max 100 jobs per second
+    max: 100,
   },
 })
 export class ClickBufferWorker extends WorkerHost {
@@ -46,7 +46,7 @@ export class ClickBufferWorker extends WorkerHost {
    * Persists accumulated clicks to PostgreSQL via NATS -> svc-user-progression
    */
   async process(job: Job<IBufferFlushJob>): Promise<IBufferFlushResult> {
-    const { userId, clicks, locToAdd } = job.data;
+    const { clicks, locToAdd, userId } = job.data;
     const startTime = Date.now();
 
     this.logger.debug(
@@ -86,13 +86,13 @@ export class ClickBufferWorker extends WorkerHost {
       );
 
       return {
-        success: true,
-        userId,
         clicksProcessed: clicks,
         locAdded: locToAdd,
         newBalance: updatedProgression.linesOfCode,
         newLevel: updatedProgression.level,
         processingTimeMs: processingTime,
+        success: true,
+        userId,
       };
     } catch (error) {
       this.logger.error(
@@ -103,11 +103,11 @@ export class ClickBufferWorker extends WorkerHost {
       await this.reAddToBuffer(userId, locToAdd, clicks);
 
       return {
+        clicksProcessed: 0,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        locAdded: '0',
         success: false,
         userId,
-        clicksProcessed: 0,
-        locAdded: '0',
-        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -115,14 +115,17 @@ export class ClickBufferWorker extends WorkerHost {
   /**
    * Publish level up event for real-time notification
    */
-  private async publishLevelUp(userId: string, newLevel: number): Promise<void> {
+  private async publishLevelUp(
+    userId: string,
+    newLevel: number,
+  ): Promise<void> {
     await this.redis.publish(
       RedisKeys.CHANNEL_ACHIEVEMENT,
       JSON.stringify({
-        type: 'LEVEL_UP',
-        userId,
         level: newLevel,
         timestamp: Date.now(),
+        type: 'LEVEL_UP',
+        userId,
       }),
     );
   }
@@ -132,7 +135,11 @@ export class ClickBufferWorker extends WorkerHost {
    * Uses HINCRBY/HINCRBYFLOAT to match the hash type written by ClickBufferService.
    * A Lua SET was previously used here, causing a WRONGTYPE conflict.
    */
-  private async reAddToBuffer(userId: string, locToAdd: string, clicks: number): Promise<void> {
+  private async reAddToBuffer(
+    userId: string,
+    locToAdd: string,
+    clicks: number,
+  ): Promise<void> {
     const key = RedisKeys.CLICK_BUFFER(userId);
 
     try {
@@ -141,7 +148,9 @@ export class ClickBufferWorker extends WorkerHost {
       await this.redis.hincrbyfloat(key, 'locToAdd', Number(locToAdd));
       this.logger.warn(`Re-added ${clicks} clicks to buffer for ${userId} after flush failure`);
     } catch (error) {
-      this.logger.error(`Failed to re-add to buffer for ${userId}: ${error}`);
+      this.logger.error(
+        `Failed to re-add to buffer for ${userId}: ${String(error)}`,
+      );
     }
   }
 
@@ -152,6 +161,8 @@ export class ClickBufferWorker extends WorkerHost {
 
   @OnWorkerEvent('failed')
   onFailed(job: Job<IBufferFlushJob>, error: Error) {
-    this.logger.error(`Job ${job.id} failed for user ${job.data.userId}: ${error.message}`);
+    this.logger.error(
+      `Job ${job.id} failed for user ${job.data.userId}: ${error.message}`,
+    );
   }
 }

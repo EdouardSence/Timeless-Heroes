@@ -9,25 +9,25 @@ import { IShopItem, SHOP_ITEMS, WebSocketEvent } from '@repo/shared-types';
 // ============================================================================
 
 interface GameState {
-  linesOfCode: number;
-  totalKeyPresses: number;
-  level: number;
   experience: number;
   experienceToNext: number;
+  items: Record<string, number>;
+  level: number;
+  linesOfCode: number;
   multiplier: number;
   passiveRate: number;
-  items: { [key: string]: number };
+  totalKeyPresses: number;
 }
 
 interface ShopItem {
-  slug: string;
-  name: string;
   baseCost: number;
-  owned: number;
-  nextCost: number;
   canAfford: boolean;
-  icon: string;
   effect: string;
+  icon: string;
+  name: string;
+  nextCost: number;
+  owned: number;
+  slug: string;
 }
 
 interface LeaderboardEntry {
@@ -46,11 +46,15 @@ interface LeaderboardEntry {
 function formatNumber(num: number): string {
   if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B';
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
-  if (num >= 1_000) return (num / 1_000).toFixed(2) + 'K';
+  if (num >= 1000) return (num / 1000).toFixed(2) + 'K';
   return Math.floor(num).toString();
 }
 
-function calculateCost(baseCost: number, costMultiplier: number, owned: number): number {
+function calculateCost(
+  baseCost: number,
+  costMultiplier: number,
+  owned: number,
+): number {
   return Math.floor(baseCost * Math.pow(costMultiplier, owned));
 }
 
@@ -60,19 +64,21 @@ function calculateCost(baseCost: number, costMultiplier: number, owned: number):
 
 export default function GamePage() {
   const [gameState, setGameState] = useState<GameState>({
-    linesOfCode: 0,
-    totalKeyPresses: 0,
-    level: 1,
     experience: 0,
     experienceToNext: 100,
-    multiplier: 1.0,
-    passiveRate: 0,
     items: {},
+    level: 1,
+    linesOfCode: 0,
+    multiplier: 1,
+    passiveRate: 0,
+    totalKeyPresses: 0,
   });
 
   const [items, setItems] = useState<ShopItem[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [activeTab, setActiveTab] = useState<'shop' | 'leaderboard' | 'info'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'leaderboard' | 'info'>(
+    'shop',
+  );
   const [notification, setNotification] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
@@ -110,70 +116,96 @@ export default function GamePage() {
     });
 
     // Handle initial balance data sent on connection
-    socket.on(WebSocketEvent.BALANCE_UPDATE, (data: {
-      linesOfCode?: string; level?: number; clickMultiplier?: number; passiveMultiplier?: number;
-    }) => {
-      setGameState((prev) => ({
-        ...prev,
-        linesOfCode: parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
-        level: data.level ?? prev.level,
-        multiplier: data.clickMultiplier ?? prev.multiplier,
-        passiveRate: data.passiveMultiplier ?? prev.passiveRate,
-      }));
-    });
+    socket.on(
+      WebSocketEvent.BALANCE_UPDATE,
+      (data: {
+        linesOfCode?: string;
+        level?: number;
+        clickMultiplier?: number;
+        passiveMultiplier?: number;
+      }) => {
+        setGameState((prev) => ({
+          ...prev,
+          linesOfCode: parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
+          level: data.level ?? prev.level,
+          multiplier: data.clickMultiplier ?? prev.multiplier,
+          passiveRate: data.passiveMultiplier ?? prev.passiveRate,
+        }));
+      },
+    );
 
     // Handle click processed acknowledgement
-    socket.on(WebSocketEvent.CLICK_PROCESSED, (result: {
-      newBalance?: string; multipliers?: { totalMultiplier?: number };
-    }) => {
-      setGameState((prev) => ({
-        ...prev,
-        linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
-        totalKeyPresses: prev.totalKeyPresses + 1,
-        multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
-      }));
-    });
+    socket.on(
+      WebSocketEvent.CLICK_PROCESSED,
+      (result: {
+        newBalance?: string;
+        multipliers?: { totalMultiplier?: number };
+      }) => {
+        setGameState((prev) => ({
+          ...prev,
+          linesOfCode:
+            parseFloat(result.newBalance || '0') || prev.linesOfCode,
+          totalKeyPresses: prev.totalKeyPresses + 1,
+          multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
+        }));
+      },
+    );
 
     // Handle item purchase result
-    socket.on(WebSocketEvent.ITEM_PURCHASED, (result: {
-      success: boolean; newBalance?: string; itemSlug?: string;
-      newQuantityOwned?: number; error?: string;
-    }) => {
-      if (result.success) {
-        setGameState((prev) => ({
-          ...prev,
-          linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
-          items: {
-            ...prev.items,
-            [result.itemSlug || '']: result.newQuantityOwned || 0,
-          },
-        }));
-        showNotification('Achat effectue !');
-      } else {
-        showNotification(`Echec de l'achat: ${result.error || 'Erreur inconnue'}`);
-      }
-    });
+    socket.on(
+      WebSocketEvent.ITEM_PURCHASED,
+      (result: {
+        success: boolean;
+        newBalance?: string;
+        itemSlug?: string;
+        newQuantityOwned?: number;
+        error?: string;
+      }) => {
+        if (result.success) {
+          setGameState((prev) => ({
+            ...prev,
+            linesOfCode:
+              parseFloat(result.newBalance || '0') || prev.linesOfCode,
+            items: {
+              ...prev.items,
+              [result.itemSlug || '']: result.newQuantityOwned || 0,
+            },
+          }));
+          showNotification('Achat effectue !');
+        } else {
+          showNotification(
+            `Echec de l'achat: ${result.error || 'Erreur inconnue'}`,
+          );
+        }
+      },
+    );
 
     // Handle leaderboard updates
-    socket.on(WebSocketEvent.LEADERBOARD_UPDATE, (data: {
-      entries?: LeaderboardEntry[];
-    }) => {
-      if (data.entries) {
-        setLeaderboard(data.entries);
-      }
-    });
+    socket.on(
+      WebSocketEvent.LEADERBOARD_UPDATE,
+      (data: { entries?: LeaderboardEntry[] }) => {
+        if (data.entries) {
+          setLeaderboard(data.entries);
+        }
+      },
+    );
 
     // Handle offline rewards
-    socket.on(WebSocketEvent.OFFLINE_REWARDS, (data: { earnedLoc?: string }) => {
-      const earnedLoc = parseFloat(data.earnedLoc || '0') || 0;
-      if (earnedLoc > 0) {
-        showNotification(`Recompenses hors-ligne : +${formatNumber(earnedLoc)} LoC !`);
-        setGameState((prev) => ({
-          ...prev,
-          linesOfCode: prev.linesOfCode + earnedLoc,
-        }));
-      }
-    });
+    socket.on(
+      WebSocketEvent.OFFLINE_REWARDS,
+      (data: { earnedLoc?: string }) => {
+        const earnedLoc = parseFloat(data.earnedLoc || '0') || 0;
+        if (earnedLoc > 0) {
+          showNotification(
+            `Recompenses hors-ligne : +${formatNumber(earnedLoc)} LoC !`,
+          );
+          setGameState((prev) => ({
+            ...prev,
+            linesOfCode: prev.linesOfCode + earnedLoc,
+          }));
+        }
+      },
+    );
 
     // Handle shop catalog response
     socket.on(WebSocketEvent.SHOP_CATALOG, (data: unknown) => {
@@ -182,12 +214,15 @@ export default function GamePage() {
     });
 
     // Handle errors from server
-    socket.on(WebSocketEvent.ERROR, (err: { code?: string; message?: string }) => {
-      console.error('Server error:', err);
-      if (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_FAILED') {
-        showNotification('Authentification requise. Veuillez vous connecter.');
-      }
-    });
+    socket.on(
+      WebSocketEvent.ERROR,
+      (err: { code?: string; message?: string }) => {
+        console.error('Server error:', err);
+        if (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_FAILED') {
+          showNotification('Authentification requise. Veuillez vous connecter.');
+        }
+      },
+    );
 
     socketRef.current = socket;
 
@@ -267,9 +302,10 @@ export default function GamePage() {
     }
   }, [activeTab, requestLeaderboard]);
 
-  const expProgress = gameState.experienceToNext > 0
-    ? (gameState.experience / gameState.experienceToNext) * 100
-    : 0;
+  const expProgress =
+    gameState.experienceToNext > 0
+      ? (gameState.experience / gameState.experienceToNext) * 100
+      : 0;
 
   return (
     <div style={styles.container}>
@@ -281,11 +317,13 @@ export default function GamePage() {
           <h1 style={styles.logoText}>Timeless Heroes</h1>
         </div>
         <div style={styles.connectionStatus}>
-          <span style={{
-            ...styles.statusDot,
-            background: connected ? '#4ade80' : '#f87171',
-            boxShadow: connected ? '0 0 10px #4ade80' : 'none',
-          }}></span>
+          <span
+            style={{
+              ...styles.statusDot,
+              background: connected ? '#4ade80' : '#f87171',
+              boxShadow: connected ? '0 0 10px #4ade80' : 'none',
+            }}
+          ></span>
           {connected ? 'Connecte au serveur' : 'Recherche du serveur...'}
         </div>
       </header>
@@ -295,28 +333,38 @@ export default function GamePage() {
           <h2>Comment jouer</h2>
           <p>Connecte-toi au serveur pour commencer a jouer :</p>
           <ol>
-            <li>Assure-toi que l'api-gateway tourne sur <code style={styles.code}>http://localhost:3000</code></li>
+            <li>
+              Assure-toi que l&apos;api-gateway tourne sur{' '}
+              <code style={styles.code}>http://localhost:3000</code>
+            </li>
             <li>Connecte-toi / inscris-toi pour obtenir un token JWT</li>
             <li>Tape sur ton clavier pour gagner des LoC !</li>
           </ol>
-          <p style={styles.hint}>Les frappes clavier sur cette page sont envoyees au serveur en temps reel via Socket.IO.</p>
+          <p style={styles.hint}>
+            Les frappes clavier sur cette page sont envoyees au serveur en temps
+            reel via Socket.IO.
+          </p>
         </div>
       )}
 
       <section style={styles.statsPanel}>
-        <div style={{...styles.statCard, ...styles.mainStat}}>
+        <div style={{ ...styles.statCard, ...styles.mainStat }}>
           <div style={styles.statIcon}>{'</>'}</div>
           <div>
             <div style={styles.statLabel}>Lines of Code</div>
-            <div style={styles.statValue}>{formatNumber(gameState.linesOfCode)}</div>
+            <div style={styles.statValue}>
+              {formatNumber(gameState.linesOfCode)}
+            </div>
           </div>
         </div>
 
         <div style={styles.statCard}>
-          <div style={styles.statIcon}>x</div>
+          <div style={styles.statIcon}>×</div>
           <div>
             <div style={styles.statLabel}>Multiplicateur</div>
-            <div style={styles.statValue}>x{gameState.multiplier.toFixed(2)}</div>
+            <div style={styles.statValue}>
+              ×{gameState.multiplier.toFixed(2)}
+            </div>
           </div>
         </div>
 
@@ -324,7 +372,9 @@ export default function GamePage() {
           <div style={styles.statIcon}>&gt;_</div>
           <div>
             <div style={styles.statLabel}>Passif</div>
-            <div style={styles.statValue}>{gameState.passiveRate.toFixed(1)}/sec</div>
+            <div style={styles.statValue}>
+              {gameState.passiveRate.toFixed(1)}/sec
+            </div>
           </div>
         </div>
 
@@ -332,37 +382,56 @@ export default function GamePage() {
           <div style={styles.statIcon}>#</div>
           <div>
             <div style={styles.statLabel}>Frappes totales</div>
-            <div style={styles.statValue}>{formatNumber(gameState.totalKeyPresses)}</div>
+            <div style={styles.statValue}>
+              {formatNumber(gameState.totalKeyPresses)}
+            </div>
           </div>
         </div>
 
         <div style={styles.statCard}>
           <div style={styles.statIcon}>^</div>
-          <div style={{width: '100%'}}>
+          <div style={{ width: '100%' }}>
             <div style={styles.statLabel}>Niveau {gameState.level}</div>
             <div style={styles.expBar}>
-              <div style={{...styles.expFill, width: `${expProgress}%`}}></div>
+              <div
+                style={{ ...styles.expFill, width: `${expProgress}%` }}
+              ></div>
             </div>
           </div>
         </div>
       </section>
 
       <nav style={styles.tabs}>
-        <button 
-          style={{...styles.tab, ...(activeTab === 'shop' ? styles.tabActive : {})}}
-          onClick={() => setActiveTab('shop')}
+        <button
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'shop' ? styles.tabActive : {}),
+          }}
+          onClick={() => {
+            setActiveTab('shop');
+          }}
         >
           Boutique
         </button>
-        <button 
-          style={{...styles.tab, ...(activeTab === 'leaderboard' ? styles.tabActive : {})}}
-          onClick={() => setActiveTab('leaderboard')}
+        <button
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'leaderboard' ? styles.tabActive : {}),
+          }}
+          onClick={() => {
+            setActiveTab('leaderboard');
+          }}
         >
           Classement
         </button>
-        <button 
-          style={{...styles.tab, ...(activeTab === 'info' ? styles.tabActive : {})}}
-          onClick={() => setActiveTab('info')}
+        <button
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'info' ? styles.tabActive : {}),
+          }}
+          onClick={() => {
+            setActiveTab('info');
+          }}
         >
           Info
         </button>
@@ -371,12 +440,12 @@ export default function GamePage() {
       <main style={styles.tabContent}>
         {activeTab === 'shop' && (
           <div style={styles.shopGrid}>
-            {items.map(item => (
-              <div 
-                key={item.slug} 
+            {items.map((item) => (
+              <div
+                key={item.slug}
                 style={{
                   ...styles.shopItem,
-                  ...(item.canAfford ? styles.affordable : styles.locked)
+                  ...(item.canAfford ? styles.affordable : styles.locked),
                 }}
               >
                 <div style={styles.itemIcon}>{item.icon}</div>
@@ -385,13 +454,15 @@ export default function GamePage() {
                   <p style={styles.itemEffect}>{item.effect}</p>
                   <p style={styles.itemOwned}>Possede: {item.owned}</p>
                 </div>
-                <button 
+                <button
                   style={{
                     ...styles.buyButton,
-                    ...(item.canAfford ? {} : styles.buyButtonDisabled)
+                    ...(item.canAfford ? {} : styles.buyButtonDisabled),
                   }}
                   disabled={!item.canAfford || !connected}
-                  onClick={() => purchaseItem(item.slug)}
+                  onClick={() => {
+                    purchaseItem(item.slug);
+                  }}
                 >
                   {formatNumber(item.nextCost)} LoC
                 </button>
@@ -417,14 +488,18 @@ export default function GamePage() {
                     <tr key={entry.userId} style={styles.leaderboardRow}>
                       <td style={styles.td}>{entry.rank}</td>
                       <td style={styles.td}>{entry.username}</td>
-                      <td style={styles.td}>{formatNumber(parseFloat(entry.score))}</td>
+                      <td style={styles.td}>
+                        {formatNumber(parseFloat(entry.score))}
+                      </td>
                       <td style={styles.td}>{entry.level}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
                     <td style={styles.td} colSpan={4}>
-                      {connected ? 'Chargement du classement...' : 'Connectez-vous pour voir le classement'}
+                      {connected
+                        ? 'Chargement du classement...'
+                        : 'Connectez-vous pour voir le classement'}
                     </td>
                   </tr>
                 )}
@@ -438,8 +513,14 @@ export default function GamePage() {
             <h2>Comment ca marche</h2>
             <div style={styles.infoCard}>
               <h3>Gagner des LoC</h3>
-              <p>Chaque frappe sur ton clavier te donne <strong>1 x multiplicateur</strong> LoC.</p>
-              <p>Les frappes sont envoyees au serveur en temps reel via Socket.IO.</p>
+              <p>
+                Chaque frappe sur ton clavier te donne{' '}
+                <strong>1 × multiplicateur</strong> LoC.
+              </p>
+              <p>
+                Les frappes sont envoyees au serveur en temps reel via
+                Socket.IO.
+              </p>
             </div>
             <div style={styles.infoCard}>
               <h3>Boutique</h3>
@@ -448,11 +529,16 @@ export default function GamePage() {
             </div>
             <div style={styles.infoCard}>
               <h3>Revenus passifs</h3>
-              <p>Certains items generent des LoC automatiquement chaque seconde.</p>
+              <p>
+                Certains items generent des LoC automatiquement chaque seconde.
+              </p>
             </div>
             <div style={styles.infoCard}>
               <h3>Recompenses hors-ligne</h3>
-              <p>Quand tu te reconnectes, tu recois 50% de tes gains passifs (max 8h).</p>
+              <p>
+                Quand tu te reconnectes, tu recois 50% de tes gains passifs (max
+                8h).
+              </p>
             </div>
           </div>
         )}
@@ -465,115 +551,67 @@ export default function GamePage() {
 // STYLES
 // ============================================================================
 
-const styles: { [key: string]: React.CSSProperties } = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%)',
-    color: '#fff',
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
-    padding: '20px',
+const styles: Record<string, React.CSSProperties> = {
+  affordable: {
+    border: '1px solid rgba(74, 222, 128, 0.5)',
   },
-  notification: {
-    position: 'fixed',
-    top: '20px',
-    right: '20px',
+  buyButton: {
     background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '15px 25px',
-    borderRadius: '10px',
+    border: 'none',
+    borderRadius: '8px',
+    color: '#fff',
+    cursor: 'pointer',
     fontWeight: 'bold',
-    zIndex: 1000,
+    marginTop: '10px',
+    padding: '12px',
   },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '15px',
-    marginBottom: '20px',
-  },
-  logo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '15px',
-  },
-  logoIcon: {
-    fontSize: '2.5rem',
-  },
-  logoText: {
-    fontSize: '1.8rem',
-    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    margin: 0,
-  },
-  connectionStatus: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.9rem',
-    color: '#aaa',
-  },
-  statusDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-  },
-  setupInstructions: {
-    background: 'rgba(102, 126, 234, 0.1)',
-    border: '1px solid rgba(102, 126, 234, 0.3)',
-    borderRadius: '15px',
-    padding: '25px',
-    marginBottom: '20px',
+  buyButtonDisabled: {
+    background: '#444',
+    cursor: 'not-allowed',
   },
   code: {
     background: 'rgba(0, 0, 0, 0.3)',
-    padding: '3px 8px',
     borderRadius: '4px',
-    fontFamily: 'monospace',
     color: '#4ade80',
+    fontFamily: 'monospace',
+    padding: '3px 8px',
   },
-  statsPanel: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-    gap: '15px',
-    marginBottom: '20px',
-  },
-  statCard: {
-    display: 'flex',
+  connectionStatus: {
     alignItems: 'center',
-    gap: '15px',
-    padding: '20px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: '15px',
-  },
-  mainStat: {
-    background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
-    border: '1px solid rgba(102, 126, 234, 0.5)',
-  },
-  statIcon: {
-    fontSize: '2rem',
-  },
-  statLabel: {
-    fontSize: '0.85rem',
     color: '#aaa',
+    display: 'flex',
+    fontSize: '0.9rem',
+    gap: '8px',
   },
-  statValue: {
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
+  container: {
+    background:
+      'linear-gradient(135deg, #0f0c29 0%, #1a1a2e 50%, #16213e 100%)',
+    color: '#fff',
+    fontFamily: "'Segoe UI', system-ui, sans-serif",
+    minHeight: '100vh',
+    padding: '20px',
   },
   expBar: {
-    width: '100%',
-    height: '8px',
     background: 'rgba(255, 255, 255, 0.1)',
     borderRadius: '4px',
-    overflow: 'hidden',
+    height: '8px',
     marginTop: '5px',
+    overflow: 'hidden',
+    width: '100%',
   },
   expFill: {
-    height: '100%',
     background: 'linear-gradient(90deg, #667eea, #764ba2)',
+    height: '100%',
     transition: 'width 0.3s',
+  },
+  header: {
+    alignItems: 'center',
+    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: '15px',
+    display: 'flex',
+    justifyContent: 'space-between',
+    marginBottom: '20px',
+    padding: '20px',
   },
   hint: {
     color: '#aaa',
@@ -581,45 +619,21 @@ const styles: { [key: string]: React.CSSProperties } = {
     margin: '15px 0',
     textAlign: 'center',
   },
-  tabs: {
-    display: 'flex',
-    gap: '10px',
-    marginBottom: '20px',
-  },
-  tab: {
-    flex: 1,
-    padding: '15px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: 'none',
+  infoCard: {
+    background: 'rgba(0, 0, 0, 0.2)',
     borderRadius: '10px',
-    color: '#aaa',
-    fontSize: '1rem',
-    cursor: 'pointer',
-  },
-  tabActive: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#fff',
-  },
-  tabContent: {
-    minHeight: '400px',
-  },
-  shopGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-    gap: '20px',
-  },
-  shopItem: {
-    display: 'flex',
-    flexDirection: 'column',
+    marginBottom: '15px',
     padding: '20px',
+  },
+  infoPanel: {
     background: 'rgba(255, 255, 255, 0.05)',
     borderRadius: '15px',
+    padding: '25px',
   },
-  affordable: {
-    border: '1px solid rgba(74, 222, 128, 0.5)',
-  },
-  locked: {
-    opacity: 0.7,
+  itemEffect: {
+    color: '#4ade80',
+    fontWeight: 'bold',
+    margin: '5px 0',
   },
   itemIcon: {
     fontSize: '2.5rem',
@@ -629,66 +643,140 @@ const styles: { [key: string]: React.CSSProperties } = {
     flex: 1,
   },
   itemName: {
-    margin: '0 0 5px 0',
     fontSize: '1.1rem',
-  },
-  itemEffect: {
-    color: '#4ade80',
-    fontWeight: 'bold',
-    margin: '5px 0',
+    margin: '0 0 5px 0',
   },
   itemOwned: {
     color: '#667eea',
     fontSize: '0.85rem',
     margin: '5px 0',
   },
-  buyButton: {
-    marginTop: '10px',
-    padding: '12px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#fff',
-    fontWeight: 'bold',
-    cursor: 'pointer',
-  },
-  buyButtonDisabled: {
-    background: '#444',
-    cursor: 'not-allowed',
-  },
   leaderboardPanel: {
     background: 'rgba(255, 255, 255, 0.05)',
     borderRadius: '15px',
     padding: '20px',
   },
-  leaderboardTable: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  th: {
-    padding: '15px',
-    textAlign: 'left',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-    color: '#aaa',
-    fontWeight: 'normal',
-  },
-  td: {
-    padding: '15px',
-    textAlign: 'left',
-    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-  },
   leaderboardRow: {
     transition: 'background 0.2s',
   },
-  infoPanel: {
-    background: 'rgba(255, 255, 255, 0.05)',
+  leaderboardTable: {
+    borderCollapse: 'collapse',
+    width: '100%',
+  },
+  locked: {
+    opacity: 0.7,
+  },
+  logo: {
+    alignItems: 'center',
+    display: 'flex',
+    gap: '15px',
+  },
+  logoIcon: {
+    fontSize: '2.5rem',
+  },
+  logoText: {
+    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+    fontSize: '1.8rem',
+    margin: 0,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+  },
+  mainStat: {
+    background:
+      'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+    border: '1px solid rgba(102, 126, 234, 0.5)',
+  },
+  notification: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '10px',
+    fontWeight: 'bold',
+    padding: '15px 25px',
+    position: 'fixed',
+    right: '20px',
+    top: '20px',
+    zIndex: 1000,
+  },
+  setupInstructions: {
+    background: 'rgba(102, 126, 234, 0.1)',
+    border: '1px solid rgba(102, 126, 234, 0.3)',
     borderRadius: '15px',
+    marginBottom: '20px',
     padding: '25px',
   },
-  infoCard: {
-    background: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: '10px',
+  shopGrid: {
+    display: 'grid',
+    gap: '20px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+  },
+  shopItem: {
+    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: '15px',
+    display: 'flex',
+    flexDirection: 'column',
     padding: '20px',
-    marginBottom: '15px',
+  },
+  statCard: {
+    alignItems: 'center',
+    background: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: '15px',
+    display: 'flex',
+    gap: '15px',
+    padding: '20px',
+  },
+  statIcon: {
+    fontSize: '2rem',
+  },
+  statLabel: {
+    color: '#aaa',
+    fontSize: '0.85rem',
+  },
+  statsPanel: {
+    display: 'grid',
+    gap: '15px',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+    marginBottom: '20px',
+  },
+  statusDot: {
+    borderRadius: '50%',
+    height: '10px',
+    width: '10px',
+  },
+  statValue: {
+    fontSize: '1.5rem',
+    fontWeight: 'bold',
+  },
+  tab: {
+    background: 'rgba(255, 255, 255, 0.05)',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#aaa',
+    cursor: 'pointer',
+    flex: 1,
+    fontSize: '1rem',
+    padding: '15px',
+  },
+  tabActive: {
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: '#fff',
+  },
+  tabContent: {
+    minHeight: '400px',
+  },
+  tabs: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '20px',
+  },
+  td: {
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    padding: '15px',
+    textAlign: 'left',
+  },
+  th: {
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    color: '#aaa',
+    fontWeight: 'normal',
+    padding: '15px',
+    textAlign: 'left',
   },
 };

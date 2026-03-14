@@ -1,6 +1,11 @@
 # Timeless-Heroes Docker Compose
 # Distributed Architecture for Developer Idle Game
 #
+# Usage:
+#   docker compose up -d                  # Start all services
+#   docker compose --profile dev up -d    # Include dev tools (Redis Commander)
+#   docker compose logs -f api-gateway    # Follow service logs
+#
 # ARCHITECTURE:
 # ┌──────────────────┐    ┌───────────────────┐    ┌──────────────────┐
 # │ PowerShell Agent │───>│  API Gateway      │───>│  NATS            │
@@ -12,7 +17,7 @@
 #                                ▼                   ▼                ▼
 #                         ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
 #                         │ Frontend     │  │ svc-progress │  │ svc-payment  │
-#                         │ (Electron)   │  │  (NATS MS)   │  │  (Hybrid)    │
+#                         │ (Next.js)    │  │  (NATS MS)   │  │  (Hybrid)    │
 #                         └──────────────┘  └──────────────┘  └──────────────┘
 #                                                  │
 #                                           Redis + BullMQ
@@ -30,7 +35,7 @@ services:
   # ============================================================================
   # INFRASTRUCTURE
   # ============================================================================
-  
+
   postgres:
     image: postgres:16-alpine
     container_name: timeless-postgres
@@ -40,29 +45,40 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-timeless_secret}
       POSTGRES_DB: ${POSTGRES_DB:-timeless_heroes}
     ports:
-      - "5432:5432"
+      - '${POSTGRES_PORT:-5432}:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Seed script: runs automatically on first DB creation only
+      - ./scripts/db:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-timeless}"]
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-timeless} -d ${POSTGRES_DB:-timeless_heroes}',
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
-  
+    networks:
+      - timeless-net
+
   redis:
     image: redis:7-alpine
     container_name: timeless-redis
     restart: unless-stopped
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secret}
     ports:
-      - "6379:6379"
+      - '${REDIS_PORT:-6379}:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+        ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-redis_secret}', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - timeless-net
   
   nats:
     image: nats:2-alpine
@@ -77,6 +93,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+    networks:
+      - timeless-net
 
   # Redis Commander - Redis GUI (development only)
   redis-commander:
@@ -86,16 +104,19 @@ services:
     environment:
       REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-redis_secret}
     ports:
-      - "8081:8081"
+      - '8081:8081'
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     profiles:
       - dev
+    networks:
+      - timeless-net
 
   # ============================================================================
   # APPLICATION SERVICES
   # ============================================================================
-  
+
   api-gateway:
     build:
       context: .
@@ -103,9 +124,9 @@ services:
     container_name: timeless-api-gateway
     restart: unless-stopped
     ports:
-      - "3000:3000"     # HTTP/WebSocket + REST Ingest
+      - '${PORT:-3000}:3000'
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
@@ -116,6 +137,11 @@ services:
       MAX_CPS: ${MAX_CPS:-20}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       NATS_URL: nats://nats:4222
+      # Service discovery
+      SVC_USER_PROGRESSION_HOST: svc-user-progression
+      SVC_USER_PROGRESSION_PORT: 3001
+      SVC_PAYMENT_HOST: svc-payment
+      SVC_PAYMENT_PORT: 3003
     depends_on:
       postgres:
         condition: service_healthy
@@ -123,19 +149,19 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-    # Note: Volume mounts removed for production build
-    # For hot-reload development, run services locally with `pnpm dev`
-  
+    networks:
+      - timeless-net
+
   svc-user-progression:
     build:
       context: .
       dockerfile: ./apps/svc-user-progression/Dockerfile
     container_name: timeless-svc-progression
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - '3001'
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       PROGRESSION_PORT: 3001
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
@@ -149,7 +175,9 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-  
+    networks:
+      - timeless-net
+
   worker-game-loop:
     build:
       context: .
@@ -158,7 +186,7 @@ services:
     restart: unless-stopped
     # No HTTP port exposed — pure NATS microservice + BullMQ worker
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -171,24 +199,26 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-  
+    networks:
+      - timeless-net
+
   svc-payment:
     build:
       context: .
       dockerfile: ./apps/svc-payment/Dockerfile
     container_name: timeless-svc-payment
     restart: unless-stopped
-    ports:
-      - "3003:3003"
+    expose:
+      - '3003'
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
+      NODE_ENV: ${NODE_ENV:-production}
       PAYMENT_PORT: 3003
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_...}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_...}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       NATS_URL: nats://nats:4222
     depends_on:
       postgres:
@@ -197,11 +227,36 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+    networks:
+      - timeless-net
+
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    container_name: timeless-web
+    restart: unless-stopped
+    ports:
+      - '${WEB_PORT:-8080}:3000'
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://api-gateway:3000}
+    depends_on:
+      - api-gateway
+    networks:
+      - timeless-net
+
+# ============================================================================
+# VOLUMES & NETWORKS
+# ============================================================================
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
 
 networks:
-  default:
+  timeless-net:
     name: timeless-network
+    driver: bridge
