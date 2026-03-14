@@ -66,7 +66,8 @@ export class GameGateway
     private readonly leaderboardService: LeaderboardService,
     private readonly authService: AuthService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
   ) {}
 
   afterInit() {
@@ -87,15 +88,19 @@ export class GameGateway
 
       if (!rawToken) {
         this.logger.warn(`Client ${client.id} rejected: no auth token`);
-        client.emit(WebSocketEvent.ERROR, { code: 'AUTH_REQUIRED', message: 'JWT token required' });
+        client.emit(WebSocketEvent.ERROR, {
+          code: 'AUTH_REQUIRED',
+          message: 'JWT token required',
+        });
         client.disconnect(true);
         return;
       }
 
       // Strip "Bearer " prefix if present
-      const token = typeof rawToken === 'string' && rawToken.startsWith('Bearer ')
-        ? rawToken.slice(7)
-        : rawToken;
+      const token =
+        typeof rawToken === 'string' && rawToken.startsWith('Bearer ')
+          ? rawToken.slice(7)
+          : rawToken;
 
       // Verify JWT and extract payload
       const payload = await this.authService.verifyToken(token as string);
@@ -130,8 +135,13 @@ export class GameGateway
       // Calculate and send offline rewards if applicable
       await this.calculateOfflineRewards(client);
     } catch (error) {
-      this.logger.warn(`Client ${client.id} rejected: invalid token — ${error}`);
-      client.emit(WebSocketEvent.ERROR, { code: 'AUTH_FAILED', message: 'Invalid or expired JWT token' });
+      this.logger.warn(
+        `Client ${client.id} rejected: invalid token — ${error}`,
+      );
+      client.emit(WebSocketEvent.ERROR, {
+        code: 'AUTH_FAILED',
+        message: 'Invalid or expired JWT token',
+      });
       client.disconnect(true);
     }
   }
@@ -205,7 +215,10 @@ export class GameGateway
     if (!progression) {
       // Fetch from progression microservice via NATS
       progression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+        this.progressionClient.send<IProgressionData>(
+          NatsPattern.PROGRESSION_GET,
+          { userId },
+        ),
       );
       await this.clickProcessor.cacheProgression(progression);
     }
@@ -266,7 +279,10 @@ export class GameGateway
 
         try {
           const progression = await firstValueFrom(
-            this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId: entry.userId }),
+            this.progressionClient.send<IProgressionData>(
+              NatsPattern.PROGRESSION_GET,
+              { userId: entry.userId },
+            ),
           );
           if (progression) {
             level = progression.level ?? 1;
@@ -276,7 +292,9 @@ export class GameGateway
         }
 
         // Try to get username from Redis session data
-        const sessionData = await this.redis.get(RedisKeys.USER_SESSION(entry.userId));
+        const sessionData = await this.redis.get(
+          RedisKeys.USER_SESSION(entry.userId),
+        );
         if (sessionData) {
           try {
             const session = JSON.parse(sessionData);
@@ -315,9 +333,7 @@ export class GameGateway
    * Get shop catalog from progression service
    */
   @SubscribeMessage(WebSocketEvent.GET_SHOP_CATALOG)
-  async handleGetShopCatalog(
-    @ConnectedSocket() client: IAuthenticatedSocket,
-  ) {
+  async handleGetShopCatalog(@ConnectedSocket() client: IAuthenticatedSocket) {
     try {
       const result = await firstValueFrom(
         this.progressionClient.send(NatsPattern.SHOP_GET_CATALOG, {}),
@@ -344,7 +360,10 @@ export class GameGateway
     if (!progression) {
       // Fetch from progression microservice via NATS
       progression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+        this.progressionClient.send<IProgressionData>(
+          NatsPattern.PROGRESSION_GET,
+          { userId },
+        ),
       );
       await this.clickProcessor.cacheProgression(progression);
     }
@@ -374,7 +393,10 @@ export class GameGateway
 
             try {
               const prog = await firstValueFrom(
-                this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId: e.userId }),
+                this.progressionClient.send<IProgressionData>(
+                  NatsPattern.PROGRESSION_GET,
+                  { userId: e.userId },
+                ),
               );
               if (prog) {
                 level = prog.level ?? 1;
@@ -384,7 +406,9 @@ export class GameGateway
             }
 
             // Try to get username from Redis session
-            const sessionData = await this.redis.get(RedisKeys.USER_SESSION(e.userId));
+            const sessionData = await this.redis.get(
+              RedisKeys.USER_SESSION(e.userId),
+            );
             if (sessionData) {
               try {
                 const session = JSON.parse(sessionData);
@@ -497,6 +521,7 @@ export class GameGateway
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
+      totalLinesWritten: '0',
       userId,
     };
   }

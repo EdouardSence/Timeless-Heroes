@@ -40,8 +40,12 @@ export class ProgressionService {
     baseCost: item.baseCost.toString(),
     costMultiplier: item.costMultiplier,
     baseEffect: item.effect.value,
-    effectType: item.effect.type === 'click' ? 'CLICK_BONUS' :
-                item.effect.type === 'passive' ? 'PASSIVE_BONUS' : 'CLICK_MULTIPLIER',
+    effectType:
+      item.effect.type === 'click'
+        ? 'CLICK_BONUS'
+        : item.effect.type === 'passive'
+          ? 'PASSIVE_BONUS'
+          : 'CLICK_MULTIPLIER',
     unlockLevel: item.unlockLevel,
     maxQuantity: item.maxQuantity,
   }));
@@ -83,7 +87,10 @@ export class ProgressionService {
   /**
    * Update user's balance (LoC)
    */
-  async updateBalance(userId: string, delta: string): Promise<IProgressionData> {
+  async updateBalance(
+    userId: string,
+    delta: string,
+  ): Promise<IProgressionData> {
     const deltaDecimal = new Decimal(delta);
 
     // Use atomic increment/update
@@ -124,7 +131,10 @@ export class ProgressionService {
   /**
    * Add experience and handle level ups
    */
-  async addExperience(userId: string, expToAdd: string): Promise<{ newLevel: number; leveledUp: boolean }> {
+  async addExperience(
+    userId: string,
+    expToAdd: string,
+  ): Promise<{ newLevel: number; leveledUp: boolean }> {
     // Get or create progression
     let progression = await prisma.progression.findUnique({
       where: { userId },
@@ -182,7 +192,9 @@ export class ProgressionService {
   /**
    * Purchase an item
    */
-  async purchaseItem(request: IItemPurchaseRequest): Promise<IItemPurchaseResult> {
+  async purchaseItem(
+    request: IItemPurchaseRequest,
+  ): Promise<IItemPurchaseResult> {
     const { userId, itemSlug, quantity = 1 } = request;
 
     // 1. Find item definition
@@ -247,7 +259,13 @@ export class ProgressionService {
         category: 'HARDWARE',
         baseCost: new Decimal(itemDef.baseCost),
         baseEffect: itemDef.baseEffect,
-        effectType: itemDef.effectType as 'CLICK_BONUS' | 'PASSIVE_BONUS' | 'CLICK_MULTIPLIER' | 'PASSIVE_MULTIPLIER' | 'CRIT_CHANCE' | 'CRIT_MULTIPLIER',
+        effectType: itemDef.effectType as
+          | 'CLICK_BONUS'
+          | 'PASSIVE_BONUS'
+          | 'CLICK_MULTIPLIER'
+          | 'PASSIVE_MULTIPLIER'
+          | 'CRIT_CHANCE'
+          | 'CRIT_MULTIPLIER',
         costMultiplier: itemDef.costMultiplier,
         maxQuantity: itemDef.maxQuantity ?? null,
         unlockLevel: itemDef.unlockLevel,
@@ -365,7 +383,11 @@ export class ProgressionService {
   /**
    * Add an item to user's inventory (from loot, achievements, etc.)
    */
-  async addItem(userId: string, itemSlug: string, quantity: number): Promise<boolean> {
+  async addItem(
+    userId: string,
+    itemSlug: string,
+    quantity: number,
+  ): Promise<boolean> {
     // Find item definition
     const itemDef = this.ITEMS.find((i) => i.slug === itemSlug);
     if (!itemDef) {
@@ -383,7 +405,13 @@ export class ProgressionService {
         category: 'HARDWARE',
         baseCost: new Decimal(itemDef.baseCost),
         baseEffect: itemDef.baseEffect,
-        effectType: itemDef.effectType as 'CLICK_BONUS' | 'PASSIVE_BONUS' | 'CLICK_MULTIPLIER' | 'PASSIVE_MULTIPLIER' | 'CRIT_CHANCE' | 'CRIT_MULTIPLIER',
+        effectType: itemDef.effectType as
+          | 'CLICK_BONUS'
+          | 'PASSIVE_BONUS'
+          | 'CLICK_MULTIPLIER'
+          | 'PASSIVE_MULTIPLIER'
+          | 'CRIT_CHANCE'
+          | 'CRIT_MULTIPLIER',
         costMultiplier: itemDef.costMultiplier,
         maxQuantity: itemDef.maxQuantity ?? null,
         unlockLevel: itemDef.unlockLevel,
@@ -442,7 +470,8 @@ export class ProgressionService {
 
     // Calculate bonuses from items
     for (const ownedItem of ownedItems) {
-      const totalEffect = ownedItem.item.baseEffect * ownedItem.quantity * ownedItem.level;
+      const totalEffect =
+        ownedItem.item.baseEffect * ownedItem.quantity * ownedItem.level;
 
       switch (ownedItem.item.effectType) {
         case 'CLICK_BONUS':
@@ -477,6 +506,7 @@ export class ProgressionService {
     return {
       userId: progression.userId,
       linesOfCode: progression.linesOfCode.toString(),
+      totalLinesWritten: progression.totalLinesWritten.toString(),
       level: progression.level,
       experience: progression.experience.toString(),
       clickMultiplier: progression.clickMultiplier,
@@ -489,12 +519,14 @@ export class ProgressionService {
   /**
    * Get available items for a user
    */
-  async getAvailableItems(userId: string): Promise<Array<{
-    item: IItem;
-    owned: number;
-    nextCost: string;
-    canAfford: boolean;
-  }>> {
+  async getAvailableItems(userId: string): Promise<
+    Array<{
+      item: IItem;
+      owned: number;
+      nextCost: string;
+      canAfford: boolean;
+    }>
+  > {
     // Get progression from DB
     const progression = await prisma.progression.findUnique({
       where: { userId },
@@ -515,9 +547,8 @@ export class ProgressionService {
       ownedMap.set(oi.item.slug, oi.quantity);
     }
 
-    return this.ITEMS
-      .filter((itemDef) => itemDef.unlockLevel <= level)
-      .map((itemDef) => {
+    return this.ITEMS.filter((itemDef) => itemDef.unlockLevel <= level).map(
+      (itemDef) => {
         const owned = ownedMap.get(itemDef.slug) || 0;
         const nextCost = this.costCalculator.calculateNextCost(
           itemDef.baseCost,
@@ -531,7 +562,8 @@ export class ProgressionService {
           nextCost,
           canAfford: balance.gte(nextCost),
         };
-      });
+      },
+    );
   }
 
   /**
