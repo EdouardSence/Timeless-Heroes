@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { prisma } from '@repo/prisma-client';
 
+import { LeaderboardService } from '@repo/redis-client';
 import { IJwtPayload } from './jwt.strategy';
 
 interface IUserCredentials {
@@ -33,7 +34,10 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly SALT_ROUNDS = 10;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly leaderboardService: LeaderboardService,
+  ) {}
 
   /**
    * Validate user credentials and return JWT token
@@ -120,6 +124,9 @@ export class AuthService {
         criticalMultiplier: 2.0,
       },
     });
+
+    // Seed leaderboard so the new user appears immediately (score 0)
+    await this.leaderboardService.updateScore(newUser.id, 0);
 
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
       sub: newUser.id,

@@ -19,6 +19,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 
 import { AuthService, IAuthResult } from './auth.service';
 
@@ -29,14 +30,26 @@ interface IAuthenticatedUser {
 }
 
 class LoginDto {
+  @IsEmail()
   email!: string;
+
+  @IsString()
+  @MinLength(8)
   password!: string;
 }
 
 class RegisterDto {
-  email!: string;
-  password!: string;
+  @IsString()
+  @MinLength(3)
+  @MaxLength(32)
   username!: string;
+
+  @IsEmail()
+  email!: string;
+
+  @IsString()
+  @MinLength(8)
+  password!: string;
 }
 
 @Controller('auth')

@@ -20,6 +20,7 @@ import { AuthModule } from './auth/auth.module';
 import { ClickProcessorModule } from './click-processor/click-processor.module';
 import { GameGatewayModule } from './gateway/game-gateway.module';
 import { HealthModule } from './health/health.module';
+import { ProgressionModule } from './progression/progression.module';
 import { RedisModule } from './redis/redis.module';
 import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
 
@@ -95,6 +96,9 @@ export class NatsClientsModule {}
 
     // HTTP REST ingestion from keylogger
     TcpIngestModule,
+
+    // HTTP REST progression data proxy
+    ProgressionModule,
 
     // Aggregated health checks via NATS
     HealthModule,
