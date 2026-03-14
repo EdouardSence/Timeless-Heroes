@@ -48,8 +48,8 @@ export class ClickProcessorService {
     // 1. Calculate base value
     const baseValue = this.calculateBaseValue(keyType);
     
-    // 2. Calculate multipliers
-    const multipliers = this.calculateMultipliers(progression);
+    // 2. Calculate multipliers (includes active boosts from Redis)
+    const multipliers = await this.calculateMultipliers(userId, progression);
     
     // 3. Check for critical hit
     const isCritical = Math.random() < progression.criticalChance;
@@ -101,13 +101,18 @@ export class ClickProcessorService {
   
   /**
    * Calculate all multipliers for a click
+   * BUG-08 FIX: Reads active boosts and subscription from Redis
+   * instead of returning a hardcoded bonusMultiplier of 1.0
    */
-  private calculateMultipliers(progression: IProgressionData): IMultiplierBreakdown {
+  private async calculateMultipliers(
+    userId: string,
+    progression: IProgressionData,
+  ): Promise<IMultiplierBreakdown> {
     const clickMultiplier = progression.clickMultiplier;
     const criticalMultiplier = progression.criticalMultiplier;
     
-    // Bonus multiplier could come from active boosts, events, etc.
-    const bonusMultiplier = 1.0; // TODO: Implement boost system
+    // Fetch bonus multiplier from active boosts + subscription in Redis
+    const bonusMultiplier = await this.getActiveBoostMultiplier(userId);
     
     const totalMultiplier = clickMultiplier * bonusMultiplier;
     
@@ -117,6 +122,74 @@ export class ClickProcessorService {
       bonusMultiplier,
       totalMultiplier,
     };
+  }
+  
+  /**
+   * Get the combined boost multiplier from all active boosts and subscription
+   * Boosts are stored at `boost:{userId}:{boostType}` with TTL (auto-expire)
+   * Subscriptions are stored at `subscription:{userId}` with TTL
+   */
+  private async getActiveBoostMultiplier(userId: string): Promise<number> {
+    let multiplier = 1.0;
+    
+    try {
+      // 1. Check active temporary boosts (boost:{userId}:*)
+      const boostKeys = await this.redis.keys(`boost:${userId}:*`);
+      
+      if (boostKeys.length > 0) {
+        const boostValues = await this.redis.mget(...boostKeys);
+        
+        for (const raw of boostValues) {
+          if (!raw) continue;
+          try {
+            const boost = JSON.parse(raw) as { multiplier: number };
+            if (boost.multiplier && boost.multiplier > 0) {
+              // Stack boost multipliers multiplicatively
+              multiplier *= boost.multiplier;
+            }
+          } catch {
+            // Skip malformed boost data
+          }
+        }
+      }
+      
+      // 2. Check active subscription (subscription:{userId})
+      const subscriptionRaw = await this.redis.get(`subscription:${userId}`);
+      
+      if (subscriptionRaw) {
+        try {
+          const subscription = JSON.parse(subscriptionRaw) as { type: string };
+          // Apply subscription tier multiplier
+          const subMultiplier = this.getSubscriptionMultiplier(subscription.type);
+          multiplier *= subMultiplier;
+        } catch {
+          // Skip malformed subscription data
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch boost data for ${userId}, using default multiplier: ${error instanceof Error ? error.message : error}`,
+      );
+      // On Redis error, default to 1.0 (no bonus) rather than crashing
+    }
+    
+    return multiplier;
+  }
+  
+  /**
+   * Get the click multiplier bonus for a subscription tier
+   */
+  private getSubscriptionMultiplier(subscriptionType: string): number {
+    switch (subscriptionType.toUpperCase()) {
+      case 'PREMIUM':
+        return 1.5;
+      case 'VIP':
+        return 2.0;
+      case 'ELITE':
+        return 3.0;
+      default:
+        return 1.0;
+    }
   }
   
   /**

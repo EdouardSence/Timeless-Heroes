@@ -9,6 +9,7 @@ import { Queue } from 'bullmq';
 
 import { LeaderboardService, RedisKeys, getRedisClient } from '@repo/redis-client';
 import { LeaderboardType, QueueName } from '@repo/shared-types';
+import { prisma } from '@repo/prisma-client';
 
 @Injectable()
 export class LeaderboardSyncService {
@@ -70,17 +71,35 @@ export class LeaderboardSyncService {
   }
   
   /**
-   * Get leaderboard data
+   * Get leaderboard data, enriched with usernames from PostgreSQL
    */
   async getLeaderboard(type: LeaderboardType, count: number = 100) {
+    let rawEntries;
     switch (type) {
       case LeaderboardType.WEEKLY:
-        return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_WEEKLY);
+        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_WEEKLY);
+        break;
       case LeaderboardType.DAILY:
-        return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_DAILY);
+        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_DAILY);
+        break;
       default:
-        return this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_GLOBAL);
+        rawEntries = await this.leaderboardService.getTopPlayers(count, RedisKeys.LEADERBOARD_GLOBAL);
     }
+
+    if (rawEntries.length === 0) return rawEntries;
+
+    // Batch-fetch usernames from PostgreSQL
+    const userIds = rawEntries.map(e => e.userId);
+    const users = await prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, username: true },
+    });
+    const usernameMap = new Map(users.map(u => [u.id, u.username]));
+
+    return rawEntries.map(entry => ({
+      ...entry,
+      username: usernameMap.get(entry.userId) ?? entry.userId,
+    }));
   }
   
   /**

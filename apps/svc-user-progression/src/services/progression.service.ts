@@ -477,6 +477,7 @@ export class ProgressionService {
     return {
       userId: progression.userId,
       linesOfCode: progression.linesOfCode.toString(),
+      totalLinesWritten: progression.totalLinesWritten.toString(),
       level: progression.level,
       experience: progression.experience.toString(),
       clickMultiplier: progression.clickMultiplier,
