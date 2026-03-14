@@ -1,25 +1,18 @@
 /**
  * Click Processor Service
- * Core click processing logic with Redis buffering
+ * Redis buffering and progression caching (cross-cutting gateway concerns)
  *
- * Flow:
- * 1. Receive validated click from WebSocket
- * 2. Calculate click value (with multipliers)
- * 3. Atomically buffer click in Redis
- * 4. Return immediate feedback to client
+ * Click value calculation is now delegated to svc-user-progression via ClientProxy.
+ * This service handles:
+ * - Atomically buffering click values in Redis
+ * - Caching progression data (read-through cache)
  *
- * The buffer is flushed to PostgreSQL by the worker-game-loop service
+ * The buffer is flushed to PostgreSQL by the worker-game-loop service.
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClickBufferService, RedisKeys } from '@repo/redis-client';
-import {
-  IClickResult,
-  IKeyPressPayload,
-  IMultiplierBreakdown,
-  IProgressionData,
-  KeyType,
-} from '@repo/shared-types';
+import { IProgressionData } from '@repo/shared-types';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -35,100 +28,24 @@ export class ClickProcessorService {
   ) {}
 
   /**
-   * Process a single click event
-   * Returns the calculated result for immediate client feedback
+   * Buffer a click value in Redis (atomic operation)
+   * Called after the microservice returns the calculated click value.
    */
-  async processClick(
-    payload: IKeyPressPayload,
-    progression: IProgressionData,
-  ): Promise<IClickResult> {
-    const { keyType, userId } = payload;
-
-    // 1. Calculate base value
-    const baseValue = this.calculateBaseValue(keyType);
-
-    // 2. Calculate multipliers
-    const multipliers = this.calculateMultipliers(progression);
-
-    // 3. Check for critical hit
-    // eslint-disable-next-line sonarjs/pseudo-random
-    const isCritical = Math.random() < progression.criticalChance;
-
-    // 4. Calculate final value
-    let finalValue = baseValue * multipliers.totalMultiplier;
-    if (isCritical) {
-      finalValue *= progression.criticalMultiplier;
-    }
-
-    // 5. Buffer the click in Redis (atomic operation)
+  async bufferClickValue(userId: string, finalValue: string) {
     const bufferResult = await this.clickBufferService.incrementBuffer(
       userId,
-      finalValue.toString(),
+      finalValue,
     );
 
     this.logger.debug(
-      `Click processed for ${userId}: base=${baseValue}, final=${finalValue}, total buffer=${bufferResult.locToAdd}`,
+      `Click buffered for ${userId}: value=${finalValue}, total buffer=${bufferResult.locToAdd}`,
     );
 
-    // 6. Get estimated new balance (from cache + buffer)
-    const cachedBalance = BigInt(progression.linesOfCode);
-    const bufferedAmount = BigInt(
-      Math.floor(Number.parseFloat(bufferResult.locToAdd)),
-    );
-    const estimatedBalance = (cachedBalance + bufferedAmount).toString();
-
-    return {
-      baseValue,
-      finalValue: finalValue.toFixed(0),
-      isCritical,
-      multipliers,
-      newBalance: estimatedBalance,
-    };
-  }
-
-  /**
-   * Calculate base click value based on key type
-   */
-  private calculateBaseValue(keyType?: KeyType): number {
-    switch (keyType) {
-      case KeyType.SPECIAL: {
-        return 2;
-      } // Shift, Ctrl, etc. give bonus
-      case KeyType.FUNCTION: {
-        return 3;
-      } // F1-F12 give more
-      default: {
-        return 1;
-      }
-    }
-  }
-
-  /**
-   * Calculate all multipliers for a click
-   */
-  private calculateMultipliers(
-    progression: IProgressionData,
-  ): IMultiplierBreakdown {
-    const clickMultiplier = progression.clickMultiplier;
-    const criticalMultiplier = progression.criticalMultiplier;
-
-    // Bonus multiplier could come from active boosts, events, etc.
-    // eslint-disable-next-line sonarjs/todo-tag
-    const bonusMultiplier = 1; // TODO: Implement boost system
-
-    const totalMultiplier = clickMultiplier * bonusMultiplier;
-
-    return {
-      bonusMultiplier,
-      clickMultiplier,
-      criticalMultiplier,
-      totalMultiplier,
-    };
+    return bufferResult;
   }
 
   /**
    * Get user progression from Redis cache
-   * In production, this would fetch from the progression service via gRPC
    */
   async getProgressionCached(userId: string): Promise<IProgressionData | null> {
     const redisKey = RedisKeys.CACHE_USER_PROGRESSION(userId);

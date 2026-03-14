@@ -8,13 +8,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { QueueName } from '@repo/shared-types';
 
+import { HealthController } from './controllers/health.controller';
 import { ProgressionController } from './controllers/progression.controller';
 import { ItemCostCalculatorService } from './services/item-cost-calculator.service';
 import { LeaderboardSyncService } from './services/leaderboard-sync.service';
 import { ProgressionService } from './services/progression.service';
 
 @Module({
-  controllers: [ProgressionController],
+  controllers: [HealthController, ProgressionController],
   exports: [ProgressionService, ItemCostCalculatorService],
   imports: [
     ConfigModule.forRoot({

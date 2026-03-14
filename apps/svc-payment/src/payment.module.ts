@@ -8,14 +8,20 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { QueueName } from '@repo/shared-types';
 
+import { HealthController } from './health.controller';
 import { IdempotencyService } from './idempotency/idempotency.service';
+import { PaymentTransportController } from './payment-transport.controller';
 import { ProvisionOrderProcessor } from './provision/provision-order.processor';
 import { ProvisionService } from './provision/provision.service';
 import { StripeWebhookController } from './stripe/stripe-webhook.controller';
 import { StripeService } from './stripe/stripe.service';
 
 @Module({
-  controllers: [StripeWebhookController],
+  controllers: [
+    HealthController,
+    PaymentTransportController,
+    StripeWebhookController,
+  ],
   imports: [
     ConfigModule.forRoot({
       envFilePath: ['.env.local', '.env'],

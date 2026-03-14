@@ -5,10 +5,14 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import {
+  IClickResult,
   IItemPurchaseRequest,
   IItemPurchaseResult,
+  IKeyPressPayload,
+  IMultiplierBreakdown,
   IProgressionData,
   ItemPurchaseError,
+  KeyType,
 } from '@repo/shared-types';
 
 import { ItemCostCalculatorService } from './item-cost-calculator.service';
@@ -36,7 +40,7 @@ interface IOwnedItem {
   userId: string;
 }
 
-interface IItem {
+export interface IItem {
   baseCost: string;
   baseEffect: number;
   costMultiplier: number;
@@ -191,6 +195,118 @@ export class ProgressionService {
     return {
       leveledUp: progression.level > oldLevel,
       newLevel: progression.level,
+    };
+  }
+
+  /**
+   * Process a single click event
+   * Calculates base value, multipliers, critical hit, and final LoC earned.
+   * (Moved from api-gateway ClickProcessorService)
+   */
+  processClick(
+    payload: IKeyPressPayload,
+    progression: IProgressionData,
+  ): IClickResult {
+    const { keyType } = payload;
+
+    // 1. Calculate base value based on key type
+    let baseValue: number;
+    switch (keyType) {
+      case KeyType.SPECIAL: {
+        baseValue = 2;
+        break;
+      }
+      case KeyType.FUNCTION: {
+        baseValue = 3;
+        break;
+      }
+      default: {
+        baseValue = 1;
+      }
+    }
+
+    // 2. Calculate multipliers
+    const clickMultiplier = progression.clickMultiplier;
+    const criticalMultiplier = progression.criticalMultiplier;
+    const bonusMultiplier = 1; // future: active boosts, events
+    const totalMultiplier = clickMultiplier * bonusMultiplier;
+
+    const multipliers: IMultiplierBreakdown = {
+      bonusMultiplier,
+      clickMultiplier,
+      criticalMultiplier,
+      totalMultiplier,
+    };
+
+    // 3. Check for critical hit
+    // eslint-disable-next-line sonarjs/pseudo-random
+    const isCritical = Math.random() < progression.criticalChance;
+
+    // 4. Calculate final value
+    let finalValue = baseValue * totalMultiplier;
+    if (isCritical) {
+      finalValue *= criticalMultiplier;
+    }
+
+    // Note: Redis buffering stays in the gateway (cross-cutting concern).
+    // The gateway will buffer the result after receiving it.
+    return {
+      baseValue,
+      finalValue: finalValue.toFixed(0),
+      isCritical,
+      multipliers,
+      newBalance: progression.linesOfCode, // gateway estimates balance from buffer
+    };
+  }
+
+  /**
+   * Calculate offline rewards for a reconnecting player
+   * (Moved from api-gateway GameGateway)
+   */
+  calculateOfflineRewards(data: {
+    userId: string;
+    disconnectedAt: number;
+    reconnectedAt: number;
+    passiveMultiplier: number;
+  }): {
+    earnedLoc: string;
+    earnedExp: string;
+    offlineDuration: number;
+    effectiveDuration: number;
+    maxOfflineTime: number;
+    offlineRate: number;
+  } {
+    const offlineDuration = Math.floor(
+      (data.reconnectedAt - data.disconnectedAt) / 1000,
+    );
+
+    // Minimum 1 minute offline for rewards
+    if (offlineDuration < 60) {
+      return {
+        earnedExp: '0',
+        earnedLoc: '0',
+        effectiveDuration: 0,
+        maxOfflineTime: 28_800,
+        offlineDuration,
+        offlineRate: 0,
+      };
+    }
+
+    // Max 8 hours of offline rewards
+    const maxOfflineTime = 8 * 60 * 60; // 8 hours in seconds
+    const effectiveDuration = Math.min(offlineDuration, maxOfflineTime);
+
+    // Offline earnings = 50% of passive rate
+    const offlineRate = data.passiveMultiplier * 0.5;
+    const earnedLoc = Math.floor(offlineRate * effectiveDuration);
+
+    return {
+      earnedExp: '0', // future: calculate EXP
+      earnedLoc: earnedLoc.toString(),
+      effectiveDuration,
+      maxOfflineTime,
+      offlineDuration,
+      offlineRate,
     };
   }
 

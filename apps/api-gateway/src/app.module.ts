@@ -1,13 +1,13 @@
 /**
  * API Gateway - Main Application Module
- * 
+ *
  * This gateway handles ONLY routing and real-time communication:
  * - HTTP REST API endpoints (including keylogger ingestion)
  * - WebSocket connections for real-time game updates
  * - JWT authentication and validation
  * - Click validation and Redis buffering
- * 
- * Business logic (buffer flushing, persistence) is in worker-game-loop.
+ *
+ * Business logic is delegated to microservices via ClientProxy (Redis transport).
  */
 
 import { Module } from '@nestjs/common';
@@ -36,7 +36,7 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
     // Click receive → validate → buffer in Redis
     ClickProcessorModule,
 
-    // WebSocket real-time gateway
+    // WebSocket real-time gateway (includes ClientsModule for microservice proxies)
     GameGatewayModule,
 
     // HTTP REST ingestion from keylogger

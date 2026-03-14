@@ -1,6 +1,6 @@
 /**
  * Progression Controller
- * REST API endpoints for user progression
+ * REST API endpoints + Redis @MessagePattern handlers for user progression
  */
 
 import {
@@ -13,12 +13,16 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   IApiResponse,
+  IClickResult,
   IItemPurchaseRequest,
   IItemPurchaseResult,
+  IKeyPressPayload,
   IProgressionData,
   LeaderboardType,
+  ProgressionCommand,
 } from '@repo/shared-types';
 
 import { ItemCostCalculatorService } from '../services/item-cost-calculator.service';
@@ -34,6 +38,116 @@ export class ProgressionController {
     private readonly costCalculator: ItemCostCalculatorService,
     private readonly leaderboardSync: LeaderboardSyncService,
   ) {}
+
+  // ========================================================================
+  // REDIS @MessagePattern HANDLERS (called via ClientProxy from API Gateway)
+  // ========================================================================
+
+  @MessagePattern(ProgressionCommand.GET_PROGRESSION)
+  handleGetProgression(@Payload() data: { userId: string }): IProgressionData {
+    this.logger.debug(`[MQ] getProgression userId=${data.userId}`);
+    return this.progressionService.getProgression(data.userId);
+  }
+
+  @MessagePattern(ProgressionCommand.GET_DEFAULT_PROGRESSION)
+  handleGetDefaultProgression(
+    @Payload() data: { userId: string },
+  ): IProgressionData {
+    this.logger.debug(`[MQ] getDefaultProgression userId=${data.userId}`);
+    return this.progressionService.getProgression(data.userId);
+  }
+
+  @MessagePattern(ProgressionCommand.PROCESS_CLICK)
+  handleProcessClick(
+    @Payload()
+    data: {
+      payload: IKeyPressPayload;
+      progression: IProgressionData;
+    },
+  ): IClickResult {
+    this.logger.debug(`[MQ] processClick userId=${data.payload.userId}`);
+    return this.progressionService.processClick(data.payload, data.progression);
+  }
+
+  @MessagePattern(ProgressionCommand.CALCULATE_OFFLINE_REWARDS)
+  handleCalculateOfflineRewards(
+    @Payload()
+    data: {
+      userId: string;
+      disconnectedAt: number;
+      reconnectedAt: number;
+      passiveMultiplier: number;
+    },
+  ) {
+    this.logger.debug(`[MQ] calculateOfflineRewards userId=${data.userId}`);
+    return this.progressionService.calculateOfflineRewards(data);
+  }
+
+  @MessagePattern(ProgressionCommand.UPDATE_BALANCE)
+  async handleUpdateBalance(
+    @Payload() data: { userId: string; delta: string },
+  ): Promise<IProgressionData> {
+    this.logger.debug(
+      `[MQ] updateBalance userId=${data.userId} delta=${data.delta}`,
+    );
+    return this.progressionService.updateBalance(data.userId, data.delta);
+  }
+
+  @MessagePattern(ProgressionCommand.ADD_EXPERIENCE)
+  handleAddExperience(@Payload() data: { userId: string; expToAdd: string }): {
+    newLevel: number;
+    leveledUp: boolean;
+  } {
+    this.logger.debug(`[MQ] addExperience userId=${data.userId}`);
+    return this.progressionService.addExperience(data.userId, data.expToAdd);
+  }
+
+  @MessagePattern(ProgressionCommand.PURCHASE_ITEM)
+  handlePurchaseItem(
+    @Payload() data: IItemPurchaseRequest,
+  ): IItemPurchaseResult {
+    this.logger.debug(
+      `[MQ] purchaseItem userId=${data.userId} item=${data.itemSlug}`,
+    );
+    return this.progressionService.purchaseItem(data);
+  }
+
+  @MessagePattern(ProgressionCommand.ADD_ITEM)
+  handleAddItem(
+    @Payload() data: { userId: string; itemSlug: string; quantity: number },
+  ): boolean {
+    this.logger.debug(
+      `[MQ] addItem userId=${data.userId} item=${data.itemSlug}`,
+    );
+    return this.progressionService.addItem(
+      data.userId,
+      data.itemSlug,
+      data.quantity,
+    );
+  }
+
+  @MessagePattern(ProgressionCommand.GET_AVAILABLE_ITEMS)
+  handleGetAvailableItems(@Payload() data: { userId: string }) {
+    this.logger.debug(`[MQ] getAvailableItems userId=${data.userId}`);
+    return this.progressionService.getAvailableItems(data.userId);
+  }
+
+  @MessagePattern(ProgressionCommand.GET_LEADERBOARD)
+  async handleGetLeaderboardMQ(@Payload() data: { type: string }) {
+    this.logger.debug(`[MQ] getLeaderboard type=${data.type}`);
+    const leaderboardType = data.type.toUpperCase() as LeaderboardType;
+    return this.leaderboardSync.getLeaderboard(leaderboardType);
+  }
+
+  @MessagePattern(ProgressionCommand.GET_USER_RANKS)
+  async handleGetUserRanksMQ(@Payload() data: { userId: string }) {
+    this.logger.debug(`[MQ] getUserRanks userId=${data.userId}`);
+    return this.leaderboardSync.getUserRanks(data.userId);
+  }
+
+  // ========================================================================
+  // HTTP ENDPOINTS (kept for backward compatibility / direct HTTP access)
+  // ========================================================================
 
   /**
    * Get user progression

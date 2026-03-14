@@ -6,12 +6,15 @@
  * - KEY_PRESS events (clicks)
  * - Balance updates
  * - Item purchases
- * - Program management
  * - Leaderboard updates
  * - Offline rewards
+ *
+ * Business logic is delegated to microservices via ClientProxy (Redis transport).
+ * Anti-cheat validation and Redis caching stay here (cross-cutting concerns).
  */
 
 import { Inject, Logger } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import {
   ConnectedSocket,
   MessageBody,
@@ -29,9 +32,12 @@ import {
   ILeaderboardUpdate,
   IProgressionData,
   LeaderboardType,
+  ProgressionCommand,
+  ServiceToken,
   WebSocketEvent,
 } from '@repo/shared-types';
 import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 
 import { ClickProcessorService } from '../click-processor/click-processor.service';
@@ -63,10 +69,12 @@ export class GameGateway
     private readonly clickValidator: ClickValidatorService,
     private readonly leaderboardService: LeaderboardService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    @Inject(ServiceToken.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
   ) {}
 
   afterInit() {
-    this.logger.log('🎮 Game WebSocket Gateway initialized');
+    this.logger.log('Game WebSocket Gateway initialized');
   }
 
   /**
@@ -81,14 +89,11 @@ export class GameGateway
 
       if (!token) {
         this.logger.warn(`Client ${client.id} connected without auth token`);
-        // Allow connection but mark as unauthenticated
-        // In production, you might want to disconnect
         return;
       }
 
       // eslint-disable-next-line sonarjs/todo-tag
-      // TODO: Verify JWT and extract user info
-      // For now, use a mock user ID from the token
+      // TODO: Verify JWT and extract user info (M5)
       const userId =
         (client.handshake.auth as { userId?: string }).userId ?? 'anonymous';
       const username =
@@ -97,7 +102,7 @@ export class GameGateway
       client.userId = userId;
       client.username = username;
 
-      // Track connected user in Redis (replaces in-memory Map)
+      // Track connected user in Redis
       await this.redis.hset(RedisKeys.WS_CONNECTED_USERS, userId, client.id);
 
       // Join user-specific room for targeted messages
@@ -155,6 +160,7 @@ export class GameGateway
 
   /**
    * Handle KEY_PRESS event (main click handler)
+   * Anti-cheat validation stays in gateway; click processing delegated to microservice.
    */
   @SubscribeMessage(WebSocketEvent.KEY_PRESS)
   async handleKeyPress(
@@ -173,7 +179,7 @@ export class GameGateway
       userId,
     };
 
-    // 1. Validate click (anti-cheat)
+    // 1. Validate click (anti-cheat — stays in gateway)
     const validation = await this.clickValidator.validateClick(fullPayload);
 
     if (!validation.isValid) {
@@ -189,27 +195,43 @@ export class GameGateway
       return { error: validation.reason ?? 'Click rejected' };
     }
 
-    // 2. Get user progression (cached)
+    // 2. Get user progression (from Redis cache or via microservice)
     let progression = await this.clickProcessor.getProgressionCached(userId);
 
     if (!progression) {
-      // Create default progression for new users
-      // In production, this would fetch from the progression service
-      progression = this.getDefaultProgression(userId);
+      // Fetch from progression microservice
+      progression = await firstValueFrom(
+        this.progressionClient.send<IProgressionData>(
+          ProgressionCommand.GET_PROGRESSION,
+          { userId },
+        ),
+      );
       await this.clickProcessor.cacheProgression(progression);
     }
 
-    // 3. Process the click
-    const result = await this.clickProcessor.processClick(
-      fullPayload,
-      progression,
+    // 3. Delegate click processing to microservice
+    const result = await firstValueFrom(
+      this.progressionClient.send<IClickResult>(
+        ProgressionCommand.PROCESS_CLICK,
+        { payload: fullPayload, progression },
+      ),
     );
 
-    // 4. Emit click result
-    client.emit(WebSocketEvent.CLICK_PROCESSED, result);
+    // 4. Buffer the click value in Redis (cross-cutting — stays in gateway)
+    const bufferResult = await this.clickProcessor.bufferClickValue(
+      userId,
+      result.finalValue,
+    );
 
-    // 5. Optionally broadcast balance update (throttled)
-    // This is handled by the buffer processor
+    // 5. Estimate new balance from cache + buffer
+    const cachedBalance = BigInt(progression.linesOfCode);
+    const bufferedAmount = BigInt(
+      Math.floor(Number.parseFloat(bufferResult.locToAdd)),
+    );
+    result.newBalance = (cachedBalance + bufferedAmount).toString();
+
+    // 6. Emit click result
+    client.emit(WebSocketEvent.CLICK_PROCESSED, result);
 
     return result;
   }
@@ -272,16 +294,22 @@ export class GameGateway
 
   /**
    * Send initial game data to newly connected client
+   * Progression data fetched via ClientProxy from svc-user-progression
    */
   private async sendInitialData(client: IAuthenticatedSocket): Promise<void> {
     const userId = client.userId;
     if (!userId) return;
 
-    // Get or create progression
+    // Get or create progression via microservice
     let progression = await this.clickProcessor.getProgressionCached(userId);
 
     if (!progression) {
-      progression = this.getDefaultProgression(userId);
+      progression = await firstValueFrom(
+        this.progressionClient.send<IProgressionData>(
+          ProgressionCommand.GET_PROGRESSION,
+          { userId },
+        ),
+      );
       await this.clickProcessor.cacheProgression(progression);
     }
 
@@ -319,6 +347,7 @@ export class GameGateway
 
   /**
    * Calculate offline rewards for reconnecting player
+   * Delegated to svc-user-progression via ClientProxy
    */
   private async calculateOfflineRewards(
     client: IAuthenticatedSocket,
@@ -342,32 +371,37 @@ export class GameGateway
       return;
     }
 
-    // Max 8 hours of offline rewards
-    const maxOfflineTime = 8 * 60 * 60; // 8 hours in seconds
-    const effectiveDuration = Math.min(offlineDuration, maxOfflineTime);
-
     // Get progression for passive rate
     const progression = await this.clickProcessor.getProgressionCached(userId);
     if (!progression) return;
 
-    // Calculate offline earnings (reduced rate - 50% of passive)
-    const offlineRate = progression.passiveMultiplier * 0.5;
-    const earnedLoc = Math.floor(offlineRate * effectiveDuration);
+    // Delegate offline reward calculation to microservice
+    const rewards = await firstValueFrom(
+      this.progressionClient.send<{
+        earnedLoc: string;
+        earnedExp: string;
+        offlineDuration: number;
+        effectiveDuration: number;
+        maxOfflineTime: number;
+        offlineRate: number;
+      }>(ProgressionCommand.CALCULATE_OFFLINE_REWARDS, {
+        disconnectedAt,
+        passiveMultiplier: progression.passiveMultiplier,
+        reconnectedAt,
+        userId,
+      }),
+    );
 
-    if (earnedLoc > 0) {
-      // eslint-disable-next-line sonarjs/todo-tag
-      // TODO: Actually credit the earnings via progression service
-
+    if (Number.parseInt(rewards.earnedLoc, 10) > 0) {
       client.emit(WebSocketEvent.OFFLINE_REWARDS, {
         completedPrograms: [],
         disconnectedAt: new Date(disconnectedAt),
-        // eslint-disable-next-line sonarjs/todo-tag
-        earnedExp: '0', // TODO: Calculate EXP
-        earnedLoc: earnedLoc.toString(),
-        effectiveDuration,
-        maxOfflineTime,
-        offlineDuration,
-        offlineRate,
+        earnedExp: rewards.earnedExp,
+        earnedLoc: rewards.earnedLoc,
+        effectiveDuration: rewards.effectiveDuration,
+        maxOfflineTime: rewards.maxOfflineTime,
+        offlineDuration: rewards.offlineDuration,
+        offlineRate: rewards.offlineRate,
         reconnectedAt: new Date(reconnectedAt),
         userId,
       });
@@ -375,22 +409,6 @@ export class GameGateway
 
     // Clear the disconnect timestamp
     await this.redis.del(`offline:disconnect:${userId}`);
-  }
-
-  /**
-   * Get default progression for new users
-   */
-  private getDefaultProgression(userId: string): IProgressionData {
-    return {
-      clickMultiplier: 1,
-      criticalChance: 0.05,
-      criticalMultiplier: 2,
-      experience: '0',
-      level: 1,
-      linesOfCode: '0',
-      passiveMultiplier: 0,
-      userId,
-    };
   }
 
   /**
