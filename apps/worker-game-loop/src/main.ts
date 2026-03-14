@@ -1,6 +1,7 @@
 /**
  * Worker Game Loop - Main Entry Point
- * Handles BullMQ workers for programs, offline calculation, etc.
+ * Pure BullMQ consumer — no HTTP server.
+ * Processes background jobs: click buffer flush, programs, offline calculation.
  */
 
 import { Logger } from '@nestjs/common';
@@ -11,16 +12,17 @@ import { WorkerModule } from './worker.module';
 async function bootstrap() {
   const logger = new Logger('WorkerGameLoop');
 
-  const app = await NestFactory.create(WorkerModule);
+  // Create application context only (no HTTP listener)
+  // BullMQ processors and @nestjs/schedule crons start automatically via DI
+  const app = await NestFactory.createApplicationContext(WorkerModule);
 
-  // This is a worker service, not an HTTP server by default
-  // But we can expose a health check endpoint
-  const port = process.env.WORKER_PORT ?? 3002;
-  await app.listen(port);
+  // Enable graceful shutdown
+  app.enableShutdownHooks();
 
-  logger.log(`⚙️ Worker Game Loop started on port ${port}`);
-  logger.log('📦 Program Processor active');
-  logger.log('🌙 Offline Calculator active');
+  logger.log('Worker Game Loop started (pure BullMQ consumer, no HTTP)');
+  logger.log(
+    'Click buffer flush, program processor, offline calculator active',
+  );
 }
 
 void bootstrap();
