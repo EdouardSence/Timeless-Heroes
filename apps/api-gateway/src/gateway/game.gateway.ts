@@ -14,7 +14,8 @@
  * Anti-cheat validation and Redis caching stay here (cross-cutting concerns).
  */
 
-import { Inject, Logger } from '@nestjs/common';
+import { Inject, Logger, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   ConnectedSocket,
@@ -43,14 +44,18 @@ import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 
+import { IJwtPayload } from '../auth/jwt.strategy';
+import { WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ClickProcessorService } from '../click-processor/click-processor.service';
 import { ClickValidatorService } from '../click-processor/click-validator.service';
 
 interface IAuthenticatedSocket extends Socket {
+  email?: string;
   userId?: string;
   username?: string;
 }
 
+@UseGuards(WsJwtGuard)
 @WebSocketGateway({
   cors: {
     credentials: true,
@@ -70,6 +75,7 @@ export class GameGateway
   constructor(
     private readonly clickProcessor: ClickProcessorService,
     private readonly clickValidator: ClickValidatorService,
+    private readonly jwtService: JwtService,
     private readonly leaderboardService: LeaderboardService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     @Inject(ServiceToken.PROGRESSION)
@@ -84,28 +90,51 @@ export class GameGateway
 
   /**
    * Handle new client connection
+   * Verifies JWT token and attaches user info to socket.
+   * Disconnects client if token is missing or invalid.
    */
   async handleConnection(client: IAuthenticatedSocket) {
     try {
-      // Extract and verify JWT from handshake
+      // Extract JWT from handshake
       const token =
         (client.handshake.auth as { token?: string }).token ??
-        client.handshake.headers.authorization;
+        client.handshake.headers.authorization?.replace('Bearer ', '') ??
+        (typeof client.handshake.query.token === 'string'
+          ? client.handshake.query.token
+          : undefined);
 
       if (!token) {
-        this.logger.warn(`Client ${client.id} connected without auth token`);
+        this.logger.warn(`Client ${client.id} rejected: no auth token`);
+        client.emit(WebSocketEvent.ERROR, {
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        });
+        client.disconnect(true);
         return;
       }
 
-      // eslint-disable-next-line sonarjs/todo-tag
-      // TODO: Verify JWT and extract user info (M5)
-      const userId =
-        (client.handshake.auth as { userId?: string }).userId ?? 'anonymous';
-      const username =
-        (client.handshake.auth as { username?: string }).username ?? 'Player';
+      // Verify JWT and extract payload
+      let payload: IJwtPayload;
+      try {
+        payload = await this.jwtService.verifyAsync<IJwtPayload>(token);
+      } catch {
+        this.logger.warn(
+          `Client ${client.id} rejected: invalid or expired token`,
+        );
+        client.emit(WebSocketEvent.ERROR, {
+          code: 'UNAUTHORIZED',
+          message: 'Invalid or expired token',
+        });
+        client.disconnect(true);
+        return;
+      }
 
-      client.userId = userId;
-      client.username = username;
+      // Attach verified user info to socket
+      client.userId = payload.sub;
+      client.username = payload.username;
+      client.email = payload.email;
+
+      const userId = client.userId;
 
       // Track connected user in Redis
       await this.redis.hset(RedisKeys.WS_CONNECTED_USERS, userId, client.id);

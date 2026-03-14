@@ -8,9 +8,13 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
+import { validateEnv } from './env.validation';
 import { PaymentModule } from './payment.module';
 
 async function bootstrap() {
+  // Validate environment variables — crash early if Stripe keys are missing
+  validateEnv();
+
   const logger = new Logger('SvcPayment');
 
   const app = await NestFactory.create(PaymentModule, {

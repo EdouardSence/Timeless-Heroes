@@ -7,9 +7,13 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
+import { validateEnv } from './env.validation';
 import { ProgressionModule } from './progression.module';
 
 async function bootstrap() {
+  // Validate environment variables — crash early if DATABASE_URL is missing
+  validateEnv();
+
   const logger = new Logger('SvcUserProgression');
 
   // Create HTTP app (health endpoint only)

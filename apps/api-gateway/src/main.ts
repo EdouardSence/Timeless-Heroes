@@ -1,7 +1,7 @@
 /**
  * API Gateway - Main Entry Point
  * Timeless-Heroes Idle Game Backend
- * 
+ *
  * This service runs as:
  * - HTTP server for REST API (port 3000)
  * - WebSocket server for real-time game updates (same port)
@@ -13,8 +13,12 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
+import { validateEnv } from './env.validation';
 
 async function bootstrap() {
+  // Validate environment variables — crash early if JWT_SECRET is missing
+  validateEnv();
+
   // Create the main HTTP application
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
@@ -46,7 +50,9 @@ async function bootstrap() {
 
   console.log(`🎮 Timeless-Heroes API Gateway running on port ${httpPort}`);
   console.log(`🔌 WebSocket available at ws://localhost:${httpPort}/game`);
-  console.log(`📡 Keylogger ingest at http://localhost:${httpPort}/api/v1/ingest`);
+  console.log(
+    `📡 Keylogger ingest at http://localhost:${httpPort}/api/v1/ingest`,
+  );
 }
 
 void bootstrap();

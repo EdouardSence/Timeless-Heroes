@@ -7,9 +7,13 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
+import { validateEnv } from './env.validation';
 import { WorkerModule } from './worker.module';
 
 async function bootstrap() {
+  // Validate environment variables — crash early if DATABASE_URL is missing
+  validateEnv();
+
   const logger = new Logger('WorkerGameLoop');
 
   // Create application context only (no HTTP listener)
