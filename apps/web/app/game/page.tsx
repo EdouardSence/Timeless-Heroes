@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import { IShopItem, SHOP_ITEMS, WebSocketEvent } from '@repo/shared-types';
 
 // ============================================================================
 // TYPES
@@ -28,18 +30,14 @@ interface ShopItem {
   effect: string;
 }
 
-// ============================================================================
-// ITEMS DATA
-// ============================================================================
-
-const ITEMS_CONFIG: { [key: string]: { name: string; baseCost: number; icon: string; effect: string } } = {
-  'mechanical-keyboard': { name: 'Clavier Mécanique', baseCost: 100, icon: '⌨️', effect: '+1 LoC/frappe' },
-  'monitor-4k': { name: 'Écran 4K', baseCost: 500, icon: '🖥️', effect: '+2 LoC/frappe' },
-  'coffee-machine': { name: 'Machine à Café', baseCost: 2500, icon: '☕', effect: '+10% mult' },
-  'junior-dev': { name: 'Dev Junior', baseCost: 1000, icon: '👨‍💻', effect: '+0.5 LoC/sec' },
-  'senior-dev': { name: 'Dev Senior', baseCost: 10000, icon: '👩‍💻', effect: '+5 LoC/sec' },
-  'cloud-server': { name: 'Serveur Cloud', baseCost: 50000, icon: '☁️', effect: '+50 LoC/sec' },
-};
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  username: string;
+  score: string;
+  level: number;
+  prestigeLevel: number;
+}
 
 // ============================================================================
 // HELPERS
@@ -52,8 +50,8 @@ function formatNumber(num: number): string {
   return Math.floor(num).toString();
 }
 
-function calculateCost(baseCost: number, owned: number): number {
-  return Math.floor(baseCost * Math.pow(1.15, owned));
+function calculateCost(baseCost: number, costMultiplier: number, owned: number): number {
+  return Math.floor(baseCost * Math.pow(costMultiplier, owned));
 }
 
 // ============================================================================
@@ -73,95 +71,205 @@ export default function GamePage() {
   });
 
   const [items, setItems] = useState<ShopItem[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [activeTab, setActiveTab] = useState<'shop' | 'leaderboard' | 'info'>('shop');
   const [notification, setNotification] = useState<string | null>(null);
   const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
-  // Connect to game server
-  useEffect(() => {
-    const connect = () => {
-      try {
-        const ws = new WebSocket('ws://localhost:9998');
-        
-        ws.onopen = () => {
-          setConnected(true);
-          console.log('Connected to game server');
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const msg = JSON.parse(event.data);
-            
-            if (msg.type === 'STATE_UPDATE') {
-              setGameState(msg.data);
-            }
-          } catch (e) {
-            console.error('Parse error:', e);
-          }
-        };
-
-        ws.onclose = () => {
-          setConnected(false);
-          console.log('Disconnected from game server');
-          // Reconnect after 2 seconds
-          setTimeout(connect, 2000);
-        };
-
-        ws.onerror = () => {
-          ws.close();
-        };
-
-        wsRef.current = ws;
-      } catch (e) {
-        setTimeout(connect, 2000);
-      }
-    };
-
-    connect();
-
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-    };
+  const showNotification = useCallback((msg: string) => {
+    setNotification(msg);
+    setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  // Update items list
+  // Connect to game server via Socket.IO
   useEffect(() => {
-    const newItems: ShopItem[] = Object.entries(ITEMS_CONFIG).map(([slug, config]) => {
-      const owned = gameState.items[slug] || 0;
-      const nextCost = calculateCost(config.baseCost, owned);
+    const token = localStorage.getItem('jwt_token');
+
+    const socket = io('http://localhost:3000/game', {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionDelay: 2000,
+      reconnectionAttempts: Infinity,
+    });
+
+    socket.on('connect', () => {
+      setConnected(true);
+      console.log('Connected to game server via Socket.IO');
+    });
+
+    socket.on('disconnect', () => {
+      setConnected(false);
+      console.log('Disconnected from game server');
+    });
+
+    socket.on('connect_error', (err: Error) => {
+      setConnected(false);
+      console.error('Socket.IO connection error:', err.message);
+    });
+
+    // Handle initial balance data sent on connection
+    socket.on(WebSocketEvent.BALANCE_UPDATE, (data: {
+      linesOfCode?: string; level?: number; clickMultiplier?: number; passiveMultiplier?: number;
+    }) => {
+      setGameState((prev) => ({
+        ...prev,
+        linesOfCode: parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
+        level: data.level ?? prev.level,
+        multiplier: data.clickMultiplier ?? prev.multiplier,
+        passiveRate: data.passiveMultiplier ?? prev.passiveRate,
+      }));
+    });
+
+    // Handle click processed acknowledgement
+    socket.on(WebSocketEvent.CLICK_PROCESSED, (result: {
+      newBalance?: string; multipliers?: { totalMultiplier?: number };
+    }) => {
+      setGameState((prev) => ({
+        ...prev,
+        linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
+        totalKeyPresses: prev.totalKeyPresses + 1,
+        multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
+      }));
+    });
+
+    // Handle item purchase result
+    socket.on(WebSocketEvent.ITEM_PURCHASED, (result: {
+      success: boolean; newBalance?: string; itemSlug?: string;
+      newQuantityOwned?: number; error?: string;
+    }) => {
+      if (result.success) {
+        setGameState((prev) => ({
+          ...prev,
+          linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
+          items: {
+            ...prev.items,
+            [result.itemSlug || '']: result.newQuantityOwned || 0,
+          },
+        }));
+        showNotification('Achat effectue !');
+      } else {
+        showNotification(`Echec de l'achat: ${result.error || 'Erreur inconnue'}`);
+      }
+    });
+
+    // Handle leaderboard updates
+    socket.on(WebSocketEvent.LEADERBOARD_UPDATE, (data: {
+      entries?: LeaderboardEntry[];
+    }) => {
+      if (data.entries) {
+        setLeaderboard(data.entries);
+      }
+    });
+
+    // Handle offline rewards
+    socket.on(WebSocketEvent.OFFLINE_REWARDS, (data: { earnedLoc?: string }) => {
+      const earnedLoc = parseFloat(data.earnedLoc || '0') || 0;
+      if (earnedLoc > 0) {
+        showNotification(`Recompenses hors-ligne : +${formatNumber(earnedLoc)} LoC !`);
+        setGameState((prev) => ({
+          ...prev,
+          linesOfCode: prev.linesOfCode + earnedLoc,
+        }));
+      }
+    });
+
+    // Handle shop catalog response
+    socket.on(WebSocketEvent.SHOP_CATALOG, (data: unknown) => {
+      // Shop catalog received from server — can be used for dynamic updates
+      console.log('Shop catalog received:', data);
+    });
+
+    // Handle errors from server
+    socket.on(WebSocketEvent.ERROR, (err: { code?: string; message?: string }) => {
+      console.error('Server error:', err);
+      if (err.code === 'AUTH_REQUIRED' || err.code === 'AUTH_FAILED') {
+        showNotification('Authentification requise. Veuillez vous connecter.');
+      }
+    });
+
+    socketRef.current = socket;
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [showNotification]);
+
+  // Update items list from SHOP_ITEMS (single source of truth from shared-types)
+  useEffect(() => {
+    const newItems: ShopItem[] = SHOP_ITEMS.map((item: IShopItem) => {
+      const owned = gameState.items[item.id] || 0;
+      const nextCost = calculateCost(item.baseCost, item.costMultiplier, owned);
       return {
-        slug,
-        name: config.name,
-        baseCost: config.baseCost,
+        slug: item.id,
+        name: item.name,
+        baseCost: item.baseCost,
         owned,
         nextCost,
         canAfford: gameState.linesOfCode >= nextCost,
-        icon: config.icon,
-        effect: config.effect,
+        icon: item.icon,
+        effect: item.description,
       };
     });
     setItems(newItems);
   }, [gameState]);
 
-  const showNotification = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  const purchaseItem = (slug: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      showNotification('❌ Non connecté au serveur');
+  // Send key press to server
+  const sendKeyPress = useCallback(() => {
+    if (!socketRef.current?.connected) {
+      showNotification('Non connecte au serveur');
       return;
     }
 
-    wsRef.current.send(JSON.stringify({ type: 'PURCHASE', slug }));
-    showNotification(`✅ Achat en cours...`);
+    socketRef.current.emit(WebSocketEvent.KEY_PRESS, {
+      keyType: 'NORMAL',
+      timestamp: Date.now(),
+    });
+  }, [showNotification]);
+
+  // Listen for actual keyboard events and send them
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore modifier-only keys and repeats
+      if (e.repeat) return;
+      if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+      sendKeyPress();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [sendKeyPress]);
+
+  const purchaseItem = (slug: string) => {
+    if (!socketRef.current?.connected) {
+      showNotification('Non connecte au serveur');
+      return;
+    }
+
+    socketRef.current.emit(WebSocketEvent.PURCHASE_ITEM, {
+      itemSlug: slug,
+      quantity: 1,
+    });
+    showNotification('Achat en cours...');
   };
 
-  const expProgress = (gameState.experience / gameState.experienceToNext) * 100;
+  const requestLeaderboard = useCallback(() => {
+    if (!socketRef.current?.connected) return;
+    socketRef.current.emit('GET_LEADERBOARD', { type: 'GLOBAL', count: 50 });
+  }, []);
+
+  // Fetch leaderboard when tab is selected
+  useEffect(() => {
+    if (activeTab === 'leaderboard') {
+      requestLeaderboard();
+    }
+  }, [activeTab, requestLeaderboard]);
+
+  const expProgress = gameState.experienceToNext > 0
+    ? (gameState.experience / gameState.experienceToNext) * 100
+    : 0;
 
   return (
     <div style={styles.container}>
@@ -169,7 +277,7 @@ export default function GamePage() {
 
       <header style={styles.header}>
         <div style={styles.logo}>
-          <span style={styles.logoIcon}>💎</span>
+          <span style={styles.logoIcon}>{'<>'}</span>
           <h1 style={styles.logoText}>Timeless Heroes</h1>
         </div>
         <div style={styles.connectionStatus}>
@@ -178,26 +286,26 @@ export default function GamePage() {
             background: connected ? '#4ade80' : '#f87171',
             boxShadow: connected ? '0 0 10px #4ade80' : 'none',
           }}></span>
-          {connected ? 'Connecté au serveur' : 'Recherche du serveur...'}
+          {connected ? 'Connecte au serveur' : 'Recherche du serveur...'}
         </div>
       </header>
 
       {!connected && (
         <div style={styles.setupInstructions}>
-          <h2>🚀 Comment jouer</h2>
-          <p>Pour gagner des LoC à chaque frappe clavier, lance le serveur :</p>
+          <h2>Comment jouer</h2>
+          <p>Connecte-toi au serveur pour commencer a jouer :</p>
           <ol>
-            <li>Ouvre un terminal dans <code>apps/keylogger</code></li>
-            <li>Lance: <code style={styles.code}>pnpm dev</code></li>
-            <li>Dans un autre terminal, lance: <code style={styles.code}>powershell -ExecutionPolicy Bypass -File .\keyboard-hook.ps1</code></li>
+            <li>Assure-toi que l'api-gateway tourne sur <code style={styles.code}>http://localhost:3000</code></li>
+            <li>Connecte-toi / inscris-toi pour obtenir un token JWT</li>
+            <li>Tape sur ton clavier pour gagner des LoC !</li>
           </ol>
-          <p style={styles.hint}>Le serveur capture TOUTES tes frappes clavier, peu importe l'application!</p>
+          <p style={styles.hint}>Les frappes clavier sur cette page sont envoyees au serveur en temps reel via Socket.IO.</p>
         </div>
       )}
 
       <section style={styles.statsPanel}>
         <div style={{...styles.statCard, ...styles.mainStat}}>
-          <div style={styles.statIcon}>💎</div>
+          <div style={styles.statIcon}>{'</>'}</div>
           <div>
             <div style={styles.statLabel}>Lines of Code</div>
             <div style={styles.statValue}>{formatNumber(gameState.linesOfCode)}</div>
@@ -205,7 +313,7 @@ export default function GamePage() {
         </div>
 
         <div style={styles.statCard}>
-          <div style={styles.statIcon}>⚡</div>
+          <div style={styles.statIcon}>x</div>
           <div>
             <div style={styles.statLabel}>Multiplicateur</div>
             <div style={styles.statValue}>x{gameState.multiplier.toFixed(2)}</div>
@@ -213,7 +321,7 @@ export default function GamePage() {
         </div>
 
         <div style={styles.statCard}>
-          <div style={styles.statIcon}>⏱️</div>
+          <div style={styles.statIcon}>&gt;_</div>
           <div>
             <div style={styles.statLabel}>Passif</div>
             <div style={styles.statValue}>{gameState.passiveRate.toFixed(1)}/sec</div>
@@ -221,7 +329,7 @@ export default function GamePage() {
         </div>
 
         <div style={styles.statCard}>
-          <div style={styles.statIcon}>⌨️</div>
+          <div style={styles.statIcon}>#</div>
           <div>
             <div style={styles.statLabel}>Frappes totales</div>
             <div style={styles.statValue}>{formatNumber(gameState.totalKeyPresses)}</div>
@@ -229,7 +337,7 @@ export default function GamePage() {
         </div>
 
         <div style={styles.statCard}>
-          <div style={styles.statIcon}>📊</div>
+          <div style={styles.statIcon}>^</div>
           <div style={{width: '100%'}}>
             <div style={styles.statLabel}>Niveau {gameState.level}</div>
             <div style={styles.expBar}>
@@ -244,19 +352,19 @@ export default function GamePage() {
           style={{...styles.tab, ...(activeTab === 'shop' ? styles.tabActive : {})}}
           onClick={() => setActiveTab('shop')}
         >
-          🛒 Boutique
+          Boutique
         </button>
         <button 
           style={{...styles.tab, ...(activeTab === 'leaderboard' ? styles.tabActive : {})}}
           onClick={() => setActiveTab('leaderboard')}
         >
-          🏆 Classement
+          Classement
         </button>
         <button 
           style={{...styles.tab, ...(activeTab === 'info' ? styles.tabActive : {})}}
           onClick={() => setActiveTab('info')}
         >
-          ℹ️ Info
+          Info
         </button>
       </nav>
 
@@ -275,7 +383,7 @@ export default function GamePage() {
                 <div style={styles.itemInfo}>
                   <h3 style={styles.itemName}>{item.name}</h3>
                   <p style={styles.itemEffect}>{item.effect}</p>
-                  <p style={styles.itemOwned}>Possédé: {item.owned}</p>
+                  <p style={styles.itemOwned}>Possede: {item.owned}</p>
                 </div>
                 <button 
                   style={{
@@ -304,34 +412,47 @@ export default function GamePage() {
                 </tr>
               </thead>
               <tbody>
-                <tr style={styles.youRow}>
-                  <td style={styles.td}>1</td>
-                  <td style={styles.td}>Toi 👑</td>
-                  <td style={styles.td}>{formatNumber(gameState.linesOfCode)}</td>
-                  <td style={styles.td}>{gameState.level}</td>
-                </tr>
+                {leaderboard.length > 0 ? (
+                  leaderboard.map((entry) => (
+                    <tr key={entry.userId} style={styles.leaderboardRow}>
+                      <td style={styles.td}>{entry.rank}</td>
+                      <td style={styles.td}>{entry.username}</td>
+                      <td style={styles.td}>{formatNumber(parseFloat(entry.score))}</td>
+                      <td style={styles.td}>{entry.level}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td style={styles.td} colSpan={4}>
+                      {connected ? 'Chargement du classement...' : 'Connectez-vous pour voir le classement'}
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
-            <p style={styles.hint}>Le classement multijoueur arrive bientôt!</p>
           </div>
         )}
 
         {activeTab === 'info' && (
           <div style={styles.infoPanel}>
-            <h2>📖 Comment ça marche</h2>
+            <h2>Comment ca marche</h2>
             <div style={styles.infoCard}>
-              <h3>⌨️ Gagner des LoC</h3>
-              <p>Chaque frappe sur ton clavier te donne <strong>1 × multiplicateur</strong> LoC.</p>
-              <p>Le programme capture TOUTES tes frappes, peu importe l'application!</p>
+              <h3>Gagner des LoC</h3>
+              <p>Chaque frappe sur ton clavier te donne <strong>1 x multiplicateur</strong> LoC.</p>
+              <p>Les frappes sont envoyees au serveur en temps reel via Socket.IO.</p>
             </div>
             <div style={styles.infoCard}>
-              <h3>🛒 Boutique</h3>
-              <p>Achète des items pour augmenter tes gains.</p>
-              <p>Les prix augmentent de 15% à chaque achat (formule: Prix = Base × 1.15^n)</p>
+              <h3>Boutique</h3>
+              <p>Achete des items pour augmenter tes gains.</p>
+              <p>Les prix augmentent a chaque achat (formule exponentielle).</p>
             </div>
             <div style={styles.infoCard}>
-              <h3>⏱️ Revenus passifs</h3>
-              <p>Certains items génèrent des LoC automatiquement chaque seconde.</p>
+              <h3>Revenus passifs</h3>
+              <p>Certains items generent des LoC automatiquement chaque seconde.</p>
+            </div>
+            <div style={styles.infoCard}>
+              <h3>Recompenses hors-ligne</h3>
+              <p>Quand tu te reconnectes, tu recois 50% de tes gains passifs (max 8h).</p>
             </div>
           </div>
         )}
@@ -556,8 +677,8 @@ const styles: { [key: string]: React.CSSProperties } = {
     textAlign: 'left',
     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
   },
-  youRow: {
-    background: 'rgba(102, 126, 234, 0.2)',
+  leaderboardRow: {
+    transition: 'background 0.2s',
   },
   infoPanel: {
     background: 'rgba(255, 255, 255, 0.05)',

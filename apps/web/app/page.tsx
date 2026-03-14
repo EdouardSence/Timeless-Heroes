@@ -1,147 +1,219 @@
-import Image, { type ImageProps } from 'next/image';
+/**
+ * Landing Page - Timeless Heroes
+ * TD-01 FIX: Replaced Turborepo template with a game-themed landing page
+ * that provides login/register forms and links to the game.
+ */
+
+'use client';
+
+import { FormEvent, useState } from 'react';
 import styles from './page.module.css';
 
-type Props = Omit<ImageProps, 'src'> & {
-  srcLight: string;
-  srcDark: string;
-};
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+export default function Home() {
+    const [mode, setMode] = useState<'login' | 'register'>('login');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [username, setUsername] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
-  return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+    async function handleSubmit(e: FormEvent) {
+        e.preventDefault();
+        setError(null);
+        setLoading(true);
 
-type Link = {
-  id: number;
-  title: string;
-  url: string;
-  description: string;
-};
+        try {
+            const endpoint = mode === 'login' ? 'login' : 'register';
+            const body: Record<string, string> = { email, password };
+            if (mode === 'register') body.username = username;
 
-async function getLinks(): Promise<Link[]> {
-  try {
-    const res = await fetch('http://localhost:3000/links', {
-      cache: 'no-store',
-    });
+            const res = await fetch(`${API_BASE}/api/v1/auth/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
 
-    if (!res.ok) {
-      throw new Error('Failed to fetch links');
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || `${endpoint} failed`);
+            }
+
+            const data = await res.json();
+
+            // Store the JWT token and redirect to dashboard
+            localStorage.setItem('jwt_token', data.accessToken);
+            window.location.href = '/dashboard';
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'An error occurred');
+        } finally {
+            setLoading(false);
+        }
     }
 
-    return res.json();
-  } catch (error) {
-    console.error('Error fetching links:', error);
-    return [];
-  }
-}
+    return (
+        <div className={styles.page}>
+            <main className={styles.main}>
+                <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '2rem',
+                    maxWidth: '420px',
+                    width: '100%',
+                }}>
+                    {/* Title */}
+                    <div style={{ textAlign: 'center' }}>
+                        <h1 style={{
+                            fontSize: '2.5rem',
+                            fontWeight: 700,
+                            background: 'linear-gradient(135deg, #00e5ff, #b388ff, #ff80ab)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            marginBottom: '0.5rem',
+                        }}>
+                            Timeless Heroes
+                        </h1>
+                        <p style={{ color: '#888', fontSize: '0.95rem' }}>
+                            An idle RPG where your keystrokes write history
+                        </p>
+                    </div>
 
-export default async function Home() {
-  const links = await getLinks();
+                    {/* Auth Form */}
+                    <form
+                        onSubmit={handleSubmit}
+                        style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '1rem',
+                            width: '100%',
+                            padding: '2rem',
+                            borderRadius: '12px',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(255,255,255,0.03)',
+                        }}
+                    >
+                        {/* Mode toggle */}
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <button
+                                type="button"
+                                onClick={() => setMode('login')}
+                                style={{
+                                    flex: 1,
+                                    padding: '0.5rem',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    background: mode === 'login' ? 'rgba(0,229,255,0.15)' : 'transparent',
+                                    color: mode === 'login' ? '#00e5ff' : '#666',
+                                    cursor: 'pointer',
+                                    fontWeight: mode === 'login' ? 600 : 400,
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                Login
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMode('register')}
+                                style={{
+                                    flex: 1,
+                                    padding: '0.5rem',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    background: mode === 'register' ? 'rgba(0,229,255,0.15)' : 'transparent',
+                                    color: mode === 'register' ? '#00e5ff' : '#666',
+                                    cursor: 'pointer',
+                                    fontWeight: mode === 'register' ? 600 : 400,
+                                    transition: 'all 0.2s',
+                                }}
+                            >
+                                Register
+                            </button>
+                        </div>
 
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+                        {mode === 'register' && (
+                            <input
+                                type="text"
+                                placeholder="Username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                required
+                                style={inputStyle}
+                            />
+                        )}
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+                        <input
+                            type="email"
+                            placeholder="Email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            style={inputStyle}
+                        />
+
+                        <input
+                            type="password"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            minLength={6}
+                            style={inputStyle}
+                        />
+
+                        {error && (
+                            <p style={{ color: '#ff5252', fontSize: '0.85rem', margin: 0 }}>
+                                {error}
+                            </p>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            style={{
+                                padding: '0.75rem',
+                                border: 'none',
+                                borderRadius: '8px',
+                                background: loading
+                                    ? 'rgba(0,229,255,0.3)'
+                                    : 'linear-gradient(135deg, #00e5ff, #b388ff)',
+                                color: '#fff',
+                                fontWeight: 600,
+                                fontSize: '1rem',
+                                cursor: loading ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.2s',
+                            }}
+                        >
+                            {loading
+                                ? 'Loading...'
+                                : mode === 'login'
+                                    ? 'Enter the Game'
+                                    : 'Create Account'}
+                        </button>
+                    </form>
+
+                    {/* Quick links */}
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+                        <a href="/game" style={{ color: '#b388ff', textDecoration: 'underline' }}>
+                            Play Now
+                        </a>
+                        <a href="/dashboard" style={{ color: '#00e5ff', textDecoration: 'underline' }}>
+                            Dashboard
+                        </a>
+                    </div>
+                </div>
+            </main>
         </div>
-
-        {links.length > 0 ? (
-          <div className={styles.ctas}>
-            {links.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={link.description}
-                className={styles.secondary}
-              >
-                {link.title}
-              </a>
-            ))}
-          </div>
-        ) : (
-          <div style={{ color: '#666' }}>
-            No links available. Make sure the NestJS API is running on port
-            3000.
-          </div>
-        )}
-      </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
-  );
+    );
 }
+
+const inputStyle: React.CSSProperties = {
+    padding: '0.75rem',
+    border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.05)',
+    color: 'inherit',
+    fontSize: '0.95rem',
+    outline: 'none',
+};
