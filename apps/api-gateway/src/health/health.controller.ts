@@ -5,6 +5,7 @@
 
 import { Controller, Get, Inject, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { NATS_SERVICE, NatsPattern } from '@repo/shared-types';
 import { catchError, firstValueFrom, of, timeout } from 'rxjs';
 
@@ -13,17 +14,24 @@ interface IServiceHealth {
   status: 'ok' | 'down';
 }
 
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
 
   constructor(
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
     @Inject(NATS_SERVICE.PAYMENT) private readonly paymentClient: ClientProxy,
     @Inject(NATS_SERVICE.WORKER) private readonly workerClient: ClientProxy,
   ) {}
 
   @Get()
+  @ApiOperation({ summary: 'Aggregated health check for all microservices' })
+  @ApiOkResponse({
+    description:
+      'Status of gateway + downstream services (progression, payment, worker)',
+  })
   async check() {
     const [payment, progression, worker] = await Promise.all([
       this.ping(this.paymentClient, 'svc-payment'),
@@ -31,9 +39,10 @@ export class HealthController {
       this.ping(this.workerClient, 'worker-game-loop'),
     ]);
 
-    const allHealthy = progression.status === 'ok'
-      && payment.status === 'ok'
-      && worker.status === 'ok';
+    const allHealthy =
+      progression.status === 'ok' &&
+      payment.status === 'ok' &&
+      worker.status === 'ok';
 
     return {
       gateway: 'ok',
@@ -43,7 +52,10 @@ export class HealthController {
     };
   }
 
-  private async ping(client: ClientProxy, name: string): Promise<IServiceHealth> {
+  private async ping(
+    client: ClientProxy,
+    name: string,
+  ): Promise<IServiceHealth> {
     try {
       const result = await firstValueFrom(
         client.send<IServiceHealth>(NatsPattern.HEALTH_CHECK, {}).pipe(

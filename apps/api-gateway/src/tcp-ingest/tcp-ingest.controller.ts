@@ -9,6 +9,13 @@
  */
 
 import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProperty,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { IngestAuthGuard } from './tcp-auth.guard';
 import { TcpIngestService } from './tcp-ingest.service';
@@ -19,6 +26,39 @@ import {
   KeyCategory,
 } from './tcp-ingest.types';
 
+class IngestAuthDto {
+  @ApiProperty({
+    description: 'JWT token from desktop login',
+    example: 'eyJhbG...',
+  })
+  token!: string;
+}
+
+class IngestKeyDto {
+  @ApiProperty({ description: 'Authenticated user ID' })
+  userId!: string;
+
+  @ApiProperty({
+    description: 'Anonymised key category',
+    enum: [
+      'CHAR',
+      'MODIFIER',
+      'FUNCTION',
+      'NAVIGATION',
+      'ENTER',
+      'SPACE',
+      'BACKSPACE',
+      'TAB',
+      'UNKNOWN',
+    ],
+  })
+  keyCategory!: string;
+
+  @ApiProperty({ description: 'Unix timestamp (ms)' })
+  timestamp!: number;
+}
+
+@ApiTags('Ingest')
 @Controller('ingest')
 export class TcpIngestController {
   private readonly logger = new Logger(TcpIngestController.name);
@@ -30,6 +70,10 @@ export class TcpIngestController {
    * POST /api/v1/ingest/auth
    */
   @Post('auth')
+  @ApiOperation({ summary: 'Authenticate a desktop keylogger session' })
+  @ApiOkResponse({
+    description: 'Session authenticated, returns sessionId and userId',
+  })
   async handleAuth(@Body() data: ITcpAuthRequest): Promise<ITcpAuthResponse> {
     this.logger.debug('Received auth request');
 
@@ -51,6 +95,9 @@ export class TcpIngestController {
    */
   @Post('key')
   @UseGuards(IngestAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Ingest an anonymised key press event' })
+  @ApiOkResponse({ description: 'Key press buffered for processing' })
   async handleKeyPress(
     @Body() data: ITcpKeyPressEvent,
   ): Promise<{ success: boolean; buffered: boolean }> {
@@ -74,6 +121,8 @@ export class TcpIngestController {
    * GET /api/v1/ingest/ping
    */
   @Get('ping')
+  @ApiOperation({ summary: 'Keep-alive ping from desktop agent' })
+  @ApiOkResponse({ description: 'Pong with timestamp' })
   handlePing(): { pong: true; timestamp: number } {
     return {
       pong: true,
