@@ -134,7 +134,8 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required - set it in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      MAX_CPS: ${MAX_CPS:-20}
+      MAX_CPS: ${MAX_CPS:-100}
+      MAX_VIOLATIONS: ${MAX_VIOLATIONS:-50}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       NATS_URL: nats://nats:4222
       # Service discovery

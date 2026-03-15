@@ -60,6 +60,16 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Debug / temp files
+*-logs.txt
+*-logs-*.txt
+build-log.txt
+build-errors*.txt
+errors.txt
+test_*.js
+tmp_*.js
+session.md
+
 # Misc
 .DS_Store
 *.pem
