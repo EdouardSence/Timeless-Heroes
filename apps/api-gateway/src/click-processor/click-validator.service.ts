@@ -30,8 +30,8 @@ export class ClickValidatorService {
   ) {
     this.config = {
       banDurationMs: this.configService.get<number>('BAN_DURATION_MS', 300_000), // 5 min
-      maxCPS: this.configService.get<number>('MAX_CPS', 20),
-      maxViolations: this.configService.get<number>('MAX_VIOLATIONS', 10),
+      maxCPS: this.configService.get<number>('MAX_CPS', 100),
+      maxViolations: this.configService.get<number>('MAX_VIOLATIONS', 50),
       windowMs: this.configService.get<number>('THROTTLE_WINDOW_MS', 1000),
     };
     

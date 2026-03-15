@@ -5,18 +5,6 @@
  */
 
 // ============================================================================
-// RBAC — Role-Based Access Control
-// ============================================================================
-
-/** User roles mirroring the Prisma `Role` enum */
-export const Role = {
-  PLAYER: 'PLAYER',
-  ADMIN: 'ADMIN',
-} as const;
-
-export type Role = (typeof Role)[keyof typeof Role];
-
-// ============================================================================
 // NATS MESSAGE PATTERNS (Transport-agnostic via ClientProxy)
 // ============================================================================
 
@@ -43,7 +31,7 @@ export const NatsPattern = {
   HEALTH_CHECK: 'health.check',
 } as const;
 
-export type NatsPattern = (typeof NatsPattern)[keyof typeof NatsPattern];
+export type NatsPattern = typeof NatsPattern[keyof typeof NatsPattern];
 
 /** Injection tokens for ClientProxy instances in the gateway */
 export const NATS_SERVICE = {
@@ -78,8 +66,7 @@ export const WebSocketEvent = {
   ERROR: 'ERROR',
 } as const;
 
-export type WebSocketEvent =
-  (typeof WebSocketEvent)[keyof typeof WebSocketEvent];
+export type WebSocketEvent = typeof WebSocketEvent[keyof typeof WebSocketEvent];
 
 // ============================================================================
 // CLICK PROCESSING
@@ -100,7 +87,7 @@ export const KeyType = {
   FUNCTION: 'FUNCTION', // F1-F12
 } as const;
 
-export type KeyType = (typeof KeyType)[keyof typeof KeyType];
+export type KeyType = typeof KeyType[keyof typeof KeyType];
 
 export interface IClickResult {
   /** Base LoC earned */
@@ -143,8 +130,7 @@ export const ClickRejectionReason = {
   USER_BANNED: 'USER_BANNED',
 } as const;
 
-export type ClickRejectionReason =
-  (typeof ClickRejectionReason)[keyof typeof ClickRejectionReason];
+export type ClickRejectionReason = typeof ClickRejectionReason[keyof typeof ClickRejectionReason];
 
 export interface IThrottleConfig {
   /** Maximum clicks per second */
@@ -215,8 +201,7 @@ export const ItemPurchaseError = {
   LEVEL_TOO_LOW: 'LEVEL_TOO_LOW',
 } as const;
 
-export type ItemPurchaseError =
-  (typeof ItemPurchaseError)[keyof typeof ItemPurchaseError];
+export type ItemPurchaseError = typeof ItemPurchaseError[keyof typeof ItemPurchaseError];
 
 export interface IItemCostCalculation {
   itemSlug: string;
@@ -257,7 +242,7 @@ export const ProgramError = {
   ALREADY_RUNNING: 'ALREADY_RUNNING',
 } as const;
 
-export type ProgramError = (typeof ProgramError)[keyof typeof ProgramError];
+export type ProgramError = typeof ProgramError[keyof typeof ProgramError];
 
 export interface IProgramRewards {
   locReward: string;
@@ -337,8 +322,7 @@ export const LeaderboardType = {
   FRIENDS: 'FRIENDS',
 } as const;
 
-export type LeaderboardType =
-  (typeof LeaderboardType)[keyof typeof LeaderboardType];
+export type LeaderboardType = typeof LeaderboardType[keyof typeof LeaderboardType];
 
 // ============================================================================
 // PAYMENT / STRIPE
@@ -391,8 +375,7 @@ export const ProvisionError = {
   RETRY_LIMIT_EXCEEDED: 'RETRY_LIMIT_EXCEEDED',
 } as const;
 
-export type ProvisionError =
-  (typeof ProvisionError)[keyof typeof ProvisionError];
+export type ProvisionError = typeof ProvisionError[keyof typeof ProvisionError];
 
 export const ProductType = {
   PREMIUM_CURRENCY: 'PREMIUM_CURRENCY',
@@ -401,7 +384,7 @@ export const ProductType = {
   BOOST: 'BOOST',
 } as const;
 
-export type ProductType = (typeof ProductType)[keyof typeof ProductType];
+export type ProductType = typeof ProductType[keyof typeof ProductType];
 
 // ============================================================================
 // BULLMQ JOB TYPES
@@ -416,7 +399,7 @@ export const QueueName = {
   ACHIEVEMENT_CHECK: 'achievement-check',
 } as const;
 
-export type QueueName = (typeof QueueName)[keyof typeof QueueName];
+export type QueueName = typeof QueueName[keyof typeof QueueName];
 
 export interface IJobData {
   [QueueName.CLICK_BUFFER]: IRedisClickBuffer;

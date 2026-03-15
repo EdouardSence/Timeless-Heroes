@@ -97,22 +97,39 @@ export class LeaderboardSyncService {
         );
     }
 
-    if (rawEntries.length === 0) return rawEntries;
+    this.logger.log(`Found ${rawEntries.length} raw leaderboard entries`);
+
+    if (rawEntries.length === 0) {
+      this.logger.warn(`Leaderboard ${type} is empty in Redis`);
+      return rawEntries;
+    }
 
     // Batch-fetch usernames from PostgreSQL
-    const userIds = rawEntries.map((e: ILeaderboardEntry) => e.userId);
-    const users = await prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, username: true },
-    });
-    const usernameMap = new Map(
-      users.map((u: { id: string; username: string }) => [u.id, u.username]),
-    );
+    try {
+      const userIds = rawEntries.map((e: ILeaderboardEntry) => e.userId);
+      this.logger.log(`Fetching usernames for ${userIds.length} users`);
+      
+      const users = await prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, username: true },
+      });
+      
+      this.logger.log(`Found ${users.length} users in PostgreSQL`);
+      
+      const usernameMap = new Map(
+        users.map((u: { id: string; username: string }) => [u.id, u.username]),
+      );
 
-    return rawEntries.map((entry: ILeaderboardEntry) => ({
-      ...entry,
-      username: usernameMap.get(entry.userId) ?? entry.userId,
-    }));
+      const result = rawEntries.map((entry: ILeaderboardEntry) => ({
+        ...entry,
+        username: usernameMap.get(entry.userId) ?? entry.userId,
+      }));
+      
+      return result;
+    } catch (error: any) {
+      this.logger.error(`Failed to enrich leaderboard with usernames: ${error.message}`, error.stack);
+      return rawEntries.map(e => ({ ...e, username: e.userId }));
+    }
   }
 
   /**

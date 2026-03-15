@@ -55,20 +55,27 @@ export class ClickBufferWorker extends WorkerHost {
 
     try {
       // 1. Update balance via NATS -> svc-user-progression (persists to PostgreSQL)
-      const updatedProgression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+      const rawUpdate = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
           userId,
           delta: locToAdd,
         }),
       );
+      
+      const updatedProgression = (rawUpdate && typeof rawUpdate === 'object' && 'data' in rawUpdate) 
+        ? rawUpdate.data as IProgressionData 
+        : rawUpdate as IProgressionData;
 
       // 2. Add experience (1 XP per click) via NATS
       await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
           userId,
           experience: clicks,
         }),
       );
+
+      // INVALIDATE caching for the api-gateway so the old score isn't re-used
+      await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
 
       // 3. Leaderboard sync is handled inside svc-user-progression::updateBalance()
       //    (via LeaderboardSyncService.syncUserScore — updates global, weekly, daily).
@@ -76,7 +83,7 @@ export class ClickBufferWorker extends WorkerHost {
       //    and a source of the double-update path (Bug B).
 
       // 4. Publish level-up event if applicable
-      if (updatedProgression.level > 1) {
+      if (updatedProgression && updatedProgression.level > 1) {
         await this.publishLevelUp(userId, updatedProgression.level);
       }
 
@@ -88,8 +95,8 @@ export class ClickBufferWorker extends WorkerHost {
       return {
         clicksProcessed: clicks,
         locAdded: locToAdd,
-        newBalance: updatedProgression.linesOfCode,
-        newLevel: updatedProgression.level,
+        newBalance: updatedProgression?.linesOfCode || '0',
+        newLevel: updatedProgression?.level || 1,
         processingTimeMs: processingTime,
         success: true,
         userId,

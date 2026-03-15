@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Backend Leaderboard (TD-03)
   backendLeaderboard: (type?: string) =>
     ipcRenderer.invoke('backend-leaderboard', type),
+  backendBuyItem: (itemSlug: string) =>
+    ipcRenderer.invoke('backend-buy-item', itemSlug),
   // Auth flow
   launchGame: () => ipcRenderer.send('launch-game'),
   logoutSession: () => ipcRenderer.send('logout-session'),

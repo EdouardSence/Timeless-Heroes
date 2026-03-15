@@ -11,6 +11,7 @@ import { ProgressionController } from './controllers/progression.controller';
 import { ItemCostCalculatorService } from './services/item-cost-calculator.service';
 import { LeaderboardSyncService } from './services/leaderboard-sync.service';
 import { ProgressionService } from './services/progression.service';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   controllers: [ProgressionController],
@@ -20,6 +21,7 @@ import { ProgressionService } from './services/progression.service';
       envFilePath: ['.env.local', '.env'],
       isGlobal: true,
     }),
+    RedisModule,
   ],
   providers: [
     ProgressionService,

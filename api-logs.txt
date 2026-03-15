@@ -1,0 +1,188 @@
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +26ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mNatsClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mPassportModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +70ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[HeuristicAntiCheatService] [39m[32mAnti-cheat initialized: MAX_CPS=20[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mJwtModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mRedisModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mHealthModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[ClickValidatorService] [39m[32mThrottle config: maxCPS=20, maxViolations=10[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgressionModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickProcessorModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mTcpIngestModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mGameGatewayModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAuthModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[GameGateway] [39m[32m🎮 Game WebSocket Gateway initialized[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[WebSocketsController] [39m[32mGameGateway subscribed to the "KEY_PRESS" message[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[WebSocketsController] [39m[32mGameGateway subscribed to the "GET_LEADERBOARD" message[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[WebSocketsController] [39m[32mGameGateway subscribed to the "GET_SHOP_CATALOG" message[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/api/v1/auth}:[39m[38;5;3m +2ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/register, POST} route[39m[38;5;3m +2ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/login, POST} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/auth/me, GET} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mTcpIngestController {/api/v1/ingest}:[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/ingest/auth, POST} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/ingest/key, POST} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/ingest/ping, GET} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mProgressionController {/api/v1/progression}:[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/progression/me, GET} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/progression/leaderboard, GET} route[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mHealthController {/api/v1/health}:[39m[38;5;3m +0ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/api/v1/health, GET} route[39m[38;5;3m +1ms[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:45:05 PM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +2ms[39m
+timeless-api-gateway  | 🎮 Timeless-Heroes API Gateway running on port 3000
+timeless-api-gateway  | 🔌 WebSocket available at ws://localhost:3000/game
+timeless-api-gateway  | 📡 Keylogger ingest at http://localhost:3000/api/v1/ingest
+timeless-api-gateway  | 📖 Swagger docs at http://localhost:3000/docs
+timeless-api-gateway  | ✅ Redis connected
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:08 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching progression for user f4ae9430-87bc-477c-9b4a-9958bc76f3b7[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:11 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:14 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [33m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [33m   WARN[39m [38;5;3m[TcpIngestService] [39m[33mAnti-cheat blocked key press from f4ae9430-87bc-477c-9b4a-9958bc76f3b7: USER_BANNED[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:17 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:18 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:18 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:18 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [95m[Nest] 1  - [39m03/15/2026, 12:47:18 PM [95m  DEBUG[39m [38;5;3m[ProgressionController] [39m[95mFetching leaderboard: GLOBAL[39m
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:47:48 PM [32m    LOG[39m [38;5;3m[AuthController] [39m[32mRegister attempt: jason@mail.com[39m
+timeless-api-gateway  | prisma:query SELECT "public"."User"."id", "public"."User"."email", "public"."User"."username", "public"."User"."password", "public"."User"."role"::text, "public"."User"."createdAt", "public"."User"."updatedAt", "public"."User"."lastLoginAt", "public"."User"."lastActiveAt" FROM "public"."User" WHERE ("public"."User"."email" = $1 OR "public"."User"."username" = $2) LIMIT $3 OFFSET $4
+timeless-api-gateway  | prisma:error 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  | [31m[Nest] 1  - [39m03/15/2026, 12:47:48 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31m
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.[39m
+timeless-api-gateway  | PrismaClientKnownRequestError: 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  |     at $n.handleRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:7315)
+timeless-api-gateway  |     at $n.handleAndLogRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:6623)
+timeless-api-gateway  |     at $n.request (/app/packages/prisma-client/generated/client/runtime/library.js:121:6307)
+timeless-api-gateway  |     at async l (/app/packages/prisma-client/generated/client/runtime/library.js:130:9633)
+timeless-api-gateway  |     at async AuthService.register (/app/apps/api-gateway/dist/auth/auth.service.js:86:26)
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-proxy.js:9:17
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:47:52 PM [32m    LOG[39m [38;5;3m[AuthController] [39m[32mRegister attempt: jason@mail.com[39m
+timeless-api-gateway  | prisma:query SELECT "public"."User"."id", "public"."User"."email", "public"."User"."username", "public"."User"."password", "public"."User"."role"::text, "public"."User"."createdAt", "public"."User"."updatedAt", "public"."User"."lastLoginAt", "public"."User"."lastActiveAt" FROM "public"."User" WHERE ("public"."User"."email" = $1 OR "public"."User"."username" = $2) LIMIT $3 OFFSET $4
+timeless-api-gateway  | prisma:error 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  | [31m[Nest] 1  - [39m03/15/2026, 12:47:52 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31m
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.[39m
+timeless-api-gateway  | PrismaClientKnownRequestError: 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findFirst()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:86:60
+timeless-api-gateway  | 
+timeless-api-gateway  |   83 }
+timeless-api-gateway  |   84 async register(data) {
+timeless-api-gateway  |   85     const { email, password, username } = data;
+timeless-api-gateway  | → 86     const existing = await prisma_client_1.prisma.user.findFirst(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  |     at $n.handleRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:7315)
+timeless-api-gateway  |     at $n.handleAndLogRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:6623)
+timeless-api-gateway  |     at $n.request (/app/packages/prisma-client/generated/client/runtime/library.js:121:6307)
+timeless-api-gateway  |     at async l (/app/packages/prisma-client/generated/client/runtime/library.js:130:9633)
+timeless-api-gateway  |     at async AuthService.register (/app/apps/api-gateway/dist/auth/auth.service.js:86:26)
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-proxy.js:9:17
+timeless-api-gateway  | [32m[Nest] 1  - [39m03/15/2026, 12:48:00 PM [32m    LOG[39m [38;5;3m[AuthController] [39m[32mLogin attempt: test4@mail.com[39m
+timeless-api-gateway  | prisma:query SELECT "public"."User"."id", "public"."User"."email", "public"."User"."username", "public"."User"."password", "public"."User"."role"::text, "public"."User"."createdAt", "public"."User"."updatedAt", "public"."User"."lastLoginAt", "public"."User"."lastActiveAt" FROM "public"."User" WHERE ("public"."User"."email" = $1 AND 1=1) LIMIT $2 OFFSET $3
+timeless-api-gateway  | prisma:error 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findUnique()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:54:56
+timeless-api-gateway  | 
+timeless-api-gateway  |   51 }
+timeless-api-gateway  |   52 async login(credentials) {
+timeless-api-gateway  |   53     const { email, password } = credentials;
+timeless-api-gateway  | → 54     const user = await prisma_client_1.prisma.user.findUnique(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  | [31m[Nest] 1  - [39m03/15/2026, 12:48:00 PM [31m  ERROR[39m [38;5;3m[ExceptionsHandler] [39m[31m
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findUnique()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:54:56
+timeless-api-gateway  | 
+timeless-api-gateway  |   51 }
+timeless-api-gateway  |   52 async login(credentials) {
+timeless-api-gateway  |   53     const { email, password } = credentials;
+timeless-api-gateway  | → 54     const user = await prisma_client_1.prisma.user.findUnique(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.[39m
+timeless-api-gateway  | PrismaClientKnownRequestError: 
+timeless-api-gateway  | Invalid `prisma_client_1.prisma.user.findUnique()` invocation in
+timeless-api-gateway  | /app/apps/api-gateway/dist/auth/auth.service.js:54:56
+timeless-api-gateway  | 
+timeless-api-gateway  |   51 }
+timeless-api-gateway  |   52 async login(credentials) {
+timeless-api-gateway  |   53     const { email, password } = credentials;
+timeless-api-gateway  | → 54     const user = await prisma_client_1.prisma.user.findUnique(
+timeless-api-gateway  | The column `User.role` does not exist in the current database.
+timeless-api-gateway  |     at $n.handleRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:7315)
+timeless-api-gateway  |     at $n.handleAndLogRequestError (/app/packages/prisma-client/generated/client/runtime/library.js:121:6623)
+timeless-api-gateway  |     at $n.request (/app/packages/prisma-client/generated/client/runtime/library.js:121:6307)
+timeless-api-gateway  |     at async l (/app/packages/prisma-client/generated/client/runtime/library.js:130:9633)
+timeless-api-gateway  |     at async AuthService.login (/app/apps/api-gateway/dist/auth/auth.service.js:54:22)
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-execution-context.js:46:28
+timeless-api-gateway  |     at async /app/node_modules/@nestjs/core/router/router-proxy.js:9:17

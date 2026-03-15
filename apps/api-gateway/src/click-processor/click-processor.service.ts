@@ -27,7 +27,8 @@ export class ClickProcessorService {
   private readonly logger = new Logger(ClickProcessorService.name);
 
   // TTL for Redis progression cache (seconds)
-  private readonly CACHE_TTL_SECONDS = 60;
+  // Reduced to 5s to match flush cycle and prevent serving stale data
+  private readonly CACHE_TTL_SECONDS = 5;
 
   constructor(
     private readonly clickBufferService: ClickBufferService,

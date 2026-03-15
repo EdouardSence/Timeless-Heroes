@@ -1,0 +1,140 @@
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +91ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +12ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:40 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +4ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +189ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +9ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📦 Click Buffer Flush Service initialized[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m⏰ Flush schedule: every 5 seconds[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +156ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:47:41 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:30 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:48:30 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (1 clicks) in 26ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:30 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 1 clicks, 1 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:30 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 144ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:30 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 115 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:35 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:48:35 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (8 clicks) in 9ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:35 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 8 clicks, 8 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:35 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 87ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:35 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 116 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:45 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:48:45 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (28 clicks) in 7ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:45 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 28 clicks, 28 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:45 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 36ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:48:45 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 117 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:49:05 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (2 clicks) in 19ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 2 clicks, 3 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 55ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 118 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:10 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 12:49:10 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (4 clicks) in 7ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:10 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 4 clicks, 6 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:10 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 36ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 12:49:10 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 119 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +28ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +6ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +57ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📦 Click Buffer Flush Service initialized[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m⏰ Flush schedule: every 5 seconds[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +53ms[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:25:46 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+[95m[Nest] 1  - [39m03/14/2026, 10:26:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/14/2026, 10:26:05 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (1 clicks) in 9ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 10:26:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 1 clicks, 1 LoC[39m
+[95m[Nest] 1  - [39m03/14/2026, 10:26:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 30ms[39m
+[95m[Nest] 1  - [39m03/14/2026, 10:26:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 120 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +88ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +13ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:27 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +4ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +289ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +2ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📦 Click Buffer Flush Service initialized[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m⏰ Flush schedule: every 5 seconds[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +140ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:33:28 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +41ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +14ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +50ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📦 Click Buffer Flush Service initialized[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m⏰ Flush schedule: every 5 seconds[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +95ms[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:15 AM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:35 AM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:35 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (1 clicks) in 10ms[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:35 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 1 clicks, 1 LoC[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:35 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 38ms[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:35 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 121 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:50 AM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+[32m[Nest] 1  - [39m03/15/2026, 10:34:50 AM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32m📤 Queued 1 flush jobs (19 clicks) in 4ms[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:50 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 18f48fc3-8558-414c-bd94-06b2f51faad8: 19 clicks, 19 LoC[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:50 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 18f48fc3-8558-414c-bd94-06b2f51faad8 in 21ms[39m
+[95m[Nest] 1  - [39m03/15/2026, 10:34:50 AM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 122 completed for user 18f48fc3-8558-414c-bd94-06b2f51faad8[39m

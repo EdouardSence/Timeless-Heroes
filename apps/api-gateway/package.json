@@ -19,6 +19,7 @@
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.22",
     "@nestjs/platform-socket.io": "^10.4.22",
+    "@nestjs/swagger": "^11.2.6",
     "@nestjs/websockets": "^10.4.22",
     "@repo/prisma-client": "workspace:*",
     "@repo/redis-client": "workspace:*",

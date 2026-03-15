@@ -123,7 +123,7 @@ export class ProvisionOrderProcessor implements OnModuleInit, OnModuleDestroy {
 
     try {
       // 2. Provision the order
-      const result = this.provisionService.provisionOrder(
+      const result = await this.provisionService.provisionOrder(
         userId,
         productType,
         productData,

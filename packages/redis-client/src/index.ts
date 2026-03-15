@@ -197,11 +197,30 @@ export class ClickBufferService {
   }
 
   /**
+   * Get current buffer without clearing it
+   */
+  async getBuffer(userId: string): Promise<IClickBufferData | null> {
+    const key = RedisKeys.CLICK_BUFFER(userId);
+    const data = await this.redis.hgetall(key);
+
+    if (!data || !data.clicks) {
+      return null;
+    }
+
+    return {
+      clicks: parseInt(data.clicks, 10),
+      locToAdd: data.locToAdd || '0',
+      lastUpdate: parseInt(data.lastUpdate ?? '0', 10) || Date.now(),
+    };
+  }
+
+  /**
    * Get all user IDs with pending buffers
    */
   async getAllBufferedUsers(): Promise<string[]> {
     const keys = await this.redis.keys(RedisKeys.CLICK_BUFFER_PATTERN);
-    return keys.map((key) => key.replace('buffer:clicks:', ''));
+    // RedisKeys.CLICK_BUFFER is "buffer:clicks:{userId}"
+    return keys.map((key) => key.split(':').pop() || '');
   }
 }
 

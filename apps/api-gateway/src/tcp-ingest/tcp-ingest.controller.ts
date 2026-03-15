@@ -5,6 +5,7 @@
  * Endpoints:
  * - POST /ingest/auth    - Authenticate session (JWT)
  * - POST /ingest/key     - Key press event (anonymized)
+ * - POST /ingest/passive - Passive income batch (desktop idle earnings)
  * - GET  /ingest/ping    - Keep-alive / health check
  */
 
@@ -112,6 +113,43 @@ export class TcpIngestController {
 
     return {
       buffered: result.buffered,
+      success: true,
+    };
+  }
+
+  /**
+   * Handle passive income from desktop client
+   * The desktop client accumulates passive LoC locally and periodically sends
+   * the accrued amount so it can be persisted server-side.
+   * POST /api/v1/ingest/passive
+   */
+  @Post('passive')
+  @UseGuards(IngestAuthGuard)
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Ingest passive income earned by desktop client' })
+  @ApiOkResponse({ description: 'Passive income buffered for processing' })
+  async handlePassiveIncome(
+    @Body() data: { userId: string; sessionId: string; locAmount: number; seconds: number },
+  ): Promise<{ success: boolean; buffered: boolean }> {
+    if (!data.userId || !data.locAmount || data.locAmount <= 0) {
+      return { buffered: false, success: false };
+    }
+
+    // Cap a single passive batch to prevent abuse (max 300s = 5 min worth)
+    const maxSeconds = 300;
+    if (data.seconds > maxSeconds) {
+      this.logger.warn(`Passive income batch too large from ${data.userId}: ${data.seconds}s, capping to ${maxSeconds}s`);
+      data.locAmount = Math.floor(data.locAmount * (maxSeconds / data.seconds));
+      data.seconds = maxSeconds;
+    }
+
+    const result = await this.tcpIngestService.processPassiveIncome(
+      data.userId,
+      data.locAmount,
+    );
+
+    return {
+      buffered: result,
       success: true,
     };
   }

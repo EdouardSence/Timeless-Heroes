@@ -123,6 +123,10 @@ class BackendSync {
   private lastKeyTimestamp = 0;
   private flushInterval: ReturnType<typeof setInterval> | null = null;
   private isOnline = false;
+  /** Accumulated passive LoC that hasn't been sent to the backend yet */
+  private pendingPassiveLoC = 0;
+  /** Seconds of passive income accumulated since last flush */
+  private pendingPassiveSeconds = 0;
 
   get authenticated(): boolean {
     const auth = store.get('backendAuth');
@@ -285,13 +289,25 @@ class BackendSync {
     });
   }
 
+  /** Buffer passive income LoC for backend sync */
+  bufferPassiveIncome(locAmount: number): void {
+    if (!this.authenticated) return;
+    this.pendingPassiveLoC += locAmount;
+    this.pendingPassiveSeconds += 1;
+  }
+
   /** Start the periodic flush loop (every 3 seconds) */
   private startFlushLoop(): void {
     if (this.flushInterval) return;
 
     this.flushInterval = setInterval(() => {
       void this.flushKeys();
+      void this.flushPassiveIncome();
     }, 3000);
+
+    // NOTE: We intentionally do NOT run a periodic syncProgressionFromServer()
+    // here. The 30s sync was causing a regression where stale server values
+    // overwrote local progress. Syncing only happens on login/restore/purchase.
   }
 
   /** Stop the flush loop */
@@ -300,6 +316,12 @@ class BackendSync {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
     }
+  }
+
+  /** Force an immediate flush of buffered keys */
+  async forceFlush(): Promise<void> {
+    await this.flushKeys();
+    await this.flushPassiveIncome();
   }
 
   /** Flush buffered keys to the backend */
@@ -316,18 +338,81 @@ class BackendSync {
     // Send each key event (the ingest API expects individual key events)
     for (const key of keysToSend) {
       try {
-        await httpRequest('POST', `${API_BASE}/ingest/key`, {
+        const res = await httpRequest('POST', `${API_BASE}/ingest/key`, {
           userId: auth.userId,
           sessionId: auth.sessionId,
           keyCategory: key.keyCategory,
           timestamp: key.timestamp,
           deltaMs: key.deltaMs,
         });
-      } catch {
-        // Server might be down — re-buffer the remaining keys
-        // Don't re-buffer already-attempted keys to avoid duplication
+
+        if (res.status === 401 || res.status === 403) {
+          console.warn('Ingest session expired, stopping flush');
+          // Put remaining keys back in buffer
+          this.keyBuffer = [...keysToSend.slice(keysToSend.indexOf(key)), ...this.keyBuffer];
+          break;
+        }
+      } catch (err) {
+        console.error('Failed to send key:', err);
+        // Put remaining keys back
+        this.keyBuffer = [...keysToSend.slice(keysToSend.indexOf(key)), ...this.keyBuffer];
         break;
       }
+    }
+  }
+
+  /** Flush accumulated passive income to the backend */
+  private async flushPassiveIncome(): Promise<void> {
+    if (this.pendingPassiveLoC <= 0) return;
+
+    const auth = store.get('backendAuth');
+    if (!auth?.sessionId || !auth?.userId) return;
+
+    const locToSend = this.pendingPassiveLoC;
+    const secondsToSend = this.pendingPassiveSeconds;
+    this.pendingPassiveLoC = 0;
+    this.pendingPassiveSeconds = 0;
+
+    try {
+      const res = await httpRequest('POST', `${API_BASE}/ingest/passive`, {
+        userId: auth.userId,
+        sessionId: auth.sessionId,
+        locAmount: locToSend,
+        seconds: secondsToSend,
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        console.warn('Ingest session expired during passive flush');
+        // Put back so we don't lose it
+        this.pendingPassiveLoC += locToSend;
+        this.pendingPassiveSeconds += secondsToSend;
+      }
+    } catch (err) {
+      console.error('Failed to send passive income:', err);
+      // Put back on failure
+      this.pendingPassiveLoC += locToSend;
+      this.pendingPassiveSeconds += secondsToSend;
+    }
+  }
+
+  /** Purchase an item from the backend */
+  async purchaseItem(itemSlug: string): Promise<{ success: boolean; error?: string }> {
+    const auth = store.get('backendAuth');
+    if (!auth?.jwtToken) return { success: false, error: 'Not logged in' };
+
+    try {
+      const res = await httpRequest('POST', `${API_BASE}/progression/purchase`, { itemSlug }, {
+        Authorization: `Bearer ${auth.jwtToken}`,
+      });
+
+      if (res.status !== 200 && res.status !== 201) {
+        return { success: false, error: (res.data as any)?.error?.message || 'Purchase failed' };
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('Backend purchase error:', err);
+      return { success: false, error: 'Network error' };
     }
   }
 }
@@ -469,13 +554,27 @@ function loadUserState(userId: string): void {
 
 /**
  * Sync local game state from the server's canonical progression.
- * Called after login, register, and session restore so that linesOfCode,
- * level, and multiplier always reflect what the server has committed.
- * Prevents stale local data (e.g. after a DB wipe) from inflating the display.
+ * Called after login, register, session restore, and purchases.
+ *
+ * Strategy:
+ * 1. Force-flush any pending keys / passive income so the server has our latest data.
+ * 2. Fetch the server's canonical balance.
+ * 3. For linesOfCode: use Math.max(local, server) so progress never goes backwards.
+ *    The server pipeline has inherent lag (Redis buffer → BullMQ → NATS → Prisma),
+ *    so the local value may legitimately be ahead of the server.
+ * 4. For multiplier, level, passiveRate: always trust the server (these only change
+ *    via server-side purchases and are never incremented locally).
  */
 async function syncProgressionFromServer(): Promise<void> {
   const auth = store.get('backendAuth');
   if (!auth?.jwtToken) return;
+
+  // Step 1: Flush pending data so server is as up-to-date as possible
+  try {
+    await backendSync.forceFlush();
+  } catch {
+    // Non-fatal — continue with sync even if flush fails
+  }
 
   try {
     const res = await httpRequest('GET', `${API_BASE}/progression/me`, undefined, {
@@ -483,19 +582,42 @@ async function syncProgressionFromServer(): Promise<void> {
     });
 
     if (res.status === 200 || res.status === 201) {
-      const prog = res.data as {
-        linesOfCode: string;
-        level: number;
-        clickMultiplier: number;
+      // Handle both wrapped IApiResponse { success, data: {...} } and direct { linesOfCode, ... }
+      const raw = res.data as Record<string, unknown>;
+      const prog = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as {
+        linesOfCode?: string;
+        level?: number;
+        clickMultiplier?: number;
+        passiveMultiplier?: number;
+        experience?: string;
+        totalLinesWritten?: string;
       };
 
       const gameState = store.get('gameState');
-      gameState.linesOfCode = parseFloat(prog.linesOfCode) || 0;
-      gameState.multiplier = prog.clickMultiplier || 1.0;
-      gameState.level = prog.level || 1;
+      
+      const serverLoC = parseFloat(prog.linesOfCode || '0') || 0;
+      const serverLevel = prog.level || 1;
+      const serverMultiplier = prog.clickMultiplier || 1.0;
+      const serverPassiveRate = prog.passiveMultiplier || 0;
+      
+      // CRITICAL: Never let server overwrite local LoC with a lower value.
+      // Due to pipeline lag the server may not yet have flushed our latest clicks.
+      const localLoC = gameState.linesOfCode || 0;
+      gameState.linesOfCode = Math.max(localLoC, serverLoC);
+
+      // Multiplier, level, passiveRate are only changed server-side (purchases)
+      // so always trust the server for these.
+      gameState.multiplier = serverMultiplier;
+      gameState.level = Math.max(gameState.level || 1, serverLevel);
+      gameState.passiveRate = serverPassiveRate;
+      
+      if (prog.experience) {
+        gameState.experience = Math.max(gameState.experience || 0, parseFloat(prog.experience) || 0);
+      }
+      
       store.set('gameState', gameState);
       notifyAllWindows('game-state-update', store.get('gameState'));
-      console.log(`[Sync] Server progression loaded: ${prog.linesOfCode} LoC, level ${prog.level}`);
+      console.log(`[Sync] Server: ${serverLoC} LoC, local: ${localLoC} LoC → using ${gameState.linesOfCode} | level ${serverLevel}, mult ${serverMultiplier}, passive ${serverPassiveRate}`);
     }
   } catch (err) {
     // Non-fatal — local state remains as fallback until next successful sync
@@ -705,6 +827,10 @@ function startPassiveIncomeLoop(): void {
       if (menuWindow && !menuWindow.isDestroyed()) {
         menuWindow.webContents.send('game-state-update', gameState);
       }
+
+      // BUG-FIX: Also buffer passive income for backend sync
+      // Without this, passive LoC was purely local and lost on reconnect
+      backendSync.bufferPassiveIncome(locGained);
     }
   }, 1000);
 }
@@ -773,6 +899,15 @@ function setupIpcHandlers(): void {
     return result;
   });
 
+  ipcMain.handle('backend-buy-item', async (_, itemSlug: string) => {
+    const result = await backendSync.purchaseItem(itemSlug);
+    if (result.success) {
+      // Sync progression immediately after purchase to update multiplier/balance
+      await syncProgressionFromServer();
+    }
+    return result;
+  });
+
   ipcMain.handle('backend-logout', () => {
     backendSync.logout();
     return { success: true };
@@ -784,6 +919,9 @@ function setupIpcHandlers(): void {
     if (auth?.userId) {
       saveUserState(auth.userId);
     }
+    // Force flush pending keys before logout to ensure no progress is lost
+    void backendSync.forceFlush();
+    
     backendSync.logout();
     // Reset active state to clean defaults
     store.set('gameState', { ...DEFAULT_GAME_STATE });

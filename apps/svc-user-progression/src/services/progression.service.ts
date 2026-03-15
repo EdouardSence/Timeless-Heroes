@@ -14,7 +14,8 @@ import {
   ItemPurchaseError,
   SHOP_ITEMS,
 } from '@repo/shared-types';
-import { prisma, Progression } from '@repo/prisma-client';
+import { prisma } from '@repo/prisma-client';
+import { ClickBufferService } from '@repo/redis-client';
 import { ItemCostCalculatorService } from './item-cost-calculator.service';
 import { LeaderboardSyncService } from './leaderboard-sync.service';
 
@@ -53,13 +54,14 @@ export class ProgressionService {
   constructor(
     private readonly costCalculator: ItemCostCalculatorService,
     private readonly leaderboardSync: LeaderboardSyncService,
+    private readonly clickBufferService: ClickBufferService,
   ) {}
 
   /**
    * Get or create user progression from database
    */
   async getProgression(userId: string): Promise<IProgressionData> {
-    let progression = await prisma.progression.findUnique({
+    let progression: any = await prisma.progression.findUnique({
       where: { userId },
     });
 
@@ -81,7 +83,14 @@ export class ProgressionService {
       });
     }
 
-    return this.toProgressionData(progression);
+    // FETCH PENDING BUFFER (Real-time correction)
+    const buffer = await this.clickBufferService.getBuffer(userId);
+    let extraLoC = new Decimal(0);
+    if (buffer) {
+      extraLoC = new Decimal(buffer.locToAdd);
+    }
+
+    return this.toProgressionData(progression, extraLoC);
   }
 
   /**
@@ -502,11 +511,11 @@ export class ProgressionService {
   /**
    * Convert Prisma progression to DTO
    */
-  private toProgressionData(progression: Progression): IProgressionData {
+  private toProgressionData(progression: any, extraLoC = new Decimal(0)): IProgressionData {
     return {
       userId: progression.userId,
-      linesOfCode: progression.linesOfCode.toString(),
-      totalLinesWritten: progression.totalLinesWritten.toString(),
+      linesOfCode: progression.linesOfCode.add(extraLoC).toString(),
+      totalLinesWritten: progression.totalLinesWritten.add(extraLoC).toString(),
       level: progression.level,
       experience: progression.experience.toString(),
       clickMultiplier: progression.clickMultiplier,

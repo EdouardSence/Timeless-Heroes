@@ -72,6 +72,8 @@ export function useGameSocket(): UseGameSocketReturn {
     socket.on('connect', () => {
       setConnected(true);
       console.log('Connected to game server via Socket.IO');
+      // Request leaderboard immediately on connect
+      socket.emit('GET_LEADERBOARD', { type: 'GLOBAL', count: 50 });
     });
 
     socket.on('disconnect', () => {

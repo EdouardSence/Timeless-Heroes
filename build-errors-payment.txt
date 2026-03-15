@@ -1,0 +1,253 @@
+ Image timeless-heroes-svc-payment Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 634B 0.0s done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.90kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for docker.io/library/node:20-alpine
+#3 DONE 0.1s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 641B done
+#4 DONE 0.0s
+
+#5 [builder 1/6] FROM docker.io/library/node:20-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04142dde7315e3bc0afa
+#5 resolve docker.io/library/node:20-alpine@sha256:b88333c42c23fbd91596ebd7fd10de239cedab9617de04142dde7315e3bc0afa 0.0s done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 386.14kB 0.3s done
+#6 DONE 0.3s
+
+#7 [builder 2/6] RUN apk update && apk add --no-cache libc6-compat
+#7 CACHED
+
+#8 [builder 3/6] WORKDIR /app
+#8 CACHED
+
+#9 [builder 4/6] RUN corepack enable && corepack prepare pnpm@8.15.5 --activate
+#9 CACHED
+
+#10 [builder 5/6] COPY . .
+#10 DONE 6.0s
+
+#11 [builder 6/6] RUN pnpm dlx turbo prune @app/svc-payment --docker
+#11 1.257 Progress: resolved 1, reused 0, downloaded 0, added 0
+#11 2.258 Progress: resolved 2, reused 0, downloaded 0, added 0
+#11 3.259 Progress: resolved 2, reused 0, downloaded 1, added 0
+#11 4.225 Packages: +2
+#11 4.225 ++
+#11 4.260 Progress: resolved 7, reused 0, downloaded 2, added 1
+#11 4.303 Progress: resolved 7, reused 0, downloaded 2, added 2, done
+#11 4.374  WARNING  No locally installed `turbo` found in your repository. Using globally installed version (2.8.17), which can cause unexpected behavior.
+#11 4.374 
+#11 4.374 Installing the version in your repository (^2.8.1) before calling `turbo` will result in more predictable behavior across environments.
+#11 4.380 
+#11 4.380 Attention:
+#11 4.380 Turborepo now collects completely anonymous telemetry regarding usage.
+#11 4.380 This information is used to shape the Turborepo roadmap and prioritize features.
+#11 4.380 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+#11 4.380 https://turborepo.dev/docs/telemetry
+#11 4.380 
+#11 4.381 • turbo 2.8.17
+#11 4.439 Generating pruned monorepo for @app/svc-payment in /app/out
+#11 4.506  - Added @app/svc-payment
+#11 4.509  - Added @repo/eslint-config
+#11 4.512  - Added @repo/jest-config
+#11 4.567  - Added @repo/prisma-client
+#11 4.631  - Added @repo/redis-client
+#11 4.701  - Added @repo/shared-types
+#11 4.702  - Added @repo/typescript-config
+#11 DONE 7.3s
+
+#12 [installer  5/13] COPY --from=builder /app/out/json/ .
+#12 CACHED
+
+#13 [installer  6/13] RUN pnpm install --frozen-lockfile
+#13 CACHED
+
+#14 [installer  7/13] COPY --from=builder /app/out/full/ .
+#14 DONE 2.0s
+
+#15 [installer  8/13] RUN rm -rf packages/prisma-client/generated/client/*.node
+#15 DONE 0.2s
+
+#16 [installer  9/13] RUN pnpm -F @repo/prisma-client generate
+#16 0.797 
+#16 0.797 > @repo/prisma-client@1.0.0 generate /app/packages/prisma-client
+#16 0.797 > prisma generate
+#16 0.797 
+#16 1.350 prisma:warn Prisma failed to detect the libssl/openssl version to use, and may not work as expected. Defaulting to "openssl-1.1.x".
+#16 1.350 Please manually install OpenSSL and try installing Prisma again.
+#16 1.589 Environment variables loaded from .env
+#16 1.592 Prisma schema loaded from schema.prisma
+#16 1.634 prisma:warn Prisma failed to detect the libssl/openssl version to use, and may not work as expected. Defaulting to "openssl-1.1.x".
+#16 1.634 Please manually install OpenSSL and try installing Prisma again.
+#16 3.568 
+#16 3.568 ✔ Generated Prisma Client (v5.22.0) to ./generated/client in 367ms
+#16 3.568 
+#16 3.568 Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+#16 3.568 
+#16 3.568 Tip: Want to react to database changes in your app as they happen? Discover how with Pulse: https://pris.ly/tip-1-pulse
+#16 3.568 
+#16 DONE 3.8s
+
+#17 [installer 10/13] RUN pnpm run build --filter=@repo/shared-types
+#17 0.696 
+#17 0.696 > timeless-heroes@1.0.0 build /app
+#17 0.696 > turbo run build "--filter=@repo/shared-types"
+#17 0.696 
+#17 0.755 
+#17 0.755 Attention:
+#17 0.755 Turborepo now collects completely anonymous telemetry regarding usage.
+#17 0.755 This information is used to shape the Turborepo roadmap and prioritize features.
+#17 0.755 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+#17 0.755 https://turborepo.dev/docs/telemetry
+#17 0.755 
+#17 0.756 • turbo 2.8.17
+#17 0.795 • Packages in scope: @repo/shared-types
+#17 0.795 • Running build in 1 packages
+#17 0.795 • Remote caching disabled
+#17 0.881 @repo/shared-types:build: cache miss, executing 162b04a598ad9b3e
+#17 1.313 @repo/shared-types:build: 
+#17 1.313 @repo/shared-types:build: > @repo/shared-types@1.0.0 build /app/packages/shared-types
+#17 1.313 @repo/shared-types:build: > tsc
+#17 1.313 @repo/shared-types:build: 
+#17 2.135 
+#17 2.135  Tasks:    1 successful, 1 total
+#17 2.135 Cached:    0 cached, 1 total
+#17 2.135   Time:    1.377s 
+#17 2.135 
+#17 DONE 2.2s
+
+#18 [installer 11/13] RUN pnpm run build --filter=@repo/prisma-client
+#18 0.773 
+#18 0.773 > timeless-heroes@1.0.0 build /app
+#18 0.773 > turbo run build "--filter=@repo/prisma-client"
+#18 0.773 
+#18 0.824 • turbo 2.8.17
+#18 0.859 • Packages in scope: @repo/prisma-client
+#18 0.859 • Running build in 1 packages
+#18 0.859 • Remote caching disabled
+#18 0.995 @repo/prisma-client:build: cache miss, executing 9ca63f2ff2b4372d
+#18 1.416 @repo/prisma-client:build: 
+#18 1.416 @repo/prisma-client:build: > @repo/prisma-client@1.0.0 build /app/packages/prisma-client
+#18 1.416 @repo/prisma-client:build: > tsc
+#18 1.416 @repo/prisma-client:build: 
+#18 2.896 
+#18 2.896  Tasks:    1 successful, 1 total
+#18 2.896 Cached:    0 cached, 1 total
+#18 2.896   Time:    2.071s 
+#18 2.896 
+#18 DONE 2.9s
+
+#19 [installer 12/13] RUN pnpm run build --filter=@repo/redis-client
+#19 0.747 
+#19 0.747 > timeless-heroes@1.0.0 build /app
+#19 0.747 > turbo run build "--filter=@repo/redis-client"
+#19 0.747 
+#19 0.804 • turbo 2.8.17
+#19 0.841 • Packages in scope: @repo/redis-client
+#19 0.841 • Running build in 1 packages
+#19 0.841 • Remote caching disabled
+#19 0.926 @repo/redis-client:build: cache miss, executing 812d0532bbeb4399
+#19 1.344 @repo/redis-client:build: 
+#19 1.344 @repo/redis-client:build: > @repo/redis-client@1.0.0 build /app/packages/redis-client
+#19 1.344 @repo/redis-client:build: > tsc
+#19 1.344 @repo/redis-client:build: 
+#19 2.979 
+#19 2.979  Tasks:    1 successful, 1 total
+#19 2.979 Cached:    0 cached, 1 total
+#19 2.979   Time:    2.173s 
+#19 2.979 
+#19 DONE 3.0s
+
+#20 [installer 13/13] RUN pnpm run build --filter=@app/svc-payment
+#20 0.808 
+#20 0.808 > timeless-heroes@1.0.0 build /app
+#20 0.808 > turbo run build "--filter=@app/svc-payment"
+#20 0.808 
+#20 0.868 • turbo 2.8.17
+#20 0.909 • Packages in scope: @app/svc-payment
+#20 0.909 • Running build in 1 packages
+#20 0.909 • Remote caching disabled
+#20 1.080 @repo/jest-config:build: cache miss, executing 2c23e2cb1aa676cc
+#20 1.080 @repo/redis-client:build: cache miss, executing e1df559c7a2ef3ee
+#20 1.081 @repo/prisma-client:build: cache miss, executing 1145b3268fe7f986
+#20 1.081 @repo/shared-types:build: cache miss, executing 88ba12ff8e012822
+#20 1.586 @repo/jest-config:build: 
+#20 1.586 @repo/jest-config:build: > @repo/jest-config@0.0.0 build /app/packages/jest-config
+#20 1.586 @repo/jest-config:build: > tsc
+#20 1.586 @repo/jest-config:build: 
+#20 1.623 @repo/redis-client:build: 
+#20 1.623 @repo/redis-client:build: > @repo/redis-client@1.0.0 build /app/packages/redis-client
+#20 1.623 @repo/redis-client:build: > tsc
+#20 1.623 @repo/redis-client:build: 
+#20 1.640 @repo/prisma-client:build: 
+#20 1.640 @repo/prisma-client:build: > @repo/prisma-client@1.0.0 build /app/packages/prisma-client
+#20 1.640 @repo/prisma-client:build: > tsc
+#20 1.640 @repo/prisma-client:build: 
+#20 1.650 @repo/shared-types:build: 
+#20 1.650 @repo/shared-types:build: > @repo/shared-types@1.0.0 build /app/packages/shared-types
+#20 1.650 @repo/shared-types:build: > tsc
+#20 1.650 @repo/shared-types:build: 
+#20 3.926 @app/svc-payment:build: cache miss, executing 1e308962c2699b47
+#20 4.384 @app/svc-payment:build: 
+#20 4.384 @app/svc-payment:build: > @app/svc-payment@1.0.0 build /app/apps/svc-payment
+#20 4.384 @app/svc-payment:build: > nest build
+#20 4.384 @app/svc-payment:build: 
+#20 8.712 
+#20 8.712  Tasks:    5 successful, 5 total
+#20 8.712 Cached:    0 cached, 5 total
+#20 8.712   Time:    7.841s 
+#20 8.712 
+#20 DONE 8.8s
+
+#21 [runner  4/11] RUN addgroup --system --gid 1001 nodejs
+#21 CACHED
+
+#22 [runner  2/11] RUN apk add --no-cache openssl libssl3
+#22 CACHED
+
+#23 [runner  3/11] WORKDIR /app
+#23 CACHED
+
+#24 [runner  5/11] RUN adduser --system --uid 1001 nestjs
+#24 CACHED
+
+#25 [runner  6/11] COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
+#25 DONE 15.3s
+
+#26 [runner  7/11] COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-payment/dist ./apps/svc-payment/dist
+#26 DONE 0.3s
+
+#27 [runner  8/11] COPY --from=installer --chown=nestjs:nodejs /app/apps/svc-payment/package.json ./apps/svc-payment/
+#27 DONE 0.0s
+
+#28 [runner  9/11] COPY --from=installer --chown=nestjs:nodejs /app/packages ./packages
+#28 DONE 1.2s
+
+#29 [runner 10/11] RUN mkdir -p ./node_modules/@repo &&     ln -sf ../../packages/shared-types ./node_modules/@repo/shared-types &&     ln -sf ../../packages/prisma-client ./node_modules/@repo/prisma-client &&     ln -sf ../../packages/redis-client ./node_modules/@repo/redis-client
+#29 DONE 0.2s
+
+#30 [runner 11/11] WORKDIR /app/apps/svc-payment
+#30 DONE 0.0s
+
+#31 exporting to image
+#31 exporting layers
+#31 exporting layers 28.4s done
+#31 exporting manifest sha256:dca0c9cd5908b244be952792dbf627c51e57cf53138262e4058104f932ddb8cd done
+#31 exporting config sha256:911c4061434b4b0a3002a346fe014305ce6bdf1671e7e5b7fa80f966b981c459 done
+#31 exporting attestation manifest sha256:3394bab7cd13ae07c0cea3e19e129ca1ea1abfcf372fd2fa5f1f04468ff07a94 0.0s done
+#31 exporting manifest list sha256:fcd66f2b6d4c4d3de555798738f8195a802973f0946535694cb384a3583c8195 done
+#31 naming to docker.io/library/timeless-heroes-svc-payment:latest done
+#31 unpacking to docker.io/library/timeless-heroes-svc-payment:latest
+#31 unpacking to docker.io/library/timeless-heroes-svc-payment:latest 15.3s done
+#31 DONE 43.7s
+
+#32 resolving provenance for metadata file
+#32 DONE 0.0s
+ Image timeless-heroes-svc-payment Built 
