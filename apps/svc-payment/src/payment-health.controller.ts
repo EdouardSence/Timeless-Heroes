@@ -5,18 +5,17 @@
 
 import { Controller, Get } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-
 import { NatsPattern } from '@repo/shared-types';
 
 @Controller()
 export class PaymentHealthController {
   @Get('health')
   healthHttp() {
-    return { status: 'ok', service: 'svc-payment', timestamp: new Date().toISOString() };
+    return { service: 'svc-payment', status: 'ok', timestamp: new Date().toISOString() };
   }
 
   @MessagePattern(NatsPattern.HEALTH_CHECK)
   handleHealthCheck() {
-    return { status: 'ok', service: 'svc-payment' };
+    return { service: 'svc-payment', status: 'ok' };
   }
 }

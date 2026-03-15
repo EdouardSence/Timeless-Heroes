@@ -8,10 +8,10 @@
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { NATS_SERVICE, NatsPattern, ProductType, ProvisionError } from '@repo/shared-types';
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 
-import { NATS_SERVICE, NatsPattern, ProductType, ProvisionError } from '@repo/shared-types';
 
 interface IProvisionResult {
   error?: string;
@@ -86,8 +86,8 @@ export class ProvisionService {
     try {
       await firstValueFrom(
         this.natsClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-          userId,
           delta: amount.toString(),
+          userId,
         }),
       );
 
@@ -96,7 +96,7 @@ export class ProvisionService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to provision premium currency for ${userId}: ${msg}`);
-      return { success: false, error: msg };
+      return { error: msg, success: false };
     }
   }
 
@@ -124,9 +124,9 @@ export class ProvisionService {
       for (const item of items) {
         await firstValueFrom(
           this.natsClient.send(NatsPattern.PROGRESSION_ADD_ITEM, {
-            userId,
             itemSlug: item.itemSlug,
             quantity: item.quantity,
+            userId,
           }),
         );
       }
@@ -138,7 +138,7 @@ export class ProvisionService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to provision item pack for ${userId}: ${msg}`);
-      return { success: false, error: msg };
+      return { error: msg, success: false };
     }
   }
 
@@ -170,10 +170,10 @@ export class ProvisionService {
         subscriptionKey,
         ttlSeconds,
         JSON.stringify({
-          type: subscriptionType,
           activatedAt: Date.now(),
-          expiresAt,
           durationDays,
+          expiresAt,
+          type: subscriptionType,
         }),
       );
 
@@ -184,7 +184,7 @@ export class ProvisionService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to provision subscription for ${userId}: ${msg}`);
-      return { success: false, error: msg };
+      return { error: msg, success: false };
     }
   }
 
@@ -215,9 +215,9 @@ export class ProvisionService {
         boostKey,
         durationSeconds,
         JSON.stringify({
-          multiplier,
           activatedAt: Date.now(),
           expiresAt: Date.now() + durationSeconds * 1000,
+          multiplier,
         }),
       );
 
@@ -228,7 +228,7 @@ export class ProvisionService {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Failed to provision boost for ${userId}: ${msg}`);
-      return { success: false, error: msg };
+      return { error: msg, success: false };
     }
   }
 }

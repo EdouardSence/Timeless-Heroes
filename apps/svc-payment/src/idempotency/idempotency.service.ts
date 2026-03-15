@@ -16,8 +16,8 @@
 
 import { createHash } from 'node:crypto';
 
-import { Injectable, Logger } from '@nestjs/common';
-import { DistributedLock, getRedisClient, RedisKeys } from '@repo/redis-client';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { DistributedLock, RedisKeys } from '@repo/redis-client';
 import Redis from 'ioredis';
 
 export enum IdempotencyStatus {
@@ -43,8 +43,8 @@ export class IdempotencyService {
   // TTL for idempotency keys (7 days)
   private readonly KEY_TTL_SECONDS = 7 * 24 * 60 * 60;
 
-  constructor() {
-    this.redis = getRedisClient();
+  constructor(@Inject('REDIS_CLIENT') redis: Redis) {
+    this.redis = redis;
     this.lock = new DistributedLock(this.redis);
   }
 

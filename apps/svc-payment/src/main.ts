@@ -24,11 +24,11 @@ async function bootstrap() {
 
   // 2. Connect NATS transport for inter-service communication
   app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.NATS,
     options: {
-      servers: [natsUrl],
       queue: 'svc-payment', // Load-balanced queue group
+      servers: [natsUrl],
     },
+    transport: Transport.NATS,
   });
 
   // 3. Start both transports
