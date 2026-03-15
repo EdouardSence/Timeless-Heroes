@@ -50,8 +50,11 @@ export interface ElectronAPI {
   backendRegister: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   backendLogout: () => Promise<{ success: boolean }>;
   backendStatus: () => Promise<BackendStatus>;
+  
   // Backend Leaderboard (TD-03)
   backendLeaderboard: (type?: string) => Promise<LeaderboardResponse>;
+  backendBuyItem: (itemSlug: string) => Promise<{ success: boolean; error?: string }>;
+
   // Auth flow
   launchGame: () => void;
   logoutSession: () => void;
