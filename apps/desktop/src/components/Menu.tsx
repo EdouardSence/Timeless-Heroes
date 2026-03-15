@@ -2,7 +2,7 @@
  * Menu Component - Shop, Stats, Leaderboard
  */
 
-import { EffectType, IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
+import { IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
 import { useEffect, useRef, useState } from 'react';
 import type { GameState, LeaderboardEntry } from '../types/electron';
 import './Menu.css';
@@ -120,45 +120,18 @@ export default function Menu() {
     return () => clearInterval(interval);
   }, [activeTab, backendOnline]);
 
-  // Update multiplier and passive when items change (only after initial load)
+  // Persist item ownership when items change (only after initial load).
+  // NOTE: multiplier and passiveRate are controlled by the server — we only save
+  // the owned-count map locally so the shop UI can display it immediately on load.
   useEffect(() => {
     // Skip if items haven't been loaded from storage yet
     if (!itemsLoadedRef.current) return;
 
-    let clickMultiplier = 1.0;
-    let passiveMultiplier = 1.0;
-    let passiveBonus = 0;
-    let clickBonus = 0;
     const itemsToSave: Record<string, number> = {};
-
     items.forEach((item) => {
       itemsToSave[item.id] = item.owned;
-      const totalEffect = item.effect.value * item.owned;
-
-      switch (item.effect.type) {
-        case EffectType.CLICK_BONUS:
-          clickBonus += totalEffect;
-          break;
-        case EffectType.CLICK_MULTIPLIER:
-          clickMultiplier += totalEffect;
-          break;
-        case EffectType.PASSIVE_BONUS:
-          passiveBonus += totalEffect;
-          break;
-        case EffectType.PASSIVE_MULTIPLIER:
-          passiveMultiplier += totalEffect;
-          break;
-        // CRIT_CHANCE, CRIT_MULTIPLIER, EXPERIENCE_BONUS: server-only, no local effect
-      }
     });
 
-    // Match server formula: clickMultiplier = (1 + clickBonus) * clickMultiplier
-    const finalMultiplier = (1 + clickBonus) * clickMultiplier;
-    // Passive LoC/sec = passiveBonus * passiveMultiplier
-    const finalPassive = passiveBonus * passiveMultiplier;
-
-    window.electronAPI?.updateMultiplier(finalMultiplier);
-    window.electronAPI?.updatePassiveRate(finalPassive);
     window.electronAPI?.saveItems(itemsToSave);
   }, [items]);
 
@@ -178,17 +151,33 @@ export default function Menu() {
       return;
     }
 
-    const success = await window.electronAPI?.subtractLoC(cost);
+    // Use backend purchase — server deducts LoC, updates multipliers, and syncs state
+    const result = await window.electronAPI?.backendBuyItem(item.id);
 
-    if (success) {
+    // The response structure is: { success, data: { success, data: { newQuantityOwned, ... }, error? } }
+    const apiResponse = result?.data as Record<string, unknown> | undefined;
+    const purchaseData = apiResponse?.data as Record<string, unknown> | undefined;
+    const purchaseSuccess = result?.success && apiResponse?.success !== false;
+
+    if (purchaseSuccess) {
+      const newQuantityOwned = typeof purchaseData?.newQuantityOwned === 'number'
+        ? purchaseData.newQuantityOwned
+        : item.owned + 1;
+
       setItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, owned: i.owned + 1 } : i)),
+        prev.map((i) => (i.id === itemId ? { ...i, owned: newQuantityOwned } : i)),
       );
 
+      // Refresh game state (backendBuyItem already synced from server)
       const newState = await window.electronAPI?.getGameState();
       if (newState) setGameState(newState);
 
       showNotification(`✅ ${item.name} acheté!`);
+    } else {
+      const errorMsg = (apiResponse?.error as Record<string, unknown>)?.message
+        || result?.error
+        || 'Achat échoué!';
+      showNotification(`❌ ${errorMsg}`);
     }
   };
 

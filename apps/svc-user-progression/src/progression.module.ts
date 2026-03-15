@@ -12,7 +12,6 @@ import { RedisModule } from './redis/redis.module';
 import { ItemCostCalculatorService } from './services/item-cost-calculator.service';
 import { LeaderboardSyncService } from './services/leaderboard-sync.service';
 import { ProgressionService } from './services/progression.service';
-import { RedisModule } from './redis/redis.module';
 
 @Module({
   controllers: [ProgressionController],

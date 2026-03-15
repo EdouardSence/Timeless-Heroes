@@ -53,7 +53,7 @@ export interface ElectronAPI {
   
   // Backend Leaderboard (TD-03)
   backendLeaderboard: (type?: string) => Promise<LeaderboardResponse>;
-  backendBuyItem: (itemSlug: string) => Promise<{ success: boolean; error?: string }>;
+  backendBuyItem: (itemSlug: string) => Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }>;
 
   // Auth flow
   launchGame: () => void;

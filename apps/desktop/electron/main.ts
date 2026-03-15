@@ -124,8 +124,8 @@ function httpRequest(
  * 1. Keystrokes are buffered in memory
  * 2. Every 2s, the batch is sent to POST /ingest/batch
  * 3. The server processes all keys, calculates LOC, and returns the new balance
- * 4. The desktop REPLACES its local LOC with the server's response
- * 5. Between flushes, an optimistic estimate is shown for instant feedback
+ * 4. The desktop REPLACES its local LOC with the server's response (HWM prevents drops)
+ * 5. The UI always shows exactly the server-authoritative value — no optimistic bonus
  */
 class BackendSync {
   private keyBuffer: Array<{ keyCategory: string; timestamp: number; deltaMs: number }> = [];
@@ -136,11 +136,6 @@ class BackendSync {
   private pendingPassiveLoC = 0;
   /** Seconds of passive income accumulated since last flush */
   private pendingPassiveSeconds = 0;
-  /**
-   * Optimistic LOC bonus — shown to the user between server flushes for instant feedback.
-   * Reset to 0 every time the server responds with an authoritative balance.
-   */
-  private _optimisticBonus = 0;
   /** Whether a flush is currently in progress (prevents overlapping flushes) */
   private flushing = false;
   /**
@@ -149,10 +144,6 @@ class BackendSync {
    * temporarily returns a lower value due to flush race conditions.
    */
   private _serverLocHighWater = 0;
-
-  get optimisticBonus(): number {
-    return this._optimisticBonus;
-  }
 
   get serverLocHighWater(): number {
     return this._serverLocHighWater;
@@ -168,16 +159,6 @@ class BackendSync {
   /** Force-set the high-water mark (used after purchases where balance legitimately drops). */
   forceSetHighWater(serverLoc: number): void {
     this._serverLocHighWater = serverLoc;
-  }
-
-  /** Add an optimistic estimate of LOC gained for a keystroke (visual only) */
-  addOptimisticBonus(amount: number): void {
-    this._optimisticBonus += amount;
-  }
-
-  /** Add an optimistic estimate of LOC gained from passive income (visual only) */
-  addOptimisticPassiveBonus(amount: number): void {
-    this._optimisticBonus += amount;
   }
 
   get authenticated(): boolean {
@@ -418,10 +399,9 @@ class BackendSync {
 
       // Apply server's authoritative progression
       const data = res.data as { success?: boolean; progression?: Record<string, unknown> };
+      console.log(`[flushKeys] server response: accepted=${(data as any).accepted}, rejected=${(data as any).rejected}, progression.linesOfCode=${data.progression?.linesOfCode}, current store.linesOfCode=${store.get('gameState')?.linesOfCode}`);
       if (data.success && data.progression) {
         applyServerProgression(data.progression);
-        // Reset optimistic bonus — server value is now authoritative
-        this._optimisticBonus = 0;
       }
     } catch (err) {
       console.error('Failed to send key batch:', err);
@@ -465,9 +445,9 @@ class BackendSync {
       // Apply server's authoritative progression
       const data = res.data as { success?: boolean; progression?: Record<string, unknown> };
       if (data.success && data.progression) {
+        // Let applyServerProgression compute the delta and reduce the optimistic
+        // bonus proportionally — no hard reset, so the display never drops.
         applyServerProgression(data.progression);
-        // Reset optimistic bonus — server value is now authoritative
-        this._optimisticBonus = 0;
       }
     } catch (err) {
       console.error('Failed to send passive income:', err);
@@ -491,7 +471,22 @@ class BackendSync {
         return { success: false, error: (res.data as any)?.error?.message || (res.data as any)?.message || 'Purchase failed' };
       }
 
-      return { success: true, data: res.data as Record<string, unknown> };
+      // The HTTP response wraps the NATS response: { success, data: { success, data: {...}, error? } }
+      // HTTP 200 doesn't guarantee purchase success — check the inner success field.
+      const responseData = res.data as Record<string, unknown>;
+      const innerSuccess = (responseData.success !== false)
+        && ((responseData.data as Record<string, unknown>)?.success !== false);
+
+      if (!innerSuccess) {
+        const innerError = (responseData.data as Record<string, unknown>)?.error as Record<string, unknown> | undefined;
+        return {
+          success: false,
+          error: (innerError?.message as string) || 'Purchase failed on server',
+          data: responseData,
+        };
+      }
+
+      return { success: true, data: responseData };
     } catch (err) {
       console.error('Backend purchase error:', err);
       return { success: false, error: 'Network error' };
@@ -533,24 +528,14 @@ function startKeyboardListener(): void {
       gameState.totalKeyPresses = (gameState.totalKeyPresses || 0) + 1;
       store.set('gameState', gameState);
 
-      // Add optimistic LOC estimate for instant visual feedback.
-      // The REAL LOC will come from the server when the batch flushes.
-      const mult = Math.max(1, gameState.multiplier || 1);
-      const estimatedGain = Math.floor(1 * mult);
-      backendSync.addOptimisticBonus(estimatedGain);
-
-      // Send game state to renderers WITH optimistic bonus for smooth UX
-      const displayState = {
-        ...gameState,
-        linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
-      };
-      
+      // Display always shows the server-authoritative value (gameState.linesOfCode).
+      // LoC will update when the next flush response arrives from the server.
       if (widgetWindow && !widgetWindow.isDestroyed()) {
-          widgetWindow.webContents.send('game-state-update', displayState);
+          widgetWindow.webContents.send('game-state-update', gameState);
           widgetWindow.webContents.send('user-keypress'); // Explicit event for combo
       }
       if (menuWindow && !menuWindow.isDestroyed()) {
-          menuWindow.webContents.send('game-state-update', displayState);
+          menuWindow.webContents.send('game-state-update', gameState);
       }
 
       // Buffer key for backend batch sync
@@ -667,7 +652,8 @@ function applyServerProgression(prog: Record<string, unknown>): void {
 
   store.set('gameState', gameState);
 
-  // Notify renderers with the authoritative state (no optimistic bonus — it was just reset)
+  // Notify renderers with the authoritative server state — no optimistic bonus.
+  // UI always shows exactly what the server says.
   notifyAllWindows('game-state-update', gameState);
 
   console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}`);
@@ -891,24 +877,18 @@ function startPassiveIncomeLoop(): void {
       const locGained = Math.floor(keysGenerated * gameState.multiplier);
       
       // DO NOT add LOC locally — the server is the single source of truth.
-      // Instead, add an optimistic bonus for instant visual feedback.
-      backendSync.addOptimisticPassiveBonus(locGained);
+      // Display updates when the flush response arrives from the server.
       
       // Also add virtual key presses for stats display (local-only stat)
       gameState.totalKeyPresses += Math.floor(keysGenerated);
       store.set('gameState', gameState);
 
-      // Send display state with optimistic bonus
-      const displayState = {
-        ...gameState,
-        linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
-      };
-      
+      // Send the authoritative server state — no optimistic bonus
       if (widgetWindow && !widgetWindow.isDestroyed()) {
-        widgetWindow.webContents.send('game-state-update', displayState);
+        widgetWindow.webContents.send('game-state-update', gameState);
       }
       if (menuWindow && !menuWindow.isDestroyed()) {
-        menuWindow.webContents.send('game-state-update', displayState);
+        menuWindow.webContents.send('game-state-update', gameState);
       }
 
       // Buffer passive income for backend sync (sent every 2s by flush loop)
@@ -922,13 +902,9 @@ function startPassiveIncomeLoop(): void {
 // ============================================================================
 
 function setupIpcHandlers(): void {
-  // Get game state (includes optimistic bonus for smooth display)
+  // Get game state — always returns the server-authoritative value
   ipcMain.handle('get-game-state', () => {
-    const gameState = store.get('gameState');
-    return {
-      ...gameState,
-      linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
-    };
+    return store.get('gameState');
   });
 
   // Get items
@@ -991,8 +967,6 @@ function setupIpcHandlers(): void {
 
       const result = await backendSync.purchaseItem(itemSlug);
       if (result.success) {
-        // Reset optimistic bonus — the purchase changed the balance on the server
-        backendSync['_optimisticBonus'] = 0;
         // Force-reset the high-water mark so the post-purchase (lower) balance is accepted
         backendSync.forceSetHighWater(0);
         // Sync from server to get the post-purchase balance, multiplier, etc.

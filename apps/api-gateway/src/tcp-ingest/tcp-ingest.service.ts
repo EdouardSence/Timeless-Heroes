@@ -265,8 +265,11 @@ export class TcpIngestService {
       }
     }
 
-    // Build progression response — always use getCurrentProgression which reads
-    // the REAL DB balance + unflushed Redis buffer (avoids stale cache rollbacks)
+    // ── Immediately flush Redis buffer to DB (bypasses BullMQ race condition) ──
+    // Instead of relying on the BullMQ worker (which runs every 5s and can clear
+    // the buffer between processClick and getCurrentProgression), we atomically
+    // flush the buffer and persist the delta to the DB right here, so the
+    // returned progression reflects the REAL persisted balance.
     let progressionResponse: {
       linesOfCode: string;
       level: number;
@@ -275,20 +278,59 @@ export class TcpIngestService {
       experience: string;
     } | null = null;
 
-    const freshProgression = await this.getCurrentProgression(userId);
-    if (freshProgression) {
-      progressionResponse = freshProgression;
-    } else if (lastClickResult) {
-      // Fallback to processClick estimate if getCurrentProgression failed
-      progressionResponse = {
-        linesOfCode: lastClickResult.newBalance,
-        level: progression.level,
-        clickMultiplier: progression.clickMultiplier,
-        passiveMultiplier: progression.passiveMultiplier,
-        experience: progression.experience,
-      };
-    } else if (progression) {
-      // No keys were accepted, but still return current state
+    if (accepted > 0) {
+      try {
+        // Atomically read and clear the buffer (Lua script: HGETALL + DEL)
+        const flushed = await this.clickBufferService.flushBuffer(userId);
+
+        if (flushed && parseFloat(flushed.locToAdd) > 0) {
+          // Directly persist to DB via NATS (bypasses BullMQ queue entirely)
+          const rawUpdateResp = await firstValueFrom(
+            this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+              userId,
+              delta: flushed.locToAdd,
+            }),
+          );
+          const updatedProg = (rawUpdateResp && typeof rawUpdateResp === 'object' && 'data' in rawUpdateResp)
+            ? rawUpdateResp.data as IProgressionData
+            : rawUpdateResp as IProgressionData;
+
+          // Add experience (1 XP per click)
+          await firstValueFrom(
+            this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+              userId,
+              experience: flushed.clicks.toString(),
+            }),
+          ).catch(e => this.logger.warn(`Failed to add XP for ${userId}`, e));
+
+          // Invalidate cached progression so next read is fresh
+          await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
+
+          if (updatedProg) {
+            progressionResponse = {
+              linesOfCode: updatedProg.linesOfCode,
+              level: updatedProg.level,
+              clickMultiplier: updatedProg.clickMultiplier,
+              passiveMultiplier: updatedProg.passiveMultiplier,
+              experience: updatedProg.experience,
+            };
+          }
+        }
+      } catch (e) {
+        this.logger.error(`Failed to flush buffer to DB for ${userId}`, e);
+      }
+    }
+
+    // Fallback: if direct flush failed or no keys were accepted, use getCurrentProgression
+    if (!progressionResponse) {
+      const freshProg = await this.getCurrentProgression(userId);
+      if (freshProg) {
+        progressionResponse = freshProg;
+      }
+    }
+
+    // Last resort fallback
+    if (!progressionResponse && progression) {
       progressionResponse = {
         linesOfCode: progression.linesOfCode,
         level: progression.level,
@@ -308,8 +350,11 @@ export class TcpIngestService {
   /**
    * Get current server-authoritative progression for a user.
    * ALWAYS fetches fresh from DB via NATS (never uses stale cache for LOC).
-   * Adds unflushed Redis buffer AND in-flight amounts (flushed but not yet persisted)
-   * to give the most accurate current balance.
+   *
+   * NOTE: The NATS response from svc-user-progression.getProgression() already
+   * includes the unflushed Redis buffer (extraLoC). We must NOT add the buffer
+   * again here — only add in-flight amounts (flushed from buffer but not yet
+   * persisted to DB) which are NOT included in the NATS response.
    */
   async getCurrentProgression(userId: string): Promise<{
     linesOfCode: string;
@@ -334,18 +379,16 @@ export class TcpIngestService {
 
     if (!progression) return null;
 
-    // Include buffered (unflushed) LOC from Redis
-    const bufferKey = RedisKeys.CLICK_BUFFER(userId);
-    const bufferedLoc = await this.redis.hget(bufferKey, 'locToAdd');
-    const buffered = parseFloat(bufferedLoc || '0') || 0;
-
-    // Include in-flight LOC (flushed from buffer but not yet persisted to DB)
+    // The NATS response (baseLoc) already includes the unflushed Redis buffer
+    // (added by svc-user-progression.getProgression). Do NOT add it again.
+    // Only add in-flight LOC (flushed from buffer but not yet persisted to DB),
+    // which is NOT included in the NATS response.
     const inflightKey = RedisKeys.INFLIGHT_CLICKS(userId);
     const inflightLoc = await this.redis.hget(inflightKey, 'locToAdd');
     const inflight = parseFloat(inflightLoc || '0') || 0;
 
     const baseLoc = parseFloat(progression.linesOfCode || '0') || 0;
-    const totalLoc = Math.floor(baseLoc + buffered + inflight);
+    const totalLoc = Math.floor(baseLoc + inflight);
 
     return {
       linesOfCode: totalLoc.toString(),
@@ -358,25 +401,40 @@ export class TcpIngestService {
 
   /**
    * Process passive income from desktop client.
-   * Buffers the LoC amount in Redis for the next flush cycle.
-   * This ensures passive income earned locally is persisted server-side.
+   * Directly persists the LoC amount to DB via NATS (bypasses BullMQ pipeline
+   * to avoid the same race condition as keystroke processing).
    */
   async processPassiveIncome(userId: string, locAmount: number): Promise<boolean> {
     try {
-      // Buffer the passive LoC exactly like a click, but as a single lump sum.
-      // The click-buffer flush will pick it up and persist via NATS.
-      await this.clickBufferService.incrementBuffer(userId, locAmount.toString());
+      // Directly persist passive LoC to DB via NATS (bypasses Redis buffer + BullMQ)
+      const rawUpdateResp = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+          userId,
+          delta: locAmount.toString(),
+        }),
+      );
+
+      // Invalidate cached progression so next read is fresh
+      await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
 
       this.logger.debug(
-        `Buffered passive income for ${userId}: +${locAmount} LoC`,
+        `Persisted passive income for ${userId}: +${locAmount} LoC`,
       );
 
       return true;
     } catch (error) {
       this.logger.error(
-        `Failed to buffer passive income for ${userId}: ${error instanceof Error ? error.message : error}`,
+        `Failed to persist passive income for ${userId}: ${error instanceof Error ? error.message : error}`,
       );
-      return false;
+      // Fallback: buffer in Redis (BullMQ will eventually flush it)
+      try {
+        await this.clickBufferService.incrementBuffer(userId, locAmount.toString());
+        this.logger.warn(`Fallback: buffered passive income for ${userId}`);
+        return true;
+      } catch (bufferError) {
+        this.logger.error(`Fallback buffering also failed for ${userId}`, bufferError);
+        return false;
+      }
     }
   }
 
