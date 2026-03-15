@@ -31,9 +31,9 @@ export default function Home() {
       if (mode === 'register') body.username = username;
 
       const res = await fetch(`${API_BASE}/api/v1/auth/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
       });
 
       if (!res.ok) {
@@ -45,9 +45,9 @@ export default function Home() {
 
       // Store the JWT token and redirect to dashboard
       localStorage.setItem('jwt_token', data.accessToken);
-      window.location.href = '/dashboard';
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      globalThis.location.href = '/dashboard';
+    } catch (error_) {
+      setError(error_ instanceof Error ? error_.message : 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -57,9 +57,9 @@ export default function Home() {
     <div className={styles.page}>
       <main className={styles.main}>
         <div style={{
+          alignItems: 'center',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
           gap: '2rem',
           maxWidth: '420px',
           width: '100%',
@@ -67,12 +67,12 @@ export default function Home() {
           {/* Title */}
           <div style={{ textAlign: 'center' }}>
             <h1 style={{
+              background: 'linear-gradient(135deg, #00e5ff, #b388ff, #ff80ab)',
               fontSize: '2.5rem',
               fontWeight: 700,
-              background: 'linear-gradient(135deg, #00e5ff, #b388ff, #ff80ab)',
+              marginBottom: '0.5rem',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
-              marginBottom: '0.5rem',
             }}>
               Timeless Heroes
             </h1>
@@ -85,30 +85,30 @@ export default function Home() {
           <form
             onSubmit={handleSubmit}
             style={{
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: '12px',
               display: 'flex',
               flexDirection: 'column',
               gap: '1rem',
-              width: '100%',
               padding: '2rem',
-              borderRadius: '12px',
-              border: '1px solid rgba(255,255,255,0.08)',
-              background: 'rgba(255,255,255,0.03)',
+              width: '100%',
             }}
           >
             {/* Mode toggle */}
             <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => { setMode('login'); }}
                 style={{
-                  flex: 1,
-                  padding: '0.5rem',
+                  background: mode === 'login' ? 'rgba(0,229,255,0.15)' : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  background: mode === 'login' ? 'rgba(0,229,255,0.15)' : 'transparent',
                   color: mode === 'login' ? '#00e5ff' : '#666',
                   cursor: 'pointer',
+                  flex: 1,
                   fontWeight: mode === 'login' ? 600 : 400,
+                  padding: '0.5rem',
                   transition: 'all 0.2s',
                 }}
               >
@@ -116,16 +116,16 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => setMode('register')}
+                onClick={() => { setMode('register'); }}
                 style={{
-                  flex: 1,
-                  padding: '0.5rem',
+                  background: mode === 'register' ? 'rgba(0,229,255,0.15)' : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
-                  background: mode === 'register' ? 'rgba(0,229,255,0.15)' : 'transparent',
                   color: mode === 'register' ? '#00e5ff' : '#666',
                   cursor: 'pointer',
+                  flex: 1,
                   fontWeight: mode === 'register' ? 600 : 400,
+                  padding: '0.5rem',
                   transition: 'all 0.2s',
                 }}
               >
@@ -138,7 +138,7 @@ export default function Home() {
                 type="text"
                 placeholder="Username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => { setUsername(e.target.value); }}
                 required
                 style={inputStyle}
               />
@@ -148,7 +148,7 @@ export default function Home() {
               type="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => { setEmail(e.target.value); }}
               required
               style={inputStyle}
             />
@@ -157,7 +157,7 @@ export default function Home() {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => { setPassword(e.target.value); }}
               required
               minLength={6}
               style={inputStyle}
@@ -173,29 +173,29 @@ export default function Home() {
               type="submit"
               disabled={loading}
               style={{
-                padding: '0.75rem',
-                border: 'none',
-                borderRadius: '8px',
                 background: loading
                   ? 'rgba(0,229,255,0.3)'
                   : 'linear-gradient(135deg, #00e5ff, #b388ff)',
+                border: 'none',
+                borderRadius: '8px',
                 color: '#fff',
-                fontWeight: 600,
-                fontSize: '1rem',
                 cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                fontWeight: 600,
+                padding: '0.75rem',
                 transition: 'all 0.2s',
               }}
             >
               {loading
                 ? 'Loading...'
-                : mode === 'login'
+                : (mode === 'login'
                   ? 'Enter the Game'
-                  : 'Create Account'}
+                  : 'Create Account')}
             </button>
           </form>
 
           {/* Quick links */}
-          <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', fontSize: '0.85rem', gap: '1rem' }}>
             <a href="/game" style={{ color: '#b388ff', textDecoration: 'underline' }}>
               Play Now
             </a>
@@ -210,11 +210,11 @@ export default function Home() {
 }
 
 const inputStyle: React.CSSProperties = {
-  padding: '0.75rem',
+  background: 'rgba(255,255,255,0.05)',
   border: '1px solid rgba(255,255,255,0.1)',
   borderRadius: '8px',
-  background: 'rgba(255,255,255,0.05)',
   color: 'inherit',
   fontSize: '0.95rem',
   outline: 'none',
+  padding: '0.75rem',
 };

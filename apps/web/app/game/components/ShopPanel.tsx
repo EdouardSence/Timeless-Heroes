@@ -10,14 +10,14 @@ import { styles } from '../styles';
 import { ShopItem } from '../types';
 
 interface ShopPanelProps {
-  items: ShopItem[];
   connected: boolean;
+  items: ShopItem[];
   onPurchase: (slug: string) => void;
 }
 
 export const ShopPanel: React.FC<ShopPanelProps> = memo(function ShopPanel({
-  items,
   connected,
+  items,
   onPurchase,
 }) {
   return (

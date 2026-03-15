@@ -12,9 +12,9 @@
 
 'use client';
 
+import { IShopItem, SHOP_ITEMS, WebSocketEvent } from '@repo/shared-types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { IShopItem, SHOP_ITEMS, WebSocketEvent } from '@repo/shared-types';
 
 import { calculateCost, formatNumber } from '../helpers';
 import { GameState, LeaderboardEntry, ShopItem, TabId } from '../types';
@@ -33,14 +33,14 @@ const INITIAL_GAME_STATE: GameState = {
 export interface UseGameSocketReturn {
   activeTab: TabId;
   connected: boolean;
+  expProgress: number;
   gameState: GameState;
   items: ShopItem[];
   leaderboard: LeaderboardEntry[];
   notification: string | null;
-  expProgress: number;
-  setActiveTab: (tab: TabId) => void;
   purchaseItem: (slug: string) => void;
   sendKeyPress: () => void;
+  setActiveTab: (tab: TabId) => void;
 }
 
 export function useGameSocket(): UseGameSocketReturn {
@@ -54,7 +54,7 @@ export function useGameSocket(): UseGameSocketReturn {
   // ── Notification helper ──────────────────────────────────────────────
   const showNotification = useCallback((msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => { setNotification(null); }, 3000);
   }, []);
 
   // ── Socket.IO lifecycle ──────────────────────────────────────────────
@@ -63,15 +63,17 @@ export function useGameSocket(): UseGameSocketReturn {
 
     const socket = io('http://localhost:3000/game', {
       auth: { token },
-      transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionDelay: 2000,
       reconnectionAttempts: Infinity,
+      reconnectionDelay: 2000,
+      transports: ['websocket', 'polling'],
     });
 
     socket.on('connect', () => {
       setConnected(true);
       console.log('Connected to game server via Socket.IO');
+      // Request leaderboard immediately on connect
+      socket.emit('GET_LEADERBOARD', { count: 50, type: 'GLOBAL' });
     });
 
     socket.on('disconnect', () => {
@@ -94,8 +96,8 @@ export function useGameSocket(): UseGameSocketReturn {
       }) => {
         setGameState((prev) => ({
           ...prev,
-          linesOfCode: parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
           level: data.level ?? prev.level,
+          linesOfCode: Number.parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
           multiplier: data.clickMultiplier ?? prev.multiplier,
           passiveRate: data.passiveMultiplier ?? prev.passiveRate,
         }));
@@ -110,9 +112,9 @@ export function useGameSocket(): UseGameSocketReturn {
       }) => {
         setGameState((prev) => ({
           ...prev,
-          linesOfCode: parseFloat(result.newBalance || '0') || prev.linesOfCode,
-          totalKeyPresses: prev.totalKeyPresses + 1,
+          linesOfCode: Number.parseFloat(result.newBalance || '0') || prev.linesOfCode,
           multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
+          totalKeyPresses: prev.totalKeyPresses + 1,
         }));
       },
     );
@@ -129,12 +131,12 @@ export function useGameSocket(): UseGameSocketReturn {
         if (result.success) {
           setGameState((prev) => ({
             ...prev,
-            linesOfCode:
-              parseFloat(result.newBalance || '0') || prev.linesOfCode,
             items: {
               ...prev.items,
               [result.itemSlug || '']: result.newQuantityOwned || 0,
             },
+            linesOfCode:
+              Number.parseFloat(result.newBalance || '0') || prev.linesOfCode,
           }));
           showNotification('Achat effectue !');
         } else {
@@ -157,7 +159,7 @@ export function useGameSocket(): UseGameSocketReturn {
     socket.on(
       WebSocketEvent.OFFLINE_REWARDS,
       (data: { earnedLoc?: string }) => {
-        const earnedLoc = parseFloat(data.earnedLoc || '0') || 0;
+        const earnedLoc = Number.parseFloat(data.earnedLoc || '0') || 0;
         if (earnedLoc > 0) {
           showNotification(
             `Recompenses hors-ligne : +${formatNumber(earnedLoc)} LoC !`,
@@ -200,14 +202,14 @@ export function useGameSocket(): UseGameSocketReturn {
       const owned = gameState.items[item.id] || 0;
       const nextCost = calculateCost(item.baseCost, item.costMultiplier, owned);
       return {
-        slug: item.id,
-        name: item.name,
         baseCost: item.baseCost,
-        owned,
-        nextCost,
         canAfford: gameState.linesOfCode >= nextCost,
-        icon: item.icon,
         effect: item.description,
+        icon: item.icon,
+        name: item.name,
+        nextCost,
+        owned,
+        slug: item.id,
       };
     });
   }, [gameState]);
@@ -231,8 +233,8 @@ export function useGameSocket(): UseGameSocketReturn {
       if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
       sendKeyPress();
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => { globalThis.removeEventListener('keydown', handleKeyDown); };
   }, [sendKeyPress]);
 
   // ── Purchase handler ─────────────────────────────────────────────────
@@ -254,14 +256,14 @@ export function useGameSocket(): UseGameSocketReturn {
   // ── Leaderboard polling ──────────────────────────────────────────────
   const requestLeaderboard = useCallback(() => {
     if (!socketRef.current?.connected) return;
-    socketRef.current.emit('GET_LEADERBOARD', { type: 'GLOBAL', count: 50 });
+    socketRef.current.emit('GET_LEADERBOARD', { count: 50, type: 'GLOBAL' });
   }, []);
 
   useEffect(() => {
     if (activeTab !== 'leaderboard') return;
     requestLeaderboard();
     const interval = setInterval(requestLeaderboard, 15_000);
-    return () => clearInterval(interval);
+    return () => { clearInterval(interval); };
   }, [activeTab, requestLeaderboard]);
 
   // ── Derived values ───────────────────────────────────────────────────
@@ -273,13 +275,13 @@ export function useGameSocket(): UseGameSocketReturn {
   return {
     activeTab,
     connected,
+    expProgress,
     gameState,
     items,
     leaderboard,
     notification,
-    expProgress,
-    setActiveTab,
     purchaseItem,
     sendKeyPress,
+    setActiveTab,
   };
 }

@@ -26,12 +26,12 @@ export interface ShopItem {
 }
 
 export interface LeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  score: string;
   level: number;
   prestigeLevel: number;
+  rank: number;
+  score: string;
+  userId: string;
+  username: string;
 }
 
 export type TabId = 'shop' | 'leaderboard' | 'info';
