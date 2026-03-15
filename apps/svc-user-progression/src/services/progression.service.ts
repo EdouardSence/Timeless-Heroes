@@ -8,6 +8,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Decimal } from '@prisma/client/runtime/library';
 
 import {
+  EffectType,
   IItemPurchaseRequest,
   IItemPurchaseResult,
   IProgressionData,
@@ -22,6 +23,7 @@ import { LeaderboardSyncService } from './leaderboard-sync.service';
 interface IItem {
   baseCost: string;
   baseEffect: number;
+  category: string;
   costMultiplier: number;
   effectType: string;
   maxQuantity?: number;
@@ -41,12 +43,8 @@ export class ProgressionService {
     baseCost: item.baseCost.toString(),
     costMultiplier: item.costMultiplier,
     baseEffect: item.effect.value,
-    effectType:
-      item.effect.type === 'click'
-        ? 'CLICK_BONUS'
-        : item.effect.type === 'passive'
-          ? 'PASSIVE_BONUS'
-          : 'CLICK_MULTIPLIER',
+    effectType: item.effect.type, // Already the DB enum string (CLICK_BONUS etc.)
+    category: item.category,      // Already the DB enum string (HARDWARE etc.)
     unlockLevel: item.unlockLevel,
     maxQuantity: item.maxQuantity,
   }));
@@ -258,14 +256,19 @@ export class ProgressionService {
       };
     }
 
-    // 4. Get or create item in DB
+    // 4. Get or create item in DB — update values if they've changed
     const item = await prisma.item.upsert({
       where: { slug: itemSlug },
       create: {
         slug: itemSlug,
         name: itemDef.name,
         description: `${itemDef.name} - ${itemDef.effectType}`,
-        category: 'HARDWARE',
+        category: itemDef.category as
+          | 'HARDWARE'
+          | 'SOFTWARE'
+          | 'COFFEE'
+          | 'TEAM_MEMBER'
+          | 'INFRASTRUCTURE',
         baseCost: new Decimal(itemDef.baseCost),
         baseEffect: itemDef.baseEffect,
         effectType: itemDef.effectType as
@@ -279,7 +282,28 @@ export class ProgressionService {
         maxQuantity: itemDef.maxQuantity ?? null,
         unlockLevel: itemDef.unlockLevel,
       },
-      update: {},
+      update: {
+        name: itemDef.name,
+        description: `${itemDef.name} - ${itemDef.effectType}`,
+        category: itemDef.category as
+          | 'HARDWARE'
+          | 'SOFTWARE'
+          | 'COFFEE'
+          | 'TEAM_MEMBER'
+          | 'INFRASTRUCTURE',
+        baseCost: new Decimal(itemDef.baseCost),
+        baseEffect: itemDef.baseEffect,
+        effectType: itemDef.effectType as
+          | 'CLICK_BONUS'
+          | 'PASSIVE_BONUS'
+          | 'CLICK_MULTIPLIER'
+          | 'PASSIVE_MULTIPLIER'
+          | 'CRIT_CHANCE'
+          | 'CRIT_MULTIPLIER',
+        costMultiplier: itemDef.costMultiplier,
+        maxQuantity: itemDef.maxQuantity ?? null,
+        unlockLevel: itemDef.unlockLevel,
+      },
     });
 
     // 5. Get current owned quantity from DB
@@ -404,14 +428,19 @@ export class ProgressionService {
       return false;
     }
 
-    // Ensure item exists in DB
+    // Ensure item exists in DB — update values if they've changed
     const item = await prisma.item.upsert({
       where: { slug: itemSlug },
       create: {
         slug: itemSlug,
         name: itemDef.name,
         description: `${itemDef.name} - ${itemDef.effectType}`,
-        category: 'HARDWARE',
+        category: itemDef.category as
+          | 'HARDWARE'
+          | 'SOFTWARE'
+          | 'COFFEE'
+          | 'TEAM_MEMBER'
+          | 'INFRASTRUCTURE',
         baseCost: new Decimal(itemDef.baseCost),
         baseEffect: itemDef.baseEffect,
         effectType: itemDef.effectType as
@@ -425,7 +454,28 @@ export class ProgressionService {
         maxQuantity: itemDef.maxQuantity ?? null,
         unlockLevel: itemDef.unlockLevel,
       },
-      update: {},
+      update: {
+        name: itemDef.name,
+        description: `${itemDef.name} - ${itemDef.effectType}`,
+        category: itemDef.category as
+          | 'HARDWARE'
+          | 'SOFTWARE'
+          | 'COFFEE'
+          | 'TEAM_MEMBER'
+          | 'INFRASTRUCTURE',
+        baseCost: new Decimal(itemDef.baseCost),
+        baseEffect: itemDef.baseEffect,
+        effectType: itemDef.effectType as
+          | 'CLICK_BONUS'
+          | 'PASSIVE_BONUS'
+          | 'CLICK_MULTIPLIER'
+          | 'PASSIVE_MULTIPLIER'
+          | 'CRIT_CHANCE'
+          | 'CRIT_MULTIPLIER',
+        costMultiplier: itemDef.costMultiplier,
+        maxQuantity: itemDef.maxQuantity ?? null,
+        unlockLevel: itemDef.unlockLevel,
+      },
     });
 
     // Get current owned quantity
@@ -476,6 +526,8 @@ export class ProgressionService {
     let passiveBonus = 0;
     let clickMultiplier = 1;
     let passiveMultiplier = 1;
+    let critChance = 0.05;       // base 5%
+    let critMultiplier = 2.0;    // base x2
 
     // Calculate bonuses from items
     for (const ownedItem of ownedItems) {
@@ -495,8 +547,18 @@ export class ProgressionService {
         case 'PASSIVE_MULTIPLIER':
           passiveMultiplier += totalEffect;
           break;
+        case 'CRIT_CHANCE':
+          critChance += totalEffect;
+          break;
+        case 'CRIT_MULTIPLIER':
+          critMultiplier += totalEffect;
+          break;
+        // EXPERIENCE_BONUS: not stored in Progression table, handled separately
       }
     }
+
+    // Cap crit chance at 95%
+    critChance = Math.min(critChance, 0.95);
 
     // Apply bonuses and update in DB
     await prisma.progression.update({
@@ -504,6 +566,8 @@ export class ProgressionService {
       data: {
         clickMultiplier: (1 + clickBonus) * clickMultiplier,
         passiveMultiplier: passiveBonus * passiveMultiplier,
+        criticalChance: critChance,
+        criticalMultiplier: critMultiplier,
       },
     });
   }

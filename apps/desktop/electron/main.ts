@@ -117,7 +117,16 @@ function httpRequest(
   });
 }
 
-/** Backend sync manager — handles JWT auth, ingest session, and periodic key flush */
+/** Backend sync manager — handles JWT auth, ingest session, and periodic key flush.
+ *
+ * ARCHITECTURE: The server is the single source of truth for linesOfCode.
+ * The desktop NEVER computes LOC locally. Instead:
+ * 1. Keystrokes are buffered in memory
+ * 2. Every 2s, the batch is sent to POST /ingest/batch
+ * 3. The server processes all keys, calculates LOC, and returns the new balance
+ * 4. The desktop REPLACES its local LOC with the server's response
+ * 5. Between flushes, an optimistic estimate is shown for instant feedback
+ */
 class BackendSync {
   private keyBuffer: Array<{ keyCategory: string; timestamp: number; deltaMs: number }> = [];
   private lastKeyTimestamp = 0;
@@ -127,6 +136,49 @@ class BackendSync {
   private pendingPassiveLoC = 0;
   /** Seconds of passive income accumulated since last flush */
   private pendingPassiveSeconds = 0;
+  /**
+   * Optimistic LOC bonus — shown to the user between server flushes for instant feedback.
+   * Reset to 0 every time the server responds with an authoritative balance.
+   */
+  private _optimisticBonus = 0;
+  /** Whether a flush is currently in progress (prevents overlapping flushes) */
+  private flushing = false;
+  /**
+   * High-water mark: the highest LOC value ever received from the server.
+   * We NEVER allow the displayed LOC to drop below this, even if the server
+   * temporarily returns a lower value due to flush race conditions.
+   */
+  private _serverLocHighWater = 0;
+
+  get optimisticBonus(): number {
+    return this._optimisticBonus;
+  }
+
+  get serverLocHighWater(): number {
+    return this._serverLocHighWater;
+  }
+
+  /** Update high-water mark. Only increases (never decreases) except via forceSetHighWater. */
+  updateHighWater(serverLoc: number): void {
+    if (serverLoc > this._serverLocHighWater) {
+      this._serverLocHighWater = serverLoc;
+    }
+  }
+
+  /** Force-set the high-water mark (used after purchases where balance legitimately drops). */
+  forceSetHighWater(serverLoc: number): void {
+    this._serverLocHighWater = serverLoc;
+  }
+
+  /** Add an optimistic estimate of LOC gained for a keystroke (visual only) */
+  addOptimisticBonus(amount: number): void {
+    this._optimisticBonus += amount;
+  }
+
+  /** Add an optimistic estimate of LOC gained from passive income (visual only) */
+  addOptimisticPassiveBonus(amount: number): void {
+    this._optimisticBonus += amount;
+  }
 
   get authenticated(): boolean {
     const auth = store.get('backendAuth');
@@ -296,14 +348,19 @@ class BackendSync {
     this.pendingPassiveSeconds += 1;
   }
 
-  /** Start the periodic flush loop (every 3 seconds) */
-  private startFlushLoop(): void {
+  /** Start the periodic flush loop (every 2 seconds) */
+  startFlushLoop(): void {
     if (this.flushInterval) return;
 
     this.flushInterval = setInterval(() => {
-      void this.flushKeys();
-      void this.flushPassiveIncome();
-    }, 3000);
+      // Serialize flushes: keys first, then passive. Both call
+      // applyServerProgression() so running them concurrently would
+      // cause race conditions where one overwrites the other's state.
+      void (async () => {
+        await this.flushKeys();
+        await this.flushPassiveIncome();
+      })();
+    }, 2000);
 
     // NOTE: We intentionally do NOT run a periodic syncProgressionFromServer()
     // here. The 30s sync was causing a regression where stale server values
@@ -311,7 +368,7 @@ class BackendSync {
   }
 
   /** Stop the flush loop */
-  private stopFlushLoop(): void {
+  stopFlushLoop(): void {
     if (this.flushInterval) {
       clearInterval(this.flushInterval);
       this.flushInterval = null;
@@ -324,44 +381,60 @@ class BackendSync {
     await this.flushPassiveIncome();
   }
 
-  /** Flush buffered keys to the backend */
+  /** Flush buffered keys to the backend via batch endpoint.
+   *  The server processes all keys, returns the authoritative LOC balance,
+   *  and we REPLACE local state with the server's response.
+   */
   private async flushKeys(): Promise<void> {
     if (this.keyBuffer.length === 0) return;
+    if (this.flushing) return; // Prevent overlapping flushes
 
     const auth = store.get('backendAuth');
     if (!auth?.sessionId || !auth?.userId) return;
 
-    // Drain buffer
-    const keysToSend = [...this.keyBuffer];
-    this.keyBuffer = [];
+    this.flushing = true;
 
-    // Send each key event (the ingest API expects individual key events)
-    for (const key of keysToSend) {
-      try {
-        const res = await httpRequest('POST', `${API_BASE}/ingest/key`, {
-          userId: auth.userId,
-          sessionId: auth.sessionId,
-          keyCategory: key.keyCategory,
-          timestamp: key.timestamp,
-          deltaMs: key.deltaMs,
-        });
+    // Drain buffer (max 200 per batch as enforced by server)
+    const keysToSend = this.keyBuffer.splice(0, 200);
 
-        if (res.status === 401 || res.status === 403) {
-          console.warn('Ingest session expired, stopping flush');
-          // Put remaining keys back in buffer
-          this.keyBuffer = [...keysToSend.slice(keysToSend.indexOf(key)), ...this.keyBuffer];
-          break;
-        }
-      } catch (err) {
-        console.error('Failed to send key:', err);
-        // Put remaining keys back
-        this.keyBuffer = [...keysToSend.slice(keysToSend.indexOf(key)), ...this.keyBuffer];
-        break;
+    try {
+      const res = await httpRequest('POST', `${API_BASE}/ingest/batch`, {
+        userId: auth.userId,
+        sessionId: auth.sessionId,
+        keys: keysToSend.map(k => ({
+          keyCategory: k.keyCategory,
+          timestamp: k.timestamp,
+          deltaMs: k.deltaMs,
+        })),
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        console.warn('Ingest session expired, stopping flush');
+        // Put keys back at front of buffer so they aren't lost
+        this.keyBuffer = [...keysToSend, ...this.keyBuffer];
+        this.flushing = false;
+        return;
       }
+
+      // Apply server's authoritative progression
+      const data = res.data as { success?: boolean; progression?: Record<string, unknown> };
+      if (data.success && data.progression) {
+        applyServerProgression(data.progression);
+        // Reset optimistic bonus — server value is now authoritative
+        this._optimisticBonus = 0;
+      }
+    } catch (err) {
+      console.error('Failed to send key batch:', err);
+      // Put keys back so they aren't lost
+      this.keyBuffer = [...keysToSend, ...this.keyBuffer];
+    } finally {
+      this.flushing = false;
     }
   }
 
-  /** Flush accumulated passive income to the backend */
+  /** Flush accumulated passive income to the backend.
+   *  The server returns the authoritative balance in the response.
+   */
   private async flushPassiveIncome(): Promise<void> {
     if (this.pendingPassiveLoC <= 0) return;
 
@@ -386,6 +459,15 @@ class BackendSync {
         // Put back so we don't lose it
         this.pendingPassiveLoC += locToSend;
         this.pendingPassiveSeconds += secondsToSend;
+        return;
+      }
+
+      // Apply server's authoritative progression
+      const data = res.data as { success?: boolean; progression?: Record<string, unknown> };
+      if (data.success && data.progression) {
+        applyServerProgression(data.progression);
+        // Reset optimistic bonus — server value is now authoritative
+        this._optimisticBonus = 0;
       }
     } catch (err) {
       console.error('Failed to send passive income:', err);
@@ -395,8 +477,8 @@ class BackendSync {
     }
   }
 
-  /** Purchase an item from the backend */
-  async purchaseItem(itemSlug: string): Promise<{ success: boolean; error?: string }> {
+  /** Purchase an item from the backend. Returns the server's purchase response. */
+  async purchaseItem(itemSlug: string): Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }> {
     const auth = store.get('backendAuth');
     if (!auth?.jwtToken) return { success: false, error: 'Not logged in' };
 
@@ -406,10 +488,10 @@ class BackendSync {
       });
 
       if (res.status !== 200 && res.status !== 201) {
-        return { success: false, error: (res.data as any)?.error?.message || 'Purchase failed' };
+        return { success: false, error: (res.data as any)?.error?.message || (res.data as any)?.message || 'Purchase failed' };
       }
 
-      return { success: true };
+      return { success: true, data: res.data as Record<string, unknown> };
     } catch (err) {
       console.error('Backend purchase error:', err);
       return { success: false, error: 'Network error' };
@@ -447,34 +529,31 @@ function startKeyboardListener(): void {
 
       if (!gameState) return;
 
-      const mult = Math.max(1, gameState.multiplier || 1);
-      const gained = Math.floor(1 * mult);
-
-      gameState.linesOfCode = (gameState.linesOfCode || 0) + gained;
+      // Track total key presses locally (for display/stats only)
       gameState.totalKeyPresses = (gameState.totalKeyPresses || 0) + 1;
-      gameState.experience = (gameState.experience || 0) + 1;
-
-      // Faster level up check
-      if (gameState.experience >= gameState.experienceToNext) {
-        while (gameState.experience >= gameState.experienceToNext) {
-          gameState.experience -= gameState.experienceToNext;
-          gameState.level += 1;
-          gameState.experienceToNext = Math.floor(gameState.experienceToNext * 1.5);
-          widgetWindow?.webContents.send('level-up', gameState.level);
-        }
-      }
-
       store.set('gameState', gameState);
+
+      // Add optimistic LOC estimate for instant visual feedback.
+      // The REAL LOC will come from the server when the batch flushes.
+      const mult = Math.max(1, gameState.multiplier || 1);
+      const estimatedGain = Math.floor(1 * mult);
+      backendSync.addOptimisticBonus(estimatedGain);
+
+      // Send game state to renderers WITH optimistic bonus for smooth UX
+      const displayState = {
+        ...gameState,
+        linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
+      };
       
       if (widgetWindow && !widgetWindow.isDestroyed()) {
-          widgetWindow.webContents.send('game-state-update', gameState);
+          widgetWindow.webContents.send('game-state-update', displayState);
           widgetWindow.webContents.send('user-keypress'); // Explicit event for combo
       }
       if (menuWindow && !menuWindow.isDestroyed()) {
-          menuWindow.webContents.send('game-state-update', gameState);
+          menuWindow.webContents.send('game-state-update', displayState);
       }
 
-      // BUG-06 FIX: Also buffer key for backend sync
+      // Buffer key for backend batch sync
       backendSync.bufferKey(e.keycode);
     });
 
@@ -553,17 +632,55 @@ function loadUserState(userId: string): void {
 }
 
 /**
+ * Apply server progression to local state — REPLACES local values entirely.
+ * This is the single function that writes server-authoritative data to the store.
+ * Called from flushKeys(), flushPassiveIncome(), syncProgressionFromServer(), and purchase handlers.
+ */
+/**
+ * Apply server progression to local state — REPLACES local values entirely.
+ * This is the single function that writes server-authoritative data to the store.
+ * Called from flushKeys(), flushPassiveIncome(), syncProgressionFromServer(), and purchase handlers.
+ *
+ * Uses a high-water mark for LOC: the displayed LOC never drops below the highest
+ * value ever seen from the server, unless forceSetHighWater() was called (purchases).
+ */
+function applyServerProgression(prog: Record<string, unknown>): void {
+  const gameState = store.get('gameState');
+
+  const rawServerLoC = parseFloat(String(prog.linesOfCode ?? '0')) || 0;
+  const serverLevel = typeof prog.level === 'number' ? prog.level : (gameState.level || 1);
+  // Use typeof check, NOT ||, so that 0 values are preserved correctly
+  const serverMultiplier = typeof prog.clickMultiplier === 'number' ? prog.clickMultiplier : (gameState.multiplier ?? 1.0);
+  const serverPassiveRate = typeof prog.passiveMultiplier === 'number' ? prog.passiveMultiplier : (gameState.passiveRate ?? 0);
+  const serverExperience = parseFloat(String(prog.experience ?? '0')) || 0;
+
+  // Apply high-water mark: never let LOC drop due to stale server responses
+  backendSync.updateHighWater(rawServerLoC);
+  const effectiveLoC = backendSync.serverLocHighWater;
+
+  // CRITICAL: Always REPLACE local values with server values
+  gameState.linesOfCode = effectiveLoC;
+  gameState.level = serverLevel;
+  gameState.multiplier = serverMultiplier;
+  gameState.passiveRate = serverPassiveRate;
+  gameState.experience = serverExperience;
+
+  store.set('gameState', gameState);
+
+  // Notify renderers with the authoritative state (no optimistic bonus — it was just reset)
+  notifyAllWindows('game-state-update', gameState);
+
+  console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}`);
+}
+
+/**
  * Sync local game state from the server's canonical progression.
  * Called after login, register, session restore, and purchases.
  *
  * Strategy:
  * 1. Force-flush any pending keys / passive income so the server has our latest data.
  * 2. Fetch the server's canonical balance.
- * 3. For linesOfCode: use Math.max(local, server) so progress never goes backwards.
- *    The server pipeline has inherent lag (Redis buffer → BullMQ → NATS → Prisma),
- *    so the local value may legitimately be ahead of the server.
- * 4. For multiplier, level, passiveRate: always trust the server (these only change
- *    via server-side purchases and are never incremented locally).
+ * 3. REPLACE local state entirely with server values (server is single source of truth).
  */
 async function syncProgressionFromServer(): Promise<void> {
   const auth = store.get('backendAuth');
@@ -584,40 +701,10 @@ async function syncProgressionFromServer(): Promise<void> {
     if (res.status === 200 || res.status === 201) {
       // Handle both wrapped IApiResponse { success, data: {...} } and direct { linesOfCode, ... }
       const raw = res.data as Record<string, unknown>;
-      const prog = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as {
-        linesOfCode?: string;
-        level?: number;
-        clickMultiplier?: number;
-        passiveMultiplier?: number;
-        experience?: string;
-        totalLinesWritten?: string;
-      };
+      const prog = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as Record<string, unknown>;
 
-      const gameState = store.get('gameState');
-      
-      const serverLoC = parseFloat(prog.linesOfCode || '0') || 0;
-      const serverLevel = prog.level || 1;
-      const serverMultiplier = prog.clickMultiplier || 1.0;
-      const serverPassiveRate = prog.passiveMultiplier || 0;
-      
-      // CRITICAL: Never let server overwrite local LoC with a lower value.
-      // Due to pipeline lag the server may not yet have flushed our latest clicks.
-      const localLoC = gameState.linesOfCode || 0;
-      gameState.linesOfCode = Math.max(localLoC, serverLoC);
-
-      // Multiplier, level, passiveRate are only changed server-side (purchases)
-      // so always trust the server for these.
-      gameState.multiplier = serverMultiplier;
-      gameState.level = Math.max(gameState.level || 1, serverLevel);
-      gameState.passiveRate = serverPassiveRate;
-      
-      if (prog.experience) {
-        gameState.experience = Math.max(gameState.experience || 0, parseFloat(prog.experience) || 0);
-      }
-      
-      store.set('gameState', gameState);
-      notifyAllWindows('game-state-update', store.get('gameState'));
-      console.log(`[Sync] Server: ${serverLoC} LoC, local: ${localLoC} LoC → using ${gameState.linesOfCode} | level ${serverLevel}, mult ${serverMultiplier}, passive ${serverPassiveRate}`);
+      applyServerProgression(prog);
+      console.log(`[Sync] Server progression applied`);
     }
   } catch (err) {
     // Non-fatal — local state remains as fallback until next successful sync
@@ -803,33 +890,28 @@ function startPassiveIncomeLoop(): void {
       const keysGenerated = gameState.passiveRate;
       const locGained = Math.floor(keysGenerated * gameState.multiplier);
       
-      gameState.linesOfCode += locGained;
+      // DO NOT add LOC locally — the server is the single source of truth.
+      // Instead, add an optimistic bonus for instant visual feedback.
+      backendSync.addOptimisticPassiveBonus(locGained);
       
-      // Also add to total key presses for stats (virtual keys)
+      // Also add virtual key presses for stats display (local-only stat)
       gameState.totalKeyPresses += Math.floor(keysGenerated);
-      
-      // Add experience from virtual keys
-      gameState.experience += Math.floor(keysGenerated);
-      
-      // Level up check
-      while (gameState.experience >= gameState.experienceToNext) {
-        gameState.experience -= gameState.experienceToNext;
-        gameState.level += 1;
-        gameState.experienceToNext = Math.floor(gameState.experienceToNext * 1.5);
-        widgetWindow?.webContents.send('level-up', gameState.level);
-      }
-      
       store.set('gameState', gameState);
+
+      // Send display state with optimistic bonus
+      const displayState = {
+        ...gameState,
+        linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
+      };
       
       if (widgetWindow && !widgetWindow.isDestroyed()) {
-        widgetWindow.webContents.send('game-state-update', gameState);
+        widgetWindow.webContents.send('game-state-update', displayState);
       }
       if (menuWindow && !menuWindow.isDestroyed()) {
-        menuWindow.webContents.send('game-state-update', gameState);
+        menuWindow.webContents.send('game-state-update', displayState);
       }
 
-      // BUG-FIX: Also buffer passive income for backend sync
-      // Without this, passive LoC was purely local and lost on reconnect
+      // Buffer passive income for backend sync (sent every 2s by flush loop)
       backendSync.bufferPassiveIncome(locGained);
     }
   }, 1000);
@@ -840,9 +922,13 @@ function startPassiveIncomeLoop(): void {
 // ============================================================================
 
 function setupIpcHandlers(): void {
-  // Get game state
+  // Get game state (includes optimistic bonus for smooth display)
   ipcMain.handle('get-game-state', () => {
-    return store.get('gameState');
+    const gameState = store.get('gameState');
+    return {
+      ...gameState,
+      linesOfCode: (gameState.linesOfCode || 0) + backendSync.optimisticBonus,
+    };
   });
 
   // Get items
@@ -850,29 +936,24 @@ function setupIpcHandlers(): void {
     return store.get('items');
   });
 
-  // Update multiplier
-  ipcMain.handle('update-multiplier', (_, multiplier: number) => {
-    const gameState = store.get('gameState');
-    gameState.multiplier = multiplier;
-    store.set('gameState', gameState);
+  // Update multiplier — NO-OP: server is the single source of truth for multiplier.
+  // The value is applied when we receive server progression responses.
+  ipcMain.handle('update-multiplier', (_: unknown, _multiplier: number) => {
+    // Intentionally empty — server controls multiplier via purchases
+    console.log('[IPC] update-multiplier called but ignored (server is source of truth)');
   });
 
-  // Update passive rate
-  ipcMain.handle('update-passive-rate', (_, passiveRate: number) => {
-    const gameState = store.get('gameState');
-    gameState.passiveRate = passiveRate;
-    store.set('gameState', gameState);
+  // Update passive rate — NO-OP: server is the single source of truth for passiveRate.
+  ipcMain.handle('update-passive-rate', (_: unknown, _passiveRate: number) => {
+    // Intentionally empty — server controls passiveRate via purchases
+    console.log('[IPC] update-passive-rate called but ignored (server is source of truth)');
   });
 
-  // Subtract LoC (for purchases)
-  ipcMain.handle('subtract-loc', (_, amount: number) => {
-    const gameState = store.get('gameState');
-    if (gameState.linesOfCode >= amount) {
-      gameState.linesOfCode -= amount;
-      store.set('gameState', gameState);
-      return true;
-    }
-    return false;
+  // Subtract LoC — NO-OP: purchases go through the server and deduct LOC there.
+  // After a purchase, syncProgressionFromServer() refreshes the local balance.
+  ipcMain.handle('subtract-loc', (_: unknown, _amount: number) => {
+    console.log('[IPC] subtract-loc called but ignored (server handles purchase deductions)');
+    return true; // Return true to not break callers expecting a boolean
   });
 
   // Save items
@@ -885,6 +966,7 @@ function setupIpcHandlers(): void {
     const result = await backendSync.login(email, password);
     if (result.success && backendSync.userId) {
       loadUserState(backendSync.userId);
+      backendSync.forceSetHighWater(0); // Reset HWM — server value is authoritative on login
       await syncProgressionFromServer();
     }
     return result;
@@ -894,18 +976,33 @@ function setupIpcHandlers(): void {
     const result = await backendSync.register(email, password, username);
     if (result.success && backendSync.userId) {
       loadUserState(backendSync.userId);
+      backendSync.forceSetHighWater(0); // Reset HWM — fresh account
       await syncProgressionFromServer();
     }
     return result;
   });
 
   ipcMain.handle('backend-buy-item', async (_, itemSlug: string) => {
-    const result = await backendSync.purchaseItem(itemSlug);
-    if (result.success) {
-      // Sync progression immediately after purchase to update multiplier/balance
-      await syncProgressionFromServer();
+    // Stop flush loop to prevent races during purchase + sync
+    backendSync.stopFlushLoop();
+    try {
+      // Force flush pending data so server has our latest balance before deducting
+      await backendSync.forceFlush();
+
+      const result = await backendSync.purchaseItem(itemSlug);
+      if (result.success) {
+        // Reset optimistic bonus — the purchase changed the balance on the server
+        backendSync['_optimisticBonus'] = 0;
+        // Force-reset the high-water mark so the post-purchase (lower) balance is accepted
+        backendSync.forceSetHighWater(0);
+        // Sync from server to get the post-purchase balance, multiplier, etc.
+        await syncProgressionFromServer();
+      }
+      return result;
+    } finally {
+      // Always restart the flush loop, even if purchase failed
+      backendSync.startFlushLoop();
     }
-    return result;
   });
 
   ipcMain.handle('backend-logout', () => {
@@ -1056,6 +1153,7 @@ app.whenReady().then(async () => {
     // (server sync overwrites stale local data, e.g. after a DB wipe)
     if (backendSync.userId) {
       loadUserState(backendSync.userId);
+      backendSync.forceSetHighWater(0); // Reset HWM — server value is authoritative on restore
       await syncProgressionFromServer();
     }
     createWidgetWindow();

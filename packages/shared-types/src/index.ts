@@ -41,6 +41,15 @@ export const NATS_SERVICE = {
 } as const;
 
 // ============================================================================
+// ROLES (mirrors Prisma enum Role)
+// ============================================================================
+
+export enum Role {
+  PLAYER = 'PLAYER',
+  ADMIN = 'ADMIN',
+}
+
+// ============================================================================
 // WEBSOCKET EVENTS
 // ============================================================================
 
@@ -481,102 +490,322 @@ export interface IPaginatedResponse<T> extends IApiResponse<T[]> {
 
 // ============================================================================
 // SHOP ITEMS CATALOG (Single Source of Truth)
+// Must match the DB seed in scripts/db/01-init.sql exactly.
 // ============================================================================
 
+export const ItemCategory = {
+  HARDWARE: 'HARDWARE',
+  SOFTWARE: 'SOFTWARE',
+  COFFEE: 'COFFEE',
+  TEAM_MEMBER: 'TEAM_MEMBER',
+  INFRASTRUCTURE: 'INFRASTRUCTURE',
+} as const;
+
+export type ItemCategory = (typeof ItemCategory)[keyof typeof ItemCategory];
+
+export const EffectType = {
+  CLICK_BONUS: 'CLICK_BONUS',
+  CLICK_MULTIPLIER: 'CLICK_MULTIPLIER',
+  PASSIVE_BONUS: 'PASSIVE_BONUS',
+  PASSIVE_MULTIPLIER: 'PASSIVE_MULTIPLIER',
+  CRIT_CHANCE: 'CRIT_CHANCE',
+  CRIT_MULTIPLIER: 'CRIT_MULTIPLIER',
+  EXPERIENCE_BONUS: 'EXPERIENCE_BONUS',
+} as const;
+
+export type EffectType = (typeof EffectType)[keyof typeof EffectType];
+
+export const ItemRarity = {
+  COMMON: 'COMMON',
+  UNCOMMON: 'UNCOMMON',
+  RARE: 'RARE',
+  EPIC: 'EPIC',
+  LEGENDARY: 'LEGENDARY',
+  MYTHIC: 'MYTHIC',
+} as const;
+
+export type ItemRarity = (typeof ItemRarity)[keyof typeof ItemRarity];
+
 export interface IShopItem {
+  /** Slug — matches the `slug` column in the DB `Item` table */
   id: string;
   name: string;
   description: string;
   icon: string;
+  category: ItemCategory;
+  rarity: ItemRarity;
   baseCost: number;
   costMultiplier: number;
   effect: {
-    type: 'click' | 'passive' | 'multiplier';
+    type: EffectType;
     value: number;
   };
   unlockLevel: number;
   maxQuantity?: number;
 }
 
+// ---------------------------------------------------------------------------
+// 20 items — mirrors scripts/db/01-init.sql seed data exactly.
+// ---------------------------------------------------------------------------
+
 export const SHOP_ITEMS: IShopItem[] = [
+  // ── HARDWARE (Click bonuses) ──────────────────────────────────────────────
   {
-    id: 'mechanical-keyboard',
-    name: 'Clavier Mécanique',
-    description: '+1 LoC par frappe',
-    icon: '⌨️',
-    baseCost: 100,
+    id: 'rubber-duck',
+    name: 'Rubber Duck',
+    description: 'Every dev needs a debugging companion. +1 LoC/click.',
+    icon: '🦆',
+    category: ItemCategory.HARDWARE,
+    rarity: ItemRarity.COMMON,
+    baseCost: 10,
     costMultiplier: 1.15,
-    effect: { type: 'click', value: 1 },
+    effect: { type: EffectType.CLICK_BONUS, value: 1.0 },
     unlockLevel: 1,
   },
   {
-    id: 'monitor-4k',
-    name: 'Écran 4K',
-    description: '+2 LoC par frappe',
-    icon: '🖥️',
-    baseCost: 500,
+    id: 'mechanical-keyboard',
+    name: 'Mechanical Keyboard',
+    description: 'Cherry MX Blues. Annoying but productive. +5 LoC/click.',
+    icon: '⌨️',
+    category: ItemCategory.HARDWARE,
+    rarity: ItemRarity.COMMON,
+    baseCost: 100,
     costMultiplier: 1.15,
-    effect: { type: 'click', value: 2 },
+    effect: { type: EffectType.CLICK_BONUS, value: 5.0 },
     unlockLevel: 3,
   },
   {
-    id: 'coffee-machine',
-    name: 'Machine à Café',
-    description: '+10% multiplicateur',
-    icon: '☕',
-    baseCost: 2500,
-    costMultiplier: 1.2,
-    effect: { type: 'multiplier', value: 0.1 },
-    unlockLevel: 7,
-  },
-  {
-    id: 'junior-dev',
-    name: 'Dev Junior',
-    description: '+0.5 keys/sec auto',
-    icon: '👨‍💻',
+    id: 'ultrawide-monitor',
+    name: 'Ultrawide Monitor',
+    description: '49-inch curved display. More pixels, more code. +25 LoC/click.',
+    icon: '🖥️',
+    category: ItemCategory.HARDWARE,
+    rarity: ItemRarity.UNCOMMON,
     baseCost: 1000,
     costMultiplier: 1.15,
-    effect: { type: 'passive', value: 0.5 },
-    unlockLevel: 5,
+    effect: { type: EffectType.CLICK_BONUS, value: 25.0 },
+    unlockLevel: 8,
   },
   {
-    id: 'senior-dev',
-    name: 'Dev Senior',
-    description: '+5 keys/sec auto',
-    icon: '👩‍💻',
+    id: 'standing-desk',
+    name: 'Standing Desk',
+    description: 'Motorized sit-stand desk. Better posture = better code. +100 LoC/click.',
+    icon: '🪑',
+    category: ItemCategory.HARDWARE,
+    rarity: ItemRarity.RARE,
     baseCost: 10000,
     costMultiplier: 1.15,
-    effect: { type: 'passive', value: 5 },
-    unlockLevel: 10,
-  },
-  {
-    id: 'cloud-server',
-    name: 'Serveur Cloud',
-    description: '+50 keys/sec auto',
-    icon: '☁️',
-    baseCost: 50000,
-    costMultiplier: 1.15,
-    effect: { type: 'passive', value: 50 },
+    effect: { type: EffectType.CLICK_BONUS, value: 100.0 },
     unlockLevel: 15,
   },
   {
-    id: 'ai-copilot',
-    name: 'AI Copilot',
-    description: '+200 keys/sec auto',
-    icon: '🤖',
-    baseCost: 250000,
-    costMultiplier: 1.15,
-    effect: { type: 'passive', value: 200 },
-    unlockLevel: 20,
+    id: 'quantum-processor',
+    name: 'Quantum Processor',
+    description: 'Experimental quantum chip. Compiles in superposition. +500 LoC/click.',
+    icon: '⚛️',
+    category: ItemCategory.HARDWARE,
+    rarity: ItemRarity.EPIC,
+    baseCost: 100000,
+    costMultiplier: 1.18,
+    effect: { type: EffectType.CLICK_BONUS, value: 500.0 },
+    unlockLevel: 30,
+  },
+
+  // ── SOFTWARE (Click multipliers) ──────────────────────────────────────────
+  {
+    id: 'vim-config',
+    name: 'Custom Vim Config',
+    description: 'Years of tweaking .vimrc finally pay off. x1.1 click multiplier.',
+    icon: '📝',
+    category: ItemCategory.SOFTWARE,
+    rarity: ItemRarity.UNCOMMON,
+    baseCost: 500,
+    costMultiplier: 1.20,
+    effect: { type: EffectType.CLICK_MULTIPLIER, value: 0.1 },
+    unlockLevel: 5,
+    maxQuantity: 10,
   },
   {
-    id: 'quantum-computer',
-    name: 'Ordinateur Quantique',
-    description: 'x2 multiplicateur global',
-    icon: '⚛️',
-    baseCost: 1000000,
+    id: 'copilot-ai',
+    name: 'AI Copilot',
+    description: 'Your AI pair programmer. x1.25 click multiplier.',
+    icon: '🤖',
+    category: ItemCategory.SOFTWARE,
+    rarity: ItemRarity.RARE,
+    baseCost: 5000,
     costMultiplier: 1.25,
-    effect: { type: 'multiplier', value: 1.0 },
-    unlockLevel: 25,
+    effect: { type: EffectType.CLICK_MULTIPLIER, value: 0.25 },
+    unlockLevel: 12,
+    maxQuantity: 5,
+  },
+  {
+    id: 'custom-ide',
+    name: 'Custom IDE',
+    description: 'Built your own IDE from scratch. x1.5 click multiplier.',
+    icon: '💻',
+    category: ItemCategory.SOFTWARE,
+    rarity: ItemRarity.EPIC,
+    baseCost: 50000,
+    costMultiplier: 1.30,
+    effect: { type: EffectType.CLICK_MULTIPLIER, value: 0.5 },
+    unlockLevel: 20,
+    maxQuantity: 3,
+  },
+
+  // ── TEAM MEMBERS (Passive generation) ─────────────────────────────────────
+  {
+    id: 'intern',
+    name: 'Junior Intern',
+    description: 'Fresh out of bootcamp. Generates 1 LoC/sec passively.',
+    icon: '👶',
+    category: ItemCategory.TEAM_MEMBER,
+    rarity: ItemRarity.COMMON,
+    baseCost: 200,
+    costMultiplier: 1.15,
+    effect: { type: EffectType.PASSIVE_BONUS, value: 1.0 },
+    unlockLevel: 2,
+  },
+  {
+    id: 'junior-dev',
+    name: 'Junior Developer',
+    description: 'Knows React. Generates 5 LoC/sec passively.',
+    icon: '👨‍💻',
+    category: ItemCategory.TEAM_MEMBER,
+    rarity: ItemRarity.UNCOMMON,
+    baseCost: 2000,
+    costMultiplier: 1.15,
+    effect: { type: EffectType.PASSIVE_BONUS, value: 5.0 },
+    unlockLevel: 7,
+  },
+  {
+    id: 'senior-dev',
+    name: 'Senior Developer',
+    description: '10 years experience. Generates 25 LoC/sec passively.',
+    icon: '👩‍💻',
+    category: ItemCategory.TEAM_MEMBER,
+    rarity: ItemRarity.RARE,
+    baseCost: 20000,
+    costMultiplier: 1.15,
+    effect: { type: EffectType.PASSIVE_BONUS, value: 25.0 },
+    unlockLevel: 14,
+  },
+  {
+    id: 'tech-lead',
+    name: 'Tech Lead',
+    description: 'Designs the architecture. Generates 100 LoC/sec passively.',
+    icon: '🧑‍💼',
+    category: ItemCategory.TEAM_MEMBER,
+    rarity: ItemRarity.EPIC,
+    baseCost: 200000,
+    costMultiplier: 1.18,
+    effect: { type: EffectType.PASSIVE_BONUS, value: 100.0 },
+    unlockLevel: 22,
+  },
+  {
+    id: 'cto',
+    name: 'CTO',
+    description: 'The mythical 10x engineer. Generates 500 LoC/sec passively.',
+    icon: '👑',
+    category: ItemCategory.TEAM_MEMBER,
+    rarity: ItemRarity.LEGENDARY,
+    baseCost: 2000000,
+    costMultiplier: 1.20,
+    effect: { type: EffectType.PASSIVE_BONUS, value: 500.0 },
+    unlockLevel: 35,
+    maxQuantity: 1,
+  },
+
+  // ── COFFEE (Crit chance / crit multiplier) ────────────────────────────────
+  {
+    id: 'espresso',
+    name: 'Espresso Shot',
+    description: 'Quick caffeine hit. +2% critical chance.',
+    icon: '☕',
+    category: ItemCategory.COFFEE,
+    rarity: ItemRarity.COMMON,
+    baseCost: 300,
+    costMultiplier: 1.20,
+    effect: { type: EffectType.CRIT_CHANCE, value: 0.02 },
+    unlockLevel: 4,
+    maxQuantity: 20,
+  },
+  {
+    id: 'cold-brew',
+    name: 'Cold Brew Concentrate',
+    description: 'Slow-drip perfection. +5% critical chance.',
+    icon: '🧊',
+    category: ItemCategory.COFFEE,
+    rarity: ItemRarity.UNCOMMON,
+    baseCost: 3000,
+    costMultiplier: 1.25,
+    effect: { type: EffectType.CRIT_CHANCE, value: 0.05 },
+    unlockLevel: 10,
+    maxQuantity: 10,
+  },
+  {
+    id: 'energy-drink',
+    name: 'Energy Drink IV Drip',
+    description: 'Maximum caffeine delivery. x1.5 critical multiplier.',
+    icon: '⚡',
+    category: ItemCategory.COFFEE,
+    rarity: ItemRarity.RARE,
+    baseCost: 8000,
+    costMultiplier: 1.20,
+    effect: { type: EffectType.CRIT_MULTIPLIER, value: 0.5 },
+    unlockLevel: 16,
+    maxQuantity: 5,
+  },
+
+  // ── INFRASTRUCTURE (Passive multipliers) ──────────────────────────────────
+  {
+    id: 'cloud-vps',
+    name: 'Cloud VPS',
+    description: 'A small server in the cloud. x1.1 passive multiplier.',
+    icon: '☁️',
+    category: ItemCategory.INFRASTRUCTURE,
+    rarity: ItemRarity.UNCOMMON,
+    baseCost: 5000,
+    costMultiplier: 1.20,
+    effect: { type: EffectType.PASSIVE_MULTIPLIER, value: 0.1 },
+    unlockLevel: 6,
+  },
+  {
+    id: 'kubernetes-cluster',
+    name: 'Kubernetes Cluster',
+    description: 'Container orchestration at scale. x1.3 passive multiplier.',
+    icon: '🐳',
+    category: ItemCategory.INFRASTRUCTURE,
+    rarity: ItemRarity.RARE,
+    baseCost: 50000,
+    costMultiplier: 1.25,
+    effect: { type: EffectType.PASSIVE_MULTIPLIER, value: 0.3 },
+    unlockLevel: 18,
+    maxQuantity: 5,
+  },
+  {
+    id: 'data-center',
+    name: 'Private Data Center',
+    description: 'Your own rack. x1.5 passive multiplier.',
+    icon: '🏢',
+    category: ItemCategory.INFRASTRUCTURE,
+    rarity: ItemRarity.EPIC,
+    baseCost: 500000,
+    costMultiplier: 1.30,
+    effect: { type: EffectType.PASSIVE_MULTIPLIER, value: 0.5 },
+    unlockLevel: 28,
+    maxQuantity: 3,
+  },
+  {
+    id: 'quantum-mainframe',
+    name: 'Quantum Mainframe',
+    description: 'The ultimate compute. x2.0 passive multiplier.',
+    icon: '🔮',
+    category: ItemCategory.INFRASTRUCTURE,
+    rarity: ItemRarity.LEGENDARY,
+    baseCost: 5000000,
+    costMultiplier: 1.35,
+    effect: { type: EffectType.PASSIVE_MULTIPLIER, value: 1.0 },
+    unlockLevel: 40,
+    maxQuantity: 1,
   },
 ];

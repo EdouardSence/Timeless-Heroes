@@ -180,6 +180,183 @@ export class TcpIngestService {
   }
 
   /**
+   * Process a BATCH of anonymized key press events.
+   * Returns the server-authoritative progression after processing all keys.
+   * This is the preferred endpoint for the desktop client.
+   */
+  async processKeyPressBatch(
+    userId: string,
+    events: ITcpKeyPressEvent[],
+  ): Promise<{
+    accepted: number;
+    rejected: number;
+    progression: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null;
+  }> {
+    let accepted = 0;
+    let rejected = 0;
+
+    // Fetch progression once for the entire batch (cache it)
+    let progression = await this.clickProcessor.getProgressionCached(userId);
+
+    if (!progression) {
+      try {
+        const rawResponse = await firstValueFrom(
+          this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, { userId }),
+        );
+        progression = (rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse)
+          ? rawResponse.data as IProgressionData
+          : rawResponse as IProgressionData;
+        if (progression) {
+          await this.clickProcessor.cacheProgression(progression);
+        }
+      } catch (e) {
+        this.logger.error(`Failed to fetch progression for ${userId}`, e);
+      }
+    }
+
+    // Fallback if progression is truly unreachable
+    if (!progression) {
+      progression = {
+        userId,
+        linesOfCode: '0',
+        clickMultiplier: 1.0,
+        criticalChance: 0.05,
+        criticalMultiplier: 2.0,
+        passiveMultiplier: 0.0,
+        level: 1,
+        totalLinesWritten: '0',
+        experience: '0',
+      };
+    }
+
+    // Process each key event in the batch
+    let lastClickResult: import('@repo/shared-types').IClickResult | null = null;
+
+    for (const event of events) {
+      // Anti-cheat per key
+      const antiCheatResult = await this.antiCheatService.analyzeKeyPress(
+        userId,
+        event.timestamp,
+      );
+
+      if (!antiCheatResult.allowed) {
+        rejected++;
+        await this.redis.incr(RedisKeys.USER_VIOLATIONS(userId));
+        continue;
+      }
+
+      const keyType = this.categoryToKeyType(event.keyCategory);
+
+      try {
+        lastClickResult = await this.clickProcessor.processClick(
+          { keyType, userId, timestamp: event.timestamp },
+          progression,
+        );
+        accepted++;
+      } catch (e) {
+        this.logger.error(`Failed to process click in batch for ${userId}`, e);
+        rejected++;
+      }
+    }
+
+    // Build progression response — always use getCurrentProgression which reads
+    // the REAL DB balance + unflushed Redis buffer (avoids stale cache rollbacks)
+    let progressionResponse: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null = null;
+
+    const freshProgression = await this.getCurrentProgression(userId);
+    if (freshProgression) {
+      progressionResponse = freshProgression;
+    } else if (lastClickResult) {
+      // Fallback to processClick estimate if getCurrentProgression failed
+      progressionResponse = {
+        linesOfCode: lastClickResult.newBalance,
+        level: progression.level,
+        clickMultiplier: progression.clickMultiplier,
+        passiveMultiplier: progression.passiveMultiplier,
+        experience: progression.experience,
+      };
+    } else if (progression) {
+      // No keys were accepted, but still return current state
+      progressionResponse = {
+        linesOfCode: progression.linesOfCode,
+        level: progression.level,
+        clickMultiplier: progression.clickMultiplier,
+        passiveMultiplier: progression.passiveMultiplier,
+        experience: progression.experience,
+      };
+    }
+
+    this.logger.debug(
+      `Batch processed for ${userId}: ${accepted} accepted, ${rejected} rejected, balance=${progressionResponse?.linesOfCode}`,
+    );
+
+    return { accepted, rejected, progression: progressionResponse };
+  }
+
+  /**
+   * Get current server-authoritative progression for a user.
+   * ALWAYS fetches fresh from DB via NATS (never uses stale cache for LOC).
+   * Adds unflushed Redis buffer AND in-flight amounts (flushed but not yet persisted)
+   * to give the most accurate current balance.
+   */
+  async getCurrentProgression(userId: string): Promise<{
+    linesOfCode: string;
+    level: number;
+    clickMultiplier: number;
+    passiveMultiplier: number;
+    experience: string;
+  } | null> {
+    let progression: IProgressionData | null = null;
+
+    try {
+      const rawResponse = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, { userId }),
+      );
+      progression = (rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse)
+        ? rawResponse.data as IProgressionData
+        : rawResponse as IProgressionData;
+    } catch {
+      // Fallback to cache if NATS fails
+      progression = await this.clickProcessor.getProgressionCached(userId);
+    }
+
+    if (!progression) return null;
+
+    // Include buffered (unflushed) LOC from Redis
+    const bufferKey = RedisKeys.CLICK_BUFFER(userId);
+    const bufferedLoc = await this.redis.hget(bufferKey, 'locToAdd');
+    const buffered = parseFloat(bufferedLoc || '0') || 0;
+
+    // Include in-flight LOC (flushed from buffer but not yet persisted to DB)
+    const inflightKey = RedisKeys.INFLIGHT_CLICKS(userId);
+    const inflightLoc = await this.redis.hget(inflightKey, 'locToAdd');
+    const inflight = parseFloat(inflightLoc || '0') || 0;
+
+    const baseLoc = parseFloat(progression.linesOfCode || '0') || 0;
+    const totalLoc = Math.floor(baseLoc + buffered + inflight);
+
+    return {
+      linesOfCode: totalLoc.toString(),
+      level: progression.level,
+      clickMultiplier: progression.clickMultiplier,
+      passiveMultiplier: progression.passiveMultiplier,
+      experience: progression.experience,
+    };
+  }
+
+  /**
    * Process passive income from desktop client.
    * Buffers the LoC amount in Redis for the next flush cycle.
    * This ensures passive income earned locally is persisted server-side.

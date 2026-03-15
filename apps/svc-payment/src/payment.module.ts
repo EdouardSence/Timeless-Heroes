@@ -38,12 +38,17 @@ const RedisClientProvider = {
       isGlobal: true,
     }),
 
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST ?? 'localhost',
-        password: process.env.REDIS_PASSWORD ?? undefined,
-        port: Number.parseInt(process.env.REDIS_PORT ?? '6379', 10),
-      },
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        connection: {
+          host: configService.get<string>('REDIS_HOST', 'localhost'),
+          port: configService.get<number>('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
+          maxRetriesPerRequest: null,
+        },
+      }),
+      inject: [ConfigService],
     }),
 
     BullModule.registerQueue({

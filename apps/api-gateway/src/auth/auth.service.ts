@@ -14,6 +14,7 @@ import { prisma } from '@repo/prisma-client';
 import * as bcrypt from 'bcrypt';
 
 import { LeaderboardService } from '@repo/redis-client';
+import { Role } from '@repo/shared-types';
 import { IJwtPayload } from './jwt.strategy';
 
 interface IUserCredentials {
@@ -71,6 +72,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       username: user.username,
+      role: (user.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -137,6 +139,7 @@ export class AuthService {
       email: newUser.email,
       sub: newUser.id,
       username: newUser.username,
+      role: (newUser.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -176,6 +179,7 @@ export class AuthService {
       email,
       sub: userId,
       username,
+      role: Role.PLAYER,
     };
 
     return this.jwtService.signAsync(payload);

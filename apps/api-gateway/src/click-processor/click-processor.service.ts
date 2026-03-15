@@ -72,7 +72,10 @@ export class ClickProcessorService {
     );
 
     // 6. Get estimated new balance (from cache + buffer)
-    const cachedBalance = BigInt(progression.linesOfCode);
+    // Guard against float strings like "123.45" — BigInt() only accepts integers
+    const cachedBalance = BigInt(
+      Math.floor(Number.parseFloat(String(progression.linesOfCode)) || 0),
+    );
     const bufferedAmount = BigInt(
       Math.floor(Number.parseFloat(bufferResult.locToAdd)),
     );
@@ -139,7 +142,20 @@ export class ClickProcessorService {
 
     try {
       // 1. Check active temporary boosts (boost:{userId}:*)
-      const boostKeys = await this.redis.keys(`boost:${userId}:*`);
+      // Use SCAN instead of KEYS to avoid blocking Redis on large keyspaces
+      const boostKeys: string[] = [];
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.redis.scan(
+          cursor,
+          'MATCH',
+          `boost:${userId}:*`,
+          'COUNT',
+          100,
+        );
+        cursor = nextCursor;
+        boostKeys.push(...keys);
+      } while (cursor !== '0');
 
       if (boostKeys.length > 0) {
         const boostValues = await this.redis.mget(...boostKeys);

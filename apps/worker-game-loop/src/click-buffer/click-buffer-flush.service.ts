@@ -94,12 +94,17 @@ export class ClickBufferFlushService implements OnModuleInit {
       const jobs: { name: string; data: IBufferFlushJob }[] = [];
 
       for (const userId of userIds) {
-        // Atomic get-and-clear operation
+        // Atomic get-and-clear operation (Lua script — no data loss)
         const buffer = await this.clickBufferService.flushBuffer(userId);
 
         if (!buffer || buffer.clicks === 0) {
           continue;
         }
+
+        // Set in-flight marker BEFORE enqueueing the job.
+        // This ensures getCurrentProgression() includes this LOC even though
+        // the buffer is now cleared and the DB hasn't been updated yet.
+        await this.clickBufferService.setInflight(userId, buffer.locToAdd, buffer.clicks);
 
         jobs.push({
           data: {
@@ -142,6 +147,9 @@ export class ClickBufferFlushService implements OnModuleInit {
     if (!buffer || buffer.clicks === 0) {
       return;
     }
+
+    // Set in-flight marker before enqueueing
+    await this.clickBufferService.setInflight(userId, buffer.locToAdd, buffer.clicks);
 
     await this.bufferQueue.add(
       `flush-${userId}-immediate`,

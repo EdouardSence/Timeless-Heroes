@@ -535,6 +535,7 @@ export class GameGateway
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
+      totalLinesWritten: '0',
       userId,
     };
   }

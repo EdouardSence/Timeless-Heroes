@@ -2,7 +2,7 @@
  * Menu Component - Shop, Stats, Leaderboard
  */
 
-import { IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
+import { EffectType, IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
 import { useEffect, useRef, useState } from 'react';
 import type { GameState, LeaderboardEntry } from '../types/electron';
 import './Menu.css';
@@ -24,8 +24,8 @@ function formatNumber(num: number): string {
   return Math.floor(num).toString();
 }
 
-function calculateCost(baseCost: number, owned: number): number {
-  return Math.floor(baseCost * Math.pow(1.15, owned));
+function calculateCost(baseCost: number, owned: number, costMultiplier = 1.15): number {
+  return Math.floor(baseCost * Math.pow(costMultiplier, owned));
 }
 
 export default function Menu() {
@@ -125,28 +125,40 @@ export default function Menu() {
     // Skip if items haven't been loaded from storage yet
     if (!itemsLoadedRef.current) return;
 
-    let newMultiplier = 1.0;
-    let newPassive = 0.0; // This is now "keys per second" which generates LoC
+    let clickMultiplier = 1.0;
+    let passiveMultiplier = 1.0;
+    let passiveBonus = 0;
     let clickBonus = 0;
     const itemsToSave: Record<string, number> = {};
 
     items.forEach((item) => {
       itemsToSave[item.id] = item.owned;
+      const totalEffect = item.effect.value * item.owned;
 
-      if (item.effect.type === 'multiplier') {
-        newMultiplier += item.effect.value * item.owned;
-      } else if (item.effect.type === 'passive') {
-        // Passive is now "keys per second" - the actual LoC rate = passive * multiplier
-        newPassive += item.effect.value * item.owned;
-      } else if (item.effect.type === 'click') {
-        clickBonus += item.effect.value * item.owned;
+      switch (item.effect.type) {
+        case EffectType.CLICK_BONUS:
+          clickBonus += totalEffect;
+          break;
+        case EffectType.CLICK_MULTIPLIER:
+          clickMultiplier += totalEffect;
+          break;
+        case EffectType.PASSIVE_BONUS:
+          passiveBonus += totalEffect;
+          break;
+        case EffectType.PASSIVE_MULTIPLIER:
+          passiveMultiplier += totalEffect;
+          break;
+        // CRIT_CHANCE, CRIT_MULTIPLIER, EXPERIENCE_BONUS: server-only, no local effect
       }
     });
 
-    newMultiplier = (1 + clickBonus) * newMultiplier;
+    // Match server formula: clickMultiplier = (1 + clickBonus) * clickMultiplier
+    const finalMultiplier = (1 + clickBonus) * clickMultiplier;
+    // Passive LoC/sec = passiveBonus * passiveMultiplier
+    const finalPassive = passiveBonus * passiveMultiplier;
 
-    window.electronAPI?.updateMultiplier(newMultiplier);
-    window.electronAPI?.updatePassiveRate(newPassive);
+    window.electronAPI?.updateMultiplier(finalMultiplier);
+    window.electronAPI?.updatePassiveRate(finalPassive);
     window.electronAPI?.saveItems(itemsToSave);
   }, [items]);
 
@@ -159,7 +171,7 @@ export default function Menu() {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
 
-    const cost = calculateCost(item.baseCost, item.owned);
+    const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
 
     if (gameState.linesOfCode < cost) {
       showNotification('❌ Pas assez de LoC!');
@@ -287,7 +299,7 @@ export default function Menu() {
         {activeTab === 'shop' && (
           <div className="shop-grid">
             {items.map((item) => {
-              const cost = calculateCost(item.baseCost, item.owned);
+              const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
               const canAfford = gameState.linesOfCode >= cost;
 
               return (

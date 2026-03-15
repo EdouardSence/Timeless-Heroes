@@ -2,8 +2,10 @@
  * Progression Controller
  * HTTP REST proxy for user progression data
  *
- * GET /api/v1/progression/me          - Get current user's progression (requires JWT)
- * GET /api/v1/progression/leaderboard - Get leaderboard data (requires JWT)
+ * GET  /api/v1/progression/me          - Get current user's progression (requires JWT)
+ * GET  /api/v1/progression/shop        - Get shop item catalog (requires JWT)
+ * GET  /api/v1/progression/leaderboard - Get leaderboard data (requires JWT)
+ * POST /api/v1/progression/purchase    - Purchase an item (requires JWT)
  *
  * Delegates to svc-user-progression via NATS.
  */
@@ -36,9 +38,11 @@ import {
   NATS_SERVICE,
   NatsPattern,
   IProgressionData,
+  SHOP_ITEMS,
 } from '@repo/shared-types';
 import { LeaderboardService, RedisKeys } from '@repo/redis-client';
 import { PrismaClient } from '@repo/prisma-client';
+import { ClickProcessorService } from '../click-processor/click-processor.service';
 
 const prisma = new PrismaClient();
 
@@ -66,6 +70,7 @@ export class ProgressionController {
   constructor(
     @Inject(NATS_SERVICE.PROGRESSION) private readonly natsClient: ClientProxy,
     private readonly leaderboardService: LeaderboardService,
+    private readonly clickProcessor: ClickProcessorService,
   ) {}
 
   /**
@@ -96,6 +101,24 @@ export class ProgressionController {
     // Unwrap IApiResponse envelope if present
     const progression = unwrapNats<IProgressionData>(response);
     return progression;
+  }
+
+  /**
+   * GET /api/v1/progression/shop
+   * Returns the shop catalog (all items with their cost, effect, and unlock requirements)
+   */
+  @Get('shop')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Get shop catalog' })
+  @ApiOkResponse({ description: 'List of all purchasable items' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
+  async getShopCatalog() {
+    return {
+      success: true,
+      data: SHOP_ITEMS,
+      timestamp: new Date().toISOString(),
+    };
   }
 
   /**
@@ -190,6 +213,16 @@ export class ProgressionController {
         itemSlug: data.itemSlug,
       }),
     );
+
+    // Invalidate the progression cache so next request gets fresh multipliers
+    // This is critical: without this, the old clickMultiplier stays cached for up to 5s
+    // and keys processed in that window would use the pre-purchase multiplier.
+    try {
+      await this.clickProcessor.invalidateCache(userId);
+      this.logger.debug(`Invalidated progression cache for ${userId} after purchase`);
+    } catch (e) {
+      this.logger.warn(`Failed to invalidate cache for ${userId}: ${e}`);
+    }
 
     return result;
   }
