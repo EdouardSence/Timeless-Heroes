@@ -6,7 +6,6 @@
 
 import { Controller, Get, Logger } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
-
 import {
   IApiResponse,
   IItemPurchaseRequest,
@@ -14,6 +13,7 @@ import {
   IProgressionData,
   LeaderboardType,
   NatsPattern,
+  SHOP_ITEMS,
 } from '@repo/shared-types';
 
 import { ItemCostCalculatorService } from '../services/item-cost-calculator.service';
@@ -34,14 +34,18 @@ export class ProgressionController {
 
   @Get('health')
   health() {
-    return { status: 'ok', service: 'svc-user-progression', timestamp: new Date().toISOString() };
+    return {
+      service: 'svc-user-progression',
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
   }
 
   // ── NATS: Health check ────────────────────────────────────────────
 
   @MessagePattern(NatsPattern.HEALTH_CHECK)
   handleHealthCheck() {
-    return { status: 'ok', service: 'svc-user-progression' };
+    return { service: 'svc-user-progression', status: 'ok' };
   }
 
   // ── NATS: Get user progression ────────────────────────────────────
@@ -54,8 +58,8 @@ export class ProgressionController {
     const result = await this.progressionService.getProgression(data.userId);
 
     return {
-      success: true,
       data: result,
+      success: true,
       timestamp: new Date().toISOString(),
     };
   }
@@ -66,12 +70,17 @@ export class ProgressionController {
   async updateBalance(
     @Payload() data: { userId: string; delta: string },
   ): Promise<IApiResponse<IProgressionData>> {
-    this.logger.debug(`NATS ${NatsPattern.PROGRESSION_UPDATE_BALANCE}: ${data.userId} delta=${data.delta}`);
-    const result = await this.progressionService.updateBalance(data.userId, data.delta);
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_UPDATE_BALANCE}: ${data.userId} delta=${data.delta}`,
+    );
+    const result = await this.progressionService.updateBalance(
+      data.userId,
+      data.delta,
+    );
 
     return {
-      success: true,
       data: result,
+      success: true,
       timestamp: new Date().toISOString(),
     };
   }
@@ -82,7 +91,9 @@ export class ProgressionController {
   async addExperience(
     @Payload() data: { userId: string; experience: string },
   ): Promise<{ newLevel: number; leveledUp: boolean }> {
-    this.logger.debug(`NATS ${NatsPattern.PROGRESSION_ADD_EXPERIENCE}: ${data.userId}`);
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_ADD_EXPERIENCE}: ${data.userId}`,
+    );
     return this.progressionService.addExperience(data.userId, data.experience);
   }
 
@@ -92,7 +103,9 @@ export class ProgressionController {
   async purchaseItem(
     @Payload() request: IItemPurchaseRequest,
   ): Promise<IApiResponse<IItemPurchaseResult>> {
-    this.logger.debug(`NATS ${NatsPattern.PROGRESSION_PURCHASE_ITEM}: ${request.userId} → ${request.itemSlug}`);
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_PURCHASE_ITEM}: ${request.userId} → ${request.itemSlug}`,
+    );
     const result = await this.progressionService.purchaseItem(request);
 
     return {
@@ -114,16 +127,20 @@ export class ProgressionController {
   async addItem(
     @Payload() data: { userId: string; itemSlug: string; quantity: number },
   ): Promise<boolean> {
-    this.logger.debug(`NATS ${NatsPattern.PROGRESSION_ADD_ITEM}: ${data.userId} +${data.quantity}x ${data.itemSlug}`);
-    return this.progressionService.addItem(data.userId, data.itemSlug, data.quantity);
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_ADD_ITEM}: ${data.userId} +${data.quantity}x ${data.itemSlug}`,
+    );
+    return this.progressionService.addItem(
+      data.userId,
+      data.itemSlug,
+      data.quantity,
+    );
   }
 
   // ── NATS: Get available items ─────────────────────────────────────
 
   @MessagePattern(NatsPattern.PROGRESSION_GET_ITEMS)
-  async getAvailableItems(
-    @Payload() data: { userId: string },
-  ) {
+  async getAvailableItems(@Payload() data: { userId: string }) {
     const items = await this.progressionService.getAvailableItems(data.userId);
 
     return {
@@ -150,7 +167,8 @@ export class ProgressionController {
 
   @MessagePattern(NatsPattern.PROGRESSION_CALCULATE_COST)
   calculateCost(
-    @Payload() body: {
+    @Payload()
+    body: {
       baseCost: string;
       amountOwned: number;
       quantity?: number;
@@ -160,26 +178,33 @@ export class ProgressionController {
     const { amountOwned, baseCost, multiplier, quantity = 1 } = body;
 
     if (quantity === 1) {
-      const cost = this.costCalculator.calculateNextCost(baseCost, amountOwned, multiplier);
+      const cost = this.costCalculator.calculateNextCost(
+        baseCost,
+        amountOwned,
+        multiplier,
+      );
       return { cost, quantity: 1 };
     }
 
-    const cost = this.costCalculator.calculateBulkCost(baseCost, amountOwned, quantity, multiplier);
+    const cost = this.costCalculator.calculateBulkCost(
+      baseCost,
+      amountOwned,
+      quantity,
+      multiplier,
+    );
     return { cost, quantity };
   }
 
   // ── NATS: Get leaderboard ─────────────────────────────────────────
 
   @MessagePattern(NatsPattern.PROGRESSION_GET_LEADERBOARD)
-  async getLeaderboard(
-    @Payload() data: { type: string },
-  ) {
-    const leaderboardType = (data.type.toUpperCase() as LeaderboardType) || LeaderboardType.GLOBAL;
+  async getLeaderboard(@Payload() data: { type: string }) {
+    const leaderboardType = data.type.toUpperCase() as LeaderboardType;
     const entries = await this.leaderboardSync.getLeaderboard(leaderboardType);
 
     return {
+      data: { entries, type: leaderboardType },
       success: true,
-      data: { type: leaderboardType, entries },
       timestamp: new Date().toISOString(),
     };
   }
@@ -187,9 +212,7 @@ export class ProgressionController {
   // ── NATS: Get user ranks ──────────────────────────────────────────
 
   @MessagePattern(NatsPattern.PROGRESSION_GET_RANKS)
-  async getUserRanks(
-    @Payload() data: { userId: string },
-  ) {
+  async getUserRanks(@Payload() data: { userId: string }) {
     const ranks = await this.leaderboardSync.getUserRanks(data.userId);
 
     return {
@@ -203,52 +226,11 @@ export class ProgressionController {
 
   @MessagePattern(NatsPattern.SHOP_GET_CATALOG)
   getShopCatalog() {
-    const items = this.progressionService.getShopCatalog();
-
+    // SHOP_ITEMS is now the single source of truth — pass through directly
     return {
+      data: SHOP_ITEMS,
       success: true,
-      data: items.map((item) => ({
-        id: item.slug,
-        name: item.name,
-        description: this.getItemDescription(item),
-        icon: this.getItemIcon(item.slug),
-        baseCost: parseInt(item.baseCost, 10),
-        costMultiplier: item.costMultiplier,
-        effect: {
-          type: item.effectType === 'CLICK_BONUS' ? 'click' :
-                item.effectType === 'PASSIVE_BONUS' ? 'passive' : 'multiplier',
-          value: item.baseEffect,
-        },
-        unlockLevel: item.unlockLevel,
-      })),
       timestamp: new Date().toISOString(),
     };
-  }
-
-  private getItemDescription(item: { effectType: string; baseEffect: number }): string {
-    switch (item.effectType) {
-      case 'CLICK_BONUS':
-        return `+${item.baseEffect} LoC par frappe`;
-      case 'PASSIVE_BONUS':
-        return `+${item.baseEffect} keys/sec auto`;
-      case 'CLICK_MULTIPLIER':
-        return `+${Math.round(item.baseEffect * 100)}% multiplicateur`;
-      default:
-        return 'Effect unknown';
-    }
-  }
-
-  private getItemIcon(slug: string): string {
-    const icons: Record<string, string> = {
-      'mechanical-keyboard': '⌨️',
-      'monitor-4k': '🖥️',
-      'coffee-machine': '☕',
-      'junior-dev': '👨‍💻',
-      'senior-dev': '👩‍💻',
-      'cloud-server': '☁️',
-      'ai-copilot': '🤖',
-      'quantum-computer': '⚛️',
-    };
-    return icons[slug] || '📦';
   }
 }
