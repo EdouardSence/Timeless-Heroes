@@ -12,6 +12,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
 import { RedisModule } from '../redis/redis.module';
+import { ClickProcessorModule } from '../click-processor/click-processor.module';
 
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import { TcpIngestController } from './tcp-ingest.controller';
@@ -23,6 +24,7 @@ import { TcpIngestService } from './tcp-ingest.service';
   imports: [
     ConfigModule,
     RedisModule,
+    ClickProcessorModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

@@ -11,7 +11,7 @@
  * - Offline rewards
  */
 
-import { Inject, Logger, OnModuleDestroy, UseGuards } from '@nestjs/common';
+import { Inject, Logger, UseGuards } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   ConnectedSocket,
@@ -53,18 +53,12 @@ import { ClickValidatorService } from '../click-processor/click-validator.servic
   transports: ['websocket', 'polling'],
 })
 export class GameGateway
-  implements
-    OnGatewayInit,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    OnModuleDestroy
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server!: Server;
 
   private readonly logger = new Logger(GameGateway.name);
-  private leaderboardBroadcastInterval: ReturnType<typeof setInterval> | null =
-    null;
 
   constructor(
     private readonly clickProcessor: ClickProcessorService,
@@ -78,91 +72,6 @@ export class GameGateway
 
   afterInit() {
     this.logger.log('🎮 Game WebSocket Gateway initialized');
-
-    // Broadcast leaderboard to all connected clients every 30 seconds
-    this.leaderboardBroadcastInterval = setInterval(() => {
-      void this.broadcastLeaderboard();
-    }, 30_000);
-  }
-
-  onModuleDestroy() {
-    if (this.leaderboardBroadcastInterval) {
-      clearInterval(this.leaderboardBroadcastInterval);
-      this.leaderboardBroadcastInterval = null;
-    }
-  }
-
-  /**
-   * Broadcast fresh leaderboard to ALL connected clients
-   */
-  private async broadcastLeaderboard(): Promise<void> {
-    try {
-      const connectedCount = await this.getConnectedUsersCount();
-      if (connectedCount === 0) return;
-
-      const count = 50;
-      const leaderboardKey = RedisKeys.LEADERBOARD_GLOBAL;
-
-      const [topPlayers, totalPlayers] = await Promise.all([
-        this.leaderboardService.getTopPlayers(count, leaderboardKey),
-        this.leaderboardService.getTotalPlayers(leaderboardKey),
-      ]);
-
-      const entries = await Promise.all(
-        topPlayers.map(async (entry) => {
-          let username = `Player_${entry.userId.slice(0, 8)}`;
-          let level = 1;
-          const prestigeLevel = 0;
-
-          try {
-            const progression = await firstValueFrom(
-              this.progressionClient.send<IProgressionData>(
-                NatsPattern.PROGRESSION_GET,
-                { userId: entry.userId },
-              ),
-            );
-            if (progression) {
-              level = progression.level ?? 1;
-            }
-          } catch {
-            // Fallback to defaults
-          }
-
-          const sessionData = await this.redis.get(
-            RedisKeys.USER_SESSION(entry.userId),
-          );
-          if (sessionData) {
-            try {
-              const session = JSON.parse(sessionData);
-              if (session.username) {
-                username = session.username;
-              }
-            } catch {
-              // ignore parse errors
-            }
-          }
-
-          return {
-            rank: entry.rank,
-            userId: entry.userId,
-            username,
-            score: entry.score.toString(),
-            level,
-            prestigeLevel,
-          };
-        }),
-      );
-
-      const update: ILeaderboardUpdate = {
-        entries,
-        totalPlayers,
-        type: LeaderboardType.GLOBAL,
-      };
-
-      this.broadcastToAll(WebSocketEvent.LEADERBOARD_UPDATE, update);
-    } catch (error) {
-      this.logger.error('Failed to broadcast leaderboard', error);
-    }
   }
 
   /**
@@ -305,12 +214,16 @@ export class GameGateway
 
     if (!progression) {
       // Fetch from progression microservice via NATS
-      progression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(
-          NatsPattern.PROGRESSION_GET,
-          { userId },
-        ),
+      const rawResponse = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+          userId,
+        }),
       );
+      // Unwrap IApiResponse { success, data, timestamp } → IProgressionData
+      progression =
+        rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse
+          ? (rawResponse.data as IProgressionData)
+          : (rawResponse as IProgressionData);
       await this.clickProcessor.cacheProgression(progression);
     }
 
@@ -369,12 +282,15 @@ export class GameGateway
         let prestigeLevel = 0;
 
         try {
-          const progression = await firstValueFrom(
-            this.progressionClient.send<IProgressionData>(
-              NatsPattern.PROGRESSION_GET,
-              { userId: entry.userId },
-            ),
+          const rawProg = await firstValueFrom(
+            this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+              userId: entry.userId,
+            }),
           );
+          const progression =
+            rawProg && typeof rawProg === 'object' && 'data' in rawProg
+              ? (rawProg.data as IProgressionData)
+              : (rawProg as IProgressionData);
           if (progression) {
             level = progression.level ?? 1;
           }
@@ -450,12 +366,16 @@ export class GameGateway
 
     if (!progression) {
       // Fetch from progression microservice via NATS
-      progression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(
-          NatsPattern.PROGRESSION_GET,
-          { userId },
-        ),
+      const rawResponse = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+          userId,
+        }),
       );
+      // Unwrap IApiResponse { success, data, timestamp } → IProgressionData
+      progression =
+        rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse
+          ? (rawResponse.data as IProgressionData)
+          : (rawResponse as IProgressionData);
       await this.clickProcessor.cacheProgression(progression);
     }
 
@@ -483,12 +403,15 @@ export class GameGateway
             let level = 1;
 
             try {
-              const prog = await firstValueFrom(
-                this.progressionClient.send<IProgressionData>(
-                  NatsPattern.PROGRESSION_GET,
-                  { userId: e.userId },
-                ),
+              const rawProg = await firstValueFrom(
+                this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+                  userId: e.userId,
+                }),
               );
+              const prog =
+                rawProg && typeof rawProg === 'object' && 'data' in rawProg
+                  ? (rawProg.data as IProgressionData)
+                  : (rawProg as IProgressionData);
               if (prog) {
                 level = prog.level ?? 1;
               }

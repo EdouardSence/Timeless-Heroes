@@ -10,8 +10,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { prisma } from '@repo/prisma-client';
+import * as bcrypt from 'bcrypt';
 
 import { LeaderboardService } from '@repo/redis-client';
 import { Role } from '@repo/shared-types';
@@ -32,7 +32,6 @@ export interface IAuthResult {
     id: string;
     email: string;
     username: string;
-    role: Role;
   };
 }
 
@@ -73,12 +72,12 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       username: user.username,
-      role: user.role as Role,
+      role: (user.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
 
-    this.logger.log(`User logged in: ${user.email} (role: ${user.role})`);
+    this.logger.log(`User logged in: ${user.email}`);
 
     return {
       accessToken,
@@ -86,7 +85,6 @@ export class AuthService {
         id: user.id,
         email: user.email,
         username: user.username,
-        role: user.role as Role,
       },
     };
   }
@@ -115,7 +113,6 @@ export class AuthService {
         email,
         username,
         password: passwordHash,
-        // New users default to PLAYER role (via Prisma schema default)
       },
     });
 
@@ -142,7 +139,7 @@ export class AuthService {
       email: newUser.email,
       sub: newUser.id,
       username: newUser.username,
-      role: newUser.role as Role,
+      role: (newUser.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -155,7 +152,6 @@ export class AuthService {
         email: newUser.email,
         id: newUser.id,
         username: newUser.username,
-        role: newUser.role as Role,
       },
     };
   }
@@ -178,13 +174,12 @@ export class AuthService {
     userId: string,
     email: string,
     username: string,
-    role: Role = Role.PLAYER,
   ): Promise<string> {
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
       email,
-      role,
       sub: userId,
       username,
+      role: Role.PLAYER,
     };
 
     return this.jwtService.signAsync(payload);

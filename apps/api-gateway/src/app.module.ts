@@ -11,7 +11,7 @@
  * Delegates business logic to downstream services via NATS (ClientProxy).
  */
 
-import { Global, Module } from '@nestjs/common';
+import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
@@ -105,4 +105,19 @@ export class NatsClientsModule {}
     HealthModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply((req: any, res: any, next: any) => {
+        const { method, originalUrl } = req;
+        const start = Date.now();
+        res.on('finish', () => {
+          const duration = Date.now() - start;
+          const { statusCode } = res;
+          console.log(`[HTTP] ${method} ${originalUrl} ${statusCode} - ${duration}ms`);
+        });
+        next();
+      })
+      .forRoutes('*');
+  }
+}
