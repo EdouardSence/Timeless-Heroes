@@ -19,8 +19,12 @@ import {
   ProgramError,
   QueueName,
 } from '@repo/shared-types';
-import { prisma, ProgramCategory } from '@repo/prisma-client';
+import { prisma } from '@repo/prisma-client';
 import { Queue } from 'bullmq';
+
+// We define a local ProgramCategory here because it's used in the service logic 
+// even if the generated client export is having issues.
+type ProgramCategory = 'BUG_FIX' | 'FEATURE' | 'REFACTORING' | 'ARCHITECTURE' | 'DEPLOYMENT' | 'RESEARCH';
 
 interface IProgramType {
   baseDurationSecs: number;
@@ -400,7 +404,7 @@ export class ProgramProcessorService {
       include: { programType: true },
     });
     
-    return activePrograms.map((ap) => ap.programType.slug);
+    return activePrograms.map((ap: any) => ap.programType.slug);
   }
 
   /**

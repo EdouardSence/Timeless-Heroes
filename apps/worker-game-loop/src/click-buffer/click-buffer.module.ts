@@ -17,7 +17,6 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ScheduleModule } from '@nestjs/schedule';
 import Redis from 'ioredis';
 
 import { ClickBufferService } from '@repo/redis-client';
@@ -50,7 +49,6 @@ const ClickBufferServiceProvider = {
   exports: [ClickBufferFlushService],
   imports: [
     ConfigModule,
-    ScheduleModule.forRoot(),
     BullModule.registerQueue({
       name: QueueName.CLICK_BUFFER,
     }),

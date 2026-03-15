@@ -14,7 +14,7 @@ import { ClientProxy } from '@nestjs/microservices';
 import { Job } from 'bullmq';
 import { firstValueFrom } from 'rxjs';
 
-import { RedisKeys } from '@repo/redis-client';
+import { RedisKeys, ClickBufferService } from '@repo/redis-client';
 import { IProgressionData, NATS_SERVICE, NatsPattern, QueueName, IBufferFlushResult } from '@repo/shared-types';
 
 interface IBufferFlushJob {
@@ -33,12 +33,14 @@ interface IBufferFlushJob {
 })
 export class ClickBufferWorker extends WorkerHost {
   private readonly logger = new Logger(ClickBufferWorker.name);
+  private readonly clickBufferService: ClickBufferService;
 
   constructor(
     @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
     @Inject('REDIS_CLIENT') private readonly redis: import('ioredis').default,
   ) {
     super();
+    this.clickBufferService = new ClickBufferService(this.redis);
   }
 
   /**
@@ -53,30 +55,46 @@ export class ClickBufferWorker extends WorkerHost {
       `Processing buffer flush for ${userId}: ${clicks} clicks, ${locToAdd} LoC`,
     );
 
+    let balanceUpdated = false;
+
     try {
       // 1. Update balance via NATS -> svc-user-progression (persists to PostgreSQL)
-      const updatedProgression = await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+      const rawUpdate = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
           userId,
           delta: locToAdd,
         }),
       );
+      
+      balanceUpdated = true;
+
+      const updatedProgression = (rawUpdate && typeof rawUpdate === 'object' && 'data' in rawUpdate) 
+        ? rawUpdate.data as IProgressionData 
+        : rawUpdate as IProgressionData;
 
       // 2. Add experience (1 XP per click) via NATS
-      await firstValueFrom(
-        this.progressionClient.send<IProgressionData>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
-          userId,
-          experience: clicks,
-        }),
-      );
+      //    If this fails, balance is already persisted — do NOT re-add to buffer
+      try {
+        await firstValueFrom(
+          this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+            userId,
+            experience: clicks,
+          }),
+        );
+      } catch (xpError) {
+        this.logger.warn(
+          `XP update failed for ${userId} (balance was persisted OK, skipping XP): ${xpError instanceof Error ? xpError.message : xpError}`,
+        );
+      }
 
-      // 3. Leaderboard sync is handled inside svc-user-progression::updateBalance()
-      //    (via LeaderboardSyncService.syncUserScore — updates global, weekly, daily).
-      //    No need to call leaderboardService.updateScore() here — doing so was redundant
-      //    and a source of the double-update path (Bug B).
+      // 3. Clear in-flight marker — DB write succeeded, balance is now in PostgreSQL
+      await this.clickBufferService.clearInflight(userId, locToAdd, clicks);
 
-      // 4. Publish level-up event if applicable
-      if (updatedProgression.level > 1) {
+      // 4. Invalidate progression cache so subsequent reads see the new DB value
+      await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
+
+      // 5. Publish level-up event if applicable
+      if (updatedProgression && updatedProgression.level > 1) {
         await this.publishLevelUp(userId, updatedProgression.level);
       }
 
@@ -88,8 +106,8 @@ export class ClickBufferWorker extends WorkerHost {
       return {
         clicksProcessed: clicks,
         locAdded: locToAdd,
-        newBalance: updatedProgression.linesOfCode,
-        newLevel: updatedProgression.level,
+        newBalance: updatedProgression?.linesOfCode || '0',
+        newLevel: updatedProgression?.level || 1,
         processingTimeMs: processingTime,
         success: true,
         userId,
@@ -99,8 +117,18 @@ export class ClickBufferWorker extends WorkerHost {
         `Failed to flush buffer for ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
 
-      // Re-add to buffer on failure (so data isn't lost)
-      await this.reAddToBuffer(userId, locToAdd, clicks);
+      // Clear in-flight since we're re-adding to buffer (avoids double-counting)
+      await this.clickBufferService.clearInflight(userId, locToAdd, clicks);
+
+      // Re-add to buffer on failure (so data isn't lost) — only if balance wasn't already persisted
+      if (!balanceUpdated) {
+        await this.reAddToBuffer(userId, locToAdd, clicks);
+      } else {
+        // Balance was persisted but something else failed — don't re-add (would cause double credit)
+        this.logger.warn(
+          `Balance for ${userId} was already persisted; NOT re-adding to buffer to avoid double credit`,
+        );
+      }
 
       return {
         clicksProcessed: 0,
