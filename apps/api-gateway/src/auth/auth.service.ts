@@ -3,10 +3,15 @@
  * Handles user authentication and token generation via Prisma + JWT
  */
 
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
 import { prisma } from '@repo/prisma-client';
+import * as bcrypt from 'bcrypt';
 
 import { LeaderboardService } from '@repo/redis-client';
 import { IJwtPayload } from './jwt.strategy';

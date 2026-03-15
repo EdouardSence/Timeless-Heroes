@@ -2,8 +2,8 @@
  * Menu Component - Shop, Stats, Leaderboard
  */
 
+import { IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
 import { useEffect, useRef, useState } from 'react';
-import { SHOP_ITEMS as SHOP_CATALOG, IShopItem } from '@repo/shared-types';
 import type { GameState, LeaderboardEntry } from '../types/electron';
 import './Menu.css';
 
@@ -206,9 +206,7 @@ export default function Menu() {
           <h1>Timeless Heroes</h1>
         </div>
         <div className="menu-header-actions">
-          {username && (
-            <span className="menu-username">@{username}</span>
-          )}
+          {username && <span className="menu-username">@{username}</span>}
           <button
             className="logout-button"
             onClick={handleLogout}
@@ -377,9 +375,7 @@ export default function Menu() {
                 leaderboard.map((entry) => (
                   <div key={entry.userId} className="your-rank">
                     <span className="rank-number">#{entry.rank}</span>
-                    <span className="rank-name">
-                      {entry.username}
-                    </span>
+                    <span className="rank-name">{entry.username}</span>
                     <span className="rank-score">
                       {formatNumber(entry.score)} LoC
                     </span>
