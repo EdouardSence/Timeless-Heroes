@@ -10,12 +10,12 @@ import { styles } from '../styles';
 import { LeaderboardEntry } from '../types';
 
 interface LeaderboardPanelProps {
-  entries: LeaderboardEntry[];
   connected: boolean;
+  entries: LeaderboardEntry[];
 }
 
 export const LeaderboardPanel: React.FC<LeaderboardPanelProps> = memo(
-  function LeaderboardPanel({ entries, connected }) {
+  function LeaderboardPanel({ connected, entries }) {
     return (
       <div style={styles.leaderboardPanel}>
         <table style={styles.leaderboardTable}>
@@ -34,7 +34,7 @@ export const LeaderboardPanel: React.FC<LeaderboardPanelProps> = memo(
                   <td style={styles.td}>{entry.rank}</td>
                   <td style={styles.td}>{entry.username}</td>
                   <td style={styles.td}>
-                    {formatNumber(parseFloat(entry.score))}
+                    {formatNumber(Number.parseFloat(entry.score))}
                   </td>
                   <td style={styles.td}>{entry.level}</td>
                 </tr>

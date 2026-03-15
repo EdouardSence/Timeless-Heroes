@@ -10,13 +10,13 @@ import { styles } from '../styles';
 import { GameState } from '../types';
 
 interface StatsPanelProps {
-  gameState: GameState;
   expProgress: number;
+  gameState: GameState;
 }
 
 export const StatsPanel: React.FC<StatsPanelProps> = memo(function StatsPanel({
-  gameState,
   expProgress,
+  gameState,
 }) {
   return (
     <section style={styles.statsPanel}>

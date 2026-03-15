@@ -15,16 +15,16 @@ async function bootstrap() {
 
   // 1. Create HTTP app (health endpoint only)
   const app = await NestFactory.create(ProgressionModule);
-  const port = process.env.PROGRESSION_PORT || 3001;
+  const port = process.env.PROGRESSION_PORT ?? 3001;
 
   // 2. Connect NATS transport for inter-service communication
-  const natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
+  const natsUrl = process.env.NATS_URL ?? 'nats://localhost:4222';
   app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.NATS,
     options: {
-      servers: [natsUrl],
       queue: 'svc-user-progression', // Load-balanced queue group
+      servers: [natsUrl],
     },
+    transport: Transport.NATS,
   });
 
   // 3. Start both transports

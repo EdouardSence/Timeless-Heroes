@@ -3,21 +3,31 @@
  */
 
 // Mock external modules before importing the service
+import { prisma } from '@repo/prisma-client';
+import {
+  LeaderboardService,
+  getRedisClient,
+  RedisKeys,
+} from '@repo/redis-client';
+import { LeaderboardType } from '@repo/shared-types';
+
+import { LeaderboardSyncService } from './leaderboard-sync.service';
+
 jest.mock('@repo/redis-client', () => ({
+  getRedisClient: jest.fn().mockReturnValue({
+    expire: jest.fn(),
+    rename: jest.fn(),
+  }),
   LeaderboardService: jest.fn().mockImplementation(() => ({
-    updateScore: jest.fn(),
-    getUserRank: jest.fn(),
     getTopPlayers: jest.fn(),
+    getUserRank: jest.fn(),
+    updateScore: jest.fn(),
   })),
   RedisKeys: {
+    LEADERBOARD_DAILY: 'leaderboard:daily',
     LEADERBOARD_GLOBAL: 'leaderboard:global',
     LEADERBOARD_WEEKLY: 'leaderboard:weekly',
-    LEADERBOARD_DAILY: 'leaderboard:daily',
   },
-  getRedisClient: jest.fn().mockReturnValue({
-    rename: jest.fn(),
-    expire: jest.fn(),
-  }),
 }));
 
 jest.mock('@repo/prisma-client', () => ({
@@ -28,20 +38,11 @@ jest.mock('@repo/prisma-client', () => ({
   },
 }));
 
-import { LeaderboardSyncService } from './leaderboard-sync.service';
-import {
-  LeaderboardService,
-  getRedisClient,
-  RedisKeys,
-} from '@repo/redis-client';
-import { prisma } from '@repo/prisma-client';
-import { LeaderboardType } from '@repo/shared-types';
-
 jest.mock('@repo/shared-types', () => ({
   LeaderboardType: {
+    DAILY: 'DAILY',
     GLOBAL: 'GLOBAL',
     WEEKLY: 'WEEKLY',
-    DAILY: 'DAILY',
   },
 }));
 
@@ -53,13 +54,13 @@ describe('LeaderboardSyncService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    mockRedis = { rename: jest.fn(), expire: jest.fn() };
+    mockRedis = { expire: jest.fn(), rename: jest.fn() };
     (getRedisClient as jest.Mock).mockReturnValue(mockRedis);
 
     mockLeaderboardService = {
-      updateScore: jest.fn().mockResolvedValue(1),
-      getUserRank: jest.fn(),
       getTopPlayers: jest.fn(),
+      getUserRank: jest.fn(),
+      updateScore: jest.fn().mockResolvedValue(1),
     } as unknown as jest.Mocked<LeaderboardService>;
 
     (LeaderboardService as jest.Mock).mockImplementation(
@@ -76,17 +77,17 @@ describe('LeaderboardSyncService', () => {
       expect(mockLeaderboardService.updateScore).toHaveBeenCalledTimes(3);
       expect(mockLeaderboardService.updateScore).toHaveBeenCalledWith(
         'user-1',
-        42000,
+        42_000,
         RedisKeys.LEADERBOARD_GLOBAL,
       );
       expect(mockLeaderboardService.updateScore).toHaveBeenCalledWith(
         'user-1',
-        42000,
+        42_000,
         RedisKeys.LEADERBOARD_WEEKLY,
       );
       expect(mockLeaderboardService.updateScore).toHaveBeenCalledWith(
         'user-1',
-        42000,
+        42_000,
         RedisKeys.LEADERBOARD_DAILY,
       );
     });
@@ -111,7 +112,7 @@ describe('LeaderboardSyncService', () => {
 
       const result = await service.getUserRanks('user-1');
 
-      expect(result).toEqual({ global: 1, weekly: 3, daily: 7 });
+      expect(result).toEqual({ daily: 7, global: 1, weekly: 3 });
     });
 
     it('should handle null ranks (user not on leaderboard)', async () => {
@@ -122,14 +123,14 @@ describe('LeaderboardSyncService', () => {
 
       const result = await service.getUserRanks('unknown-user');
 
-      expect(result).toEqual({ global: null, weekly: null, daily: null });
+      expect(result).toEqual({ daily: null, global: null, weekly: null });
     });
   });
 
   describe('getLeaderboard', () => {
     const mockEntries = [
-      { userId: 'user-1', score: 5000, rank: 1 },
-      { userId: 'user-2', score: 3000, rank: 2 },
+      { rank: 1, score: 5000, userId: 'user-1' },
+      { rank: 2, score: 3000, userId: 'user-2' },
     ];
 
     it('should query global leaderboard by default', async () => {

@@ -12,7 +12,6 @@
  * to the pure components' props — no business logic here.
  */
 
-import { useGameSocket } from './hooks/useGameSocket';
 
 import { GameHeader } from './components/GameHeader';
 import { InfoPanel } from './components/InfoPanel';
@@ -20,19 +19,20 @@ import { LeaderboardPanel } from './components/LeaderboardPanel';
 import { NotificationBanner } from './components/NotificationBanner';
 import { ShopPanel } from './components/ShopPanel';
 import { StatsPanel } from './components/StatsPanel';
+import { useGameSocket } from './hooks/useGameSocket';
 import { styles } from './styles';
 
 export default function GamePage() {
   const {
     activeTab,
     connected,
+    expProgress,
     gameState,
     items,
     leaderboard,
     notification,
-    expProgress,
-    setActiveTab,
     purchaseItem,
+    setActiveTab,
   } = useGameSocket();
 
   return (
@@ -68,7 +68,7 @@ export default function GamePage() {
             ...styles.tab,
             ...(activeTab === 'shop' ? styles.tabActive : {}),
           }}
-          onClick={() => setActiveTab('shop')}
+          onClick={() => { setActiveTab('shop'); }}
         >
           Boutique
         </button>
@@ -77,7 +77,7 @@ export default function GamePage() {
             ...styles.tab,
             ...(activeTab === 'leaderboard' ? styles.tabActive : {}),
           }}
-          onClick={() => setActiveTab('leaderboard')}
+          onClick={() => { setActiveTab('leaderboard'); }}
         >
           Classement
         </button>
@@ -86,7 +86,7 @@ export default function GamePage() {
             ...styles.tab,
             ...(activeTab === 'info' ? styles.tabActive : {}),
           }}
-          onClick={() => setActiveTab('info')}
+          onClick={() => { setActiveTab('info'); }}
         >
           Info
         </button>

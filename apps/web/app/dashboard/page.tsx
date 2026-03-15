@@ -9,38 +9,38 @@
 
 'use client';
 
+import { SHOP_ITEMS } from '@repo/shared-types';
+import { GlassCard, NeonButton, NeonProgress, StatCard } from '@repo/ui';
 import { useEffect, useState } from 'react';
 
-import { GlassCard, NeonButton, NeonProgress, StatCard } from '@repo/ui';
-import { SHOP_ITEMS } from '@repo/shared-types';
 
 import styles from './dashboard.module.css';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
 interface IUserInfo {
-  userId: string;
   email: string;
+  userId: string;
   username: string;
 }
 
 interface IProgressionData {
-  userId: string;
-  linesOfCode: string;
-  level: number;
-  experience: string;
   clickMultiplier: number;
-  passiveMultiplier: number;
   criticalChance: number;
   criticalMultiplier: number;
+  experience: string;
+  level: number;
+  linesOfCode: string;
+  passiveMultiplier: number;
+  userId: string;
 }
 
 // Daily commits are not yet backed by a real system -- placeholder quests
 const DAILY_COMMITS = [
-  { id: 1, title: 'Push 1,000 lines of code', xp: 500, completed: false },
-  { id: 2, title: 'Maintain a 50x combo streak', xp: 300, completed: false },
-  { id: 3, title: 'Code for 30 minutes straight', xp: 400, completed: false },
-  { id: 4, title: 'Reach version milestone', xp: 1000, completed: false },
+  { completed: false, id: 1, title: 'Push 1,000 lines of code', xp: 500 },
+  { completed: false, id: 2, title: 'Maintain a 50x combo streak', xp: 300 },
+  { completed: false, id: 3, title: 'Code for 30 minutes straight', xp: 400 },
+  { completed: false, id: 4, title: 'Reach version milestone', xp: 1000 },
 ];
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ export default function DashboardPage() {
         setUser(userData as IUserInfo);
         setProgression(progressionData as IProgressionData);
       })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+      .catch((error_) => {
+        setError(error_ instanceof Error ? error_.message : 'Unknown error');
       })
       .finally(() => {
         setLoading(false);
@@ -131,8 +131,8 @@ export default function DashboardPage() {
         <main
           className={styles.main}
           style={{
-            display: 'flex',
             alignItems: 'center',
+            display: 'flex',
             justifyContent: 'center',
             minHeight: '60vh',
           }}
@@ -157,8 +157,8 @@ export default function DashboardPage() {
         <main
           className={styles.main}
           style={{
-            display: 'flex',
             alignItems: 'center',
+            display: 'flex',
             justifyContent: 'center',
             minHeight: '60vh',
           }}
