@@ -797,9 +797,9 @@ function createMenuWindow(): void {
 
   menuWindow = new BrowserWindow({
     width: 450,
-    height: 600,
+    height: 680,
     x: Math.floor((width - 450) / 2),
-    y: Math.floor((height - 600) / 2),
+    y: Math.floor((height - 680) / 2),
     frame: false,
     transparent: true,
     alwaysOnTop: true,

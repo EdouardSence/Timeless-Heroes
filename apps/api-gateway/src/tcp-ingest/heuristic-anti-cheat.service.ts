@@ -201,6 +201,16 @@ export class HeuristicAntiCheatService {
     };
   }
 
+  /** Expose MAX_CPS for batch-level validation */
+  getMaxCPS(): number {
+    return this.MAX_CPS;
+  }
+
+  /** Expose MAX_VIOLATIONS for batch-level validation */
+  getMaxViolations(): number {
+    return this.MAX_VIOLATIONS;
+  }
+
   /**
    * Get current metrics for a user (for debugging/admin)
    */

@@ -144,10 +144,16 @@ export default function Menu() {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
 
+    // Client-side level check
+    if (gameState.level < (item.unlockLevel ?? 1)) {
+      showNotification(`Niveau ${item.unlockLevel} requis pour acheter ${item.name}`);
+      return;
+    }
+
     const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
 
     if (gameState.linesOfCode < cost) {
-      showNotification('❌ Pas assez de LoC!');
+      showNotification('Pas assez de LoC!');
       return;
     }
 
@@ -172,12 +178,21 @@ export default function Menu() {
       const newState = await window.electronAPI?.getGameState();
       if (newState) setGameState(newState);
 
-      showNotification(`✅ ${item.name} acheté!`);
+      showNotification(`${item.name} acheté!`);
     } else {
-      const errorMsg = (apiResponse?.error as Record<string, unknown>)?.message
+      const rawError = (apiResponse?.error as Record<string, unknown>)?.message
         || result?.error
         || 'Achat échoué!';
-      showNotification(`❌ ${errorMsg}`);
+
+      // Translate known server errors to user-friendly messages
+      let errorMsg = String(rawError);
+      if (errorMsg.includes('LEVEL_TOO_LOW')) {
+        errorMsg = `Niveau ${item.unlockLevel} requis pour acheter ${item.name}`;
+      } else if (errorMsg.includes('INSUFFICIENT_FUNDS')) {
+        errorMsg = 'Pas assez de LoC!';
+      }
+
+      showNotification(errorMsg);
     }
   };
 
@@ -290,24 +305,30 @@ export default function Menu() {
             {items.map((item) => {
               const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
               const canAfford = gameState.linesOfCode >= cost;
+              const levelLocked = gameState.level < (item.unlockLevel ?? 1);
+              const canBuy = canAfford && !levelLocked;
 
               return (
                 <div
                   key={item.id}
-                  className={`shop-item ${canAfford ? 'affordable' : 'locked'}`}
+                  className={`shop-item ${levelLocked ? 'level-locked' : canAfford ? 'affordable' : 'locked'}`}
                 >
                   <div className="item-icon">{item.icon}</div>
                   <div className="item-info">
                     <h3>{item.name}</h3>
                     <p className="item-desc">{item.description}</p>
-                    <p className="item-owned">Possédé: {item.owned}</p>
+                    {levelLocked ? (
+                      <p className="item-level-req">Niveau {item.unlockLevel} requis</p>
+                    ) : (
+                      <p className="item-owned">Possédé: {item.owned}</p>
+                    )}
                   </div>
                   <button
-                    className={`buy-button ${canAfford ? '' : 'disabled'}`}
-                    disabled={!canAfford}
+                    className={`buy-button ${canBuy ? '' : 'disabled'}`}
+                    disabled={!canBuy}
                     onClick={() => handlePurchase(item.id)}
                   >
-                    {formatNumber(cost)} LoC
+                    {levelLocked ? `Niv.${item.unlockLevel}` : `${formatNumber(cost)} LoC`}
                   </button>
                 </div>
               );

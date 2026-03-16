@@ -235,33 +235,63 @@ export class TcpIngestService {
       };
     }
 
-    // Process each key event in the batch
+    // ── Batch-level anti-cheat (instead of per-key) ──
+    // The desktop buffers keys for ~2s and sends them in a single HTTP batch.
+    // Running per-key anti-cheat against Redis timestamps makes every batch
+    // look like a burst (deltas ≈ 0ms between keys) and flags them all as
+    // RATE_TOO_FAST. Instead, we validate the batch as a whole:
+    //   1. Check if user is already banned (too many violations).
+    //   2. Compute the average CPS over the batch's own timestamp span.
+    //   3. If the batch CPS is reasonable, accept all keys.
+    //   4. If the batch CPS is too high, reject the entire batch.
+    // This correctly handles the "buffered keys sent at once" pattern.
+
+    const violations = await this.redis.get(RedisKeys.USER_VIOLATIONS(userId));
+    const violationCount = violations ? Number.parseInt(violations, 10) : 0;
+    const maxViolations = this.antiCheatService.getMaxViolations();
+
+    if (violationCount >= maxViolations) {
+      this.logger.warn(`User ${userId} is banned (${violationCount} violations), rejecting batch`);
+      return { accepted: 0, rejected: events.length, progression: null };
+    }
+
+    // Compute average CPS from the batch timestamps
+    let batchRejected = false;
+    if (events.length >= 2) {
+      const sortedTs = events.map(e => e.timestamp).sort((a, b) => a - b);
+      const spanMs = sortedTs[sortedTs.length - 1]! - sortedTs[0]!;
+      if (spanMs > 0) {
+        const batchCPS = (events.length - 1) / (spanMs / 1000);
+        const maxCPS = this.antiCheatService.getMaxCPS();
+        if (batchCPS > maxCPS) {
+          this.logger.warn(
+            `Batch rejected for ${userId}: CPS=${batchCPS.toFixed(1)} exceeds max=${maxCPS}`,
+          );
+          batchRejected = true;
+          await this.redis.incr(RedisKeys.USER_VIOLATIONS(userId));
+        }
+      }
+    }
+
     let lastClickResult: import('@repo/shared-types').IClickResult | null = null;
 
-    for (const event of events) {
-      // Anti-cheat per key
-      const antiCheatResult = await this.antiCheatService.analyzeKeyPress(
-        userId,
-        event.timestamp,
-      );
+    if (batchRejected) {
+      rejected = events.length;
+    } else {
+      // All keys pass batch-level check — process them
+      for (const event of events) {
+        const keyType = this.categoryToKeyType(event.keyCategory);
 
-      if (!antiCheatResult.allowed) {
-        rejected++;
-        await this.redis.incr(RedisKeys.USER_VIOLATIONS(userId));
-        continue;
-      }
-
-      const keyType = this.categoryToKeyType(event.keyCategory);
-
-      try {
-        lastClickResult = await this.clickProcessor.processClick(
-          { keyType, userId, timestamp: event.timestamp },
-          progression,
-        );
-        accepted++;
-      } catch (e) {
-        this.logger.error(`Failed to process click in batch for ${userId}`, e);
-        rejected++;
+        try {
+          lastClickResult = await this.clickProcessor.processClick(
+            { keyType, userId, timestamp: event.timestamp },
+            progression,
+          );
+          accepted++;
+        } catch (e) {
+          this.logger.error(`Failed to process click in batch for ${userId}`, e);
+          rejected++;
+        }
       }
     }
 

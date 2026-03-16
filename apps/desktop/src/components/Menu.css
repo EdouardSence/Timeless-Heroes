@@ -294,6 +294,24 @@
     opacity: 0.6;
 }
 
+.shop-item.level-locked {
+    opacity: 0.45;
+    border-color: rgba(244, 165, 193, 0.15);
+    position: relative;
+}
+
+.shop-item.level-locked .item-icon {
+    filter: grayscale(0.6);
+}
+
+.item-level-req {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--neon-pink);
+    margin: 0;
+    font-weight: var(--weight-semibold);
+}
+
 .item-icon {
     width: 48px;
     height: 48px;

@@ -42,14 +42,14 @@ echo    - API Gateway (3000)
 echo    - Worker Game Loop (BullMQ)
 echo    - Service Progression (3001)
 echo    - Service Payment (3003)
-docker-compose up -d
+docker compose up -d
 
 REM Wait for services to be healthy
 timeout /t 5 /nobreak
 
 echo [3/5] Vérification de la santé des services...
 :check_services
-docker-compose ps | findstr "healthy" >nul
+docker compose ps | findstr "healthy" >nul
 if errorlevel 1 (
     echo    Initialisation en cours...
     timeout /t 3 /nobreak
@@ -91,7 +91,7 @@ echo      {"email":"user@example.com","password":"pass123"}
 echo.
 echo   3. Utiliser le token JWT reçu dans l'app
 echo.
-echo Pour arrêter tout: lancer "docker-compose down" ou ferme les fenêtres
+echo Pour arrêter tout: lancer "docker compose down" ou ferme les fenêtres
 echo.
 echo Appuie sur une touche pour fermer cette fenêtre...
 pause > nul
