@@ -6,8 +6,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-
 import { NATS_SERVICE } from '@repo/shared-types';
+
 import { AuthModule } from '../auth/auth.module';
 import { ClickProcessorModule } from '../click-processor/click-processor.module';
 
@@ -21,15 +21,15 @@ import { GameGateway } from './game.gateway';
     // NATS ClientProxy for progression microservice
     ClientsModule.registerAsync([
       {
-        name: NATS_SERVICE.PROGRESSION,
         imports: [ConfigModule],
+        inject: [ConfigService],
+        name: NATS_SERVICE.PROGRESSION,
         useFactory: (config: ConfigService) => ({
-          transport: Transport.NATS,
           options: {
             servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
           },
+          transport: Transport.NATS,
         }),
-        inject: [ConfigService],
       },
     ]),
   ],

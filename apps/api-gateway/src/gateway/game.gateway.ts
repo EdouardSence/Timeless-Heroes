@@ -23,10 +23,6 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import Redis from 'ioredis';
-import { firstValueFrom } from 'rxjs';
-import { Server } from 'socket.io';
-
 import { LeaderboardService, RedisKeys } from '@repo/redis-client';
 import {
   IClickResult,
@@ -38,6 +34,10 @@ import {
   NatsPattern,
   WebSocketEvent,
 } from '@repo/shared-types';
+import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
+import { Server } from 'socket.io';
+
 import { AuthService } from '../auth/auth.service';
 import { IAuthenticatedSocket, WsJwtGuard } from '../auth/ws-jwt.guard';
 import { ClickProcessorService } from '../click-processor/click-processor.service';
@@ -81,12 +81,12 @@ export class GameGateway
   async handleConnection(client: IAuthenticatedSocket) {
     try {
       // Extract token from handshake (auth object, header, or query)
-      const rawToken =
-        client.handshake.auth?.token ||
-        client.handshake.headers?.authorization ||
-        (client.handshake.query?.token as string);
+      const rawToken: unknown =
+        (client.handshake.auth as Record<string, unknown>).token ??
+        client.handshake.headers.authorization ??
+        (client.handshake.query.token as string | undefined);
 
-      if (!rawToken) {
+      if (!rawToken || typeof rawToken !== 'string') {
         this.logger.warn(`Client ${client.id} rejected: no auth token`);
         client.emit(WebSocketEvent.ERROR, {
           code: 'AUTH_REQUIRED',
@@ -97,13 +97,12 @@ export class GameGateway
       }
 
       // Strip "Bearer " prefix if present
-      const token =
-        typeof rawToken === 'string' && rawToken.startsWith('Bearer ')
-          ? rawToken.slice(7)
-          : rawToken;
+      const token = rawToken.startsWith('Bearer ')
+        ? rawToken.slice(7)
+        : rawToken;
 
       // Verify JWT and extract payload
-      const payload = await this.authService.verifyToken(token as string);
+      const payload = await this.authService.verifyToken(token);
 
       const userId = payload.sub;
       const username = payload.username || 'Player';
@@ -122,8 +121,8 @@ export class GameGateway
         RedisKeys.USER_SESSION(userId),
         JSON.stringify({
           connectedAt: Date.now(),
-          username,
           socketId: client.id,
+          username,
         }),
       );
 
@@ -136,7 +135,7 @@ export class GameGateway
       await this.calculateOfflineRewards(client);
     } catch (error) {
       this.logger.warn(
-        `Client ${client.id} rejected: invalid token — ${error}`,
+        `Client ${client.id} rejected: invalid token — ${error instanceof Error ? error.message : String(error)}`,
       );
       client.emit(WebSocketEvent.ERROR, {
         code: 'AUTH_FAILED',
@@ -214,15 +213,15 @@ export class GameGateway
 
     if (!progression) {
       // Fetch from progression microservice via NATS
-      const rawResponse = await firstValueFrom(
-        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+      const rawResponse: unknown = await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_GET, {
           userId,
         }),
       );
       // Unwrap IApiResponse { success, data, timestamp } → IProgressionData
       progression =
         rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse
-          ? (rawResponse.data as IProgressionData)
+          ? (rawResponse as { data: IProgressionData }).data
           : (rawResponse as IProgressionData);
       await this.clickProcessor.cacheProgression(progression);
     }
@@ -279,21 +278,19 @@ export class GameGateway
       topPlayers.map(async (entry) => {
         let username = `Player_${entry.userId.slice(0, 8)}`;
         let level = 1;
-        let prestigeLevel = 0;
+        const prestigeLevel = 0;
 
         try {
-          const rawProg = await firstValueFrom(
-            this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+          const rawProg: unknown = await firstValueFrom(
+            this.progressionClient.send(NatsPattern.PROGRESSION_GET, {
               userId: entry.userId,
             }),
           );
           const progression =
             rawProg && typeof rawProg === 'object' && 'data' in rawProg
-              ? (rawProg.data as IProgressionData)
+              ? (rawProg as { data: IProgressionData }).data
               : (rawProg as IProgressionData);
-          if (progression) {
-            level = progression.level ?? 1;
-          }
+          level = progression.level;
         } catch {
           // Fallback to defaults if progression service is unavailable
         }
@@ -304,7 +301,7 @@ export class GameGateway
         );
         if (sessionData) {
           try {
-            const session = JSON.parse(sessionData);
+            const session = JSON.parse(sessionData) as { username?: string };
             if (session.username) {
               username = session.username;
             }
@@ -314,12 +311,12 @@ export class GameGateway
         }
 
         return {
-          rank: entry.rank,
-          userId: entry.userId,
-          username,
-          score: entry.score.toString(),
           level,
           prestigeLevel,
+          rank: entry.rank,
+          score: entry.score.toString(),
+          userId: entry.userId,
+          username,
         };
       }),
     );
@@ -342,15 +339,15 @@ export class GameGateway
   @SubscribeMessage(WebSocketEvent.GET_SHOP_CATALOG)
   async handleGetShopCatalog(@ConnectedSocket() client: IAuthenticatedSocket) {
     try {
-      const result = await firstValueFrom(
+      const result: unknown = await firstValueFrom(
         this.progressionClient.send(NatsPattern.SHOP_GET_CATALOG, {}),
       );
 
       client.emit(WebSocketEvent.SHOP_CATALOG, result);
-      return result;
+      return result as Record<string, unknown>;
     } catch (error) {
       this.logger.error('Failed to fetch shop catalog:', error);
-      return { success: false, error: 'Failed to fetch shop catalog' };
+      return { error: 'Failed to fetch shop catalog', success: false };
     }
   }
 
@@ -366,15 +363,15 @@ export class GameGateway
 
     if (!progression) {
       // Fetch from progression microservice via NATS
-      const rawResponse = await firstValueFrom(
-        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+      const rawResponse: unknown = await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_GET, {
           userId,
         }),
       );
       // Unwrap IApiResponse { success, data, timestamp } → IProgressionData
       progression =
         rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse
-          ? (rawResponse.data as IProgressionData)
+          ? (rawResponse as { data: IProgressionData }).data
           : (rawResponse as IProgressionData);
       await this.clickProcessor.cacheProgression(progression);
     }
@@ -396,25 +393,22 @@ export class GameGateway
       );
 
       client.emit(WebSocketEvent.LEADERBOARD_UPDATE, {
-        type: LeaderboardType.GLOBAL,
         entries: await Promise.all(
           entries.map(async (e) => {
             let username = `Player_${e.userId.slice(0, 8)}`;
             let level = 1;
 
             try {
-              const rawProg = await firstValueFrom(
-                this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, {
+              const rawProg: unknown = await firstValueFrom(
+                this.progressionClient.send(NatsPattern.PROGRESSION_GET, {
                   userId: e.userId,
                 }),
               );
               const prog =
                 rawProg && typeof rawProg === 'object' && 'data' in rawProg
-                  ? (rawProg.data as IProgressionData)
+                  ? (rawProg as { data: IProgressionData }).data
                   : (rawProg as IProgressionData);
-              if (prog) {
-                level = prog.level ?? 1;
-              }
+              level = prog.level;
             } catch {
               // fallback
             }
@@ -425,7 +419,9 @@ export class GameGateway
             );
             if (sessionData) {
               try {
-                const session = JSON.parse(sessionData);
+                const session = JSON.parse(sessionData) as {
+                  username?: string;
+                };
                 if (session.username) {
                   username = session.username;
                 }
@@ -435,17 +431,18 @@ export class GameGateway
             }
 
             return {
-              rank: e.rank,
-              userId: e.userId,
-              username,
-              score: e.score.toString(),
               level,
               prestigeLevel: 0,
+              rank: e.rank,
+              score: e.score.toString(),
+              userId: e.userId,
+              username,
             };
           }),
         ),
-        userRank,
         totalPlayers: await this.leaderboardService.getTotalPlayers(),
+        type: LeaderboardType.GLOBAL,
+        userRank,
       });
     }
   }
@@ -493,29 +490,29 @@ export class GameGateway
 
       await firstValueFrom(
         this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-          userId,
           delta: earnedLoc.toString(),
+          userId,
         }),
       );
 
       await firstValueFrom(
         this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
-          userId,
           experience: earnedExp,
+          userId,
         }),
       );
 
       client.emit(WebSocketEvent.OFFLINE_REWARDS, {
-        userId,
-        disconnectedAt: new Date(disconnectedAt),
-        reconnectedAt: new Date(reconnectedAt),
-        offlineDuration,
-        maxOfflineTime,
-        effectiveDuration,
-        offlineRate,
-        earnedLoc: earnedLoc.toString(),
-        earnedExp: earnedExp.toString(),
         completedPrograms: [],
+        disconnectedAt: new Date(disconnectedAt),
+        earnedExp: earnedExp.toString(),
+        earnedLoc: earnedLoc.toString(),
+        effectiveDuration,
+        maxOfflineTime,
+        offlineDuration,
+        offlineRate,
+        reconnectedAt: new Date(reconnectedAt),
+        userId,
       });
     }
 

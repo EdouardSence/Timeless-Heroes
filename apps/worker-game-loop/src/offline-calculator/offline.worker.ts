@@ -10,10 +10,15 @@
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import {
+  IOfflineCalculation,
+  NATS_SERVICE,
+  NatsPattern,
+  QueueName,
+} from '@repo/shared-types';
 import { Job } from 'bullmq';
 import { firstValueFrom } from 'rxjs';
 
-import { IOfflineCalculation, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 import { OfflineCalculatorService } from './offline-calculator.service';
 
 interface IOfflineJobData {
@@ -36,7 +41,8 @@ export class OfflineWorker extends WorkerHost {
 
   constructor(
     private readonly offlineCalculator: OfflineCalculatorService,
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
   ) {
     super();
   }
@@ -45,7 +51,13 @@ export class OfflineWorker extends WorkerHost {
    * Process a single offline calculation job
    */
   async process(job: Job<IOfflineJobData>): Promise<IOfflineCalculation> {
-    const { userId, disconnectedAt, reconnectedAt, passiveMultiplier, pendingPrograms } = job.data;
+    const {
+      disconnectedAt,
+      passiveMultiplier,
+      pendingPrograms,
+      reconnectedAt,
+      userId,
+    } = job.data;
 
     this.logger.debug(`Processing offline calculation for ${userId}`);
 
@@ -75,15 +87,15 @@ export class OfflineWorker extends WorkerHost {
     if (BigInt(calculation.earnedLoc) > 0n) {
       await firstValueFrom(
         this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-          userId,
           delta: calculation.earnedLoc,
+          userId,
         }),
       );
 
       await firstValueFrom(
         this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+          experience: Number.parseInt(calculation.earnedExp, 10),
           userId,
-          experience: parseInt(calculation.earnedExp, 10),
         }),
       );
     }
@@ -101,14 +113,14 @@ export class OfflineWorker extends WorkerHost {
     const earnedLoc = BigInt(result.earnedLoc);
     this.logger.log(
       `Offline processed for ${job.data.userId}: +${earnedLoc} LoC ` +
-      `(${this.offlineCalculator.formatDuration(result.effectiveDuration)} offline)`,
+        `(${this.offlineCalculator.formatDuration(result.effectiveDuration)} offline)`,
     );
   }
 
   @OnWorkerEvent('failed')
   onFailed(job: Job<IOfflineJobData>, error: Error) {
     this.logger.error(
-      `Offline calculation failed for ${job?.data.userId}: ${error.message}`,
+      `Offline calculation failed for ${job.data.userId}: ${error.message}`,
     );
   }
 }

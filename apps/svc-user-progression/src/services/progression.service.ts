@@ -71,7 +71,7 @@ export class ProgressionService {
    * Get or create user progression from database
    */
   async getProgression(userId: string): Promise<IProgressionData> {
-    let progression: any = await prisma.progression.findUnique({
+    let progression = await prisma.progression.findUnique({
       where: { userId },
     });
 

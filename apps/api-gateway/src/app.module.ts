@@ -14,11 +14,12 @@
 import { Global, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-
 import { NATS_SERVICE } from '@repo/shared-types';
-import { validate } from './config/env.validation';
+import { NextFunction, Request, Response } from 'express';
+
 import { AuthModule } from './auth/auth.module';
 import { ClickProcessorModule } from './click-processor/click-processor.module';
+import { validate } from './config/env.validation';
 import { GameGatewayModule } from './gateway/game-gateway.module';
 import { HealthModule } from './health/health.module';
 import { ProgressionModule } from './progression/progression.module';
@@ -30,44 +31,44 @@ import { TcpIngestModule } from './tcp-ingest/tcp-ingest.module';
  */
 @Global()
 @Module({
+  exports: [ClientsModule],
   imports: [
     ClientsModule.registerAsync([
       {
+        imports: [ConfigModule],
+        inject: [ConfigService],
         name: NATS_SERVICE.PROGRESSION,
-        imports: [ConfigModule],
         useFactory: (config: ConfigService) => ({
-          transport: Transport.NATS,
           options: {
             servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
           },
+          transport: Transport.NATS,
         }),
-        inject: [ConfigService],
       },
       {
+        imports: [ConfigModule],
+        inject: [ConfigService],
         name: NATS_SERVICE.PAYMENT,
-        imports: [ConfigModule],
         useFactory: (config: ConfigService) => ({
-          transport: Transport.NATS,
           options: {
             servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
           },
+          transport: Transport.NATS,
         }),
-        inject: [ConfigService],
       },
       {
-        name: NATS_SERVICE.WORKER,
         imports: [ConfigModule],
+        inject: [ConfigService],
+        name: NATS_SERVICE.WORKER,
         useFactory: (config: ConfigService) => ({
-          transport: Transport.NATS,
           options: {
             servers: [config.get<string>('NATS_URL', 'nats://localhost:4222')],
           },
+          transport: Transport.NATS,
         }),
-        inject: [ConfigService],
       },
     ]),
   ],
-  exports: [ClientsModule],
 })
 export class NatsClientsModule {}
 
@@ -76,8 +77,8 @@ export class NatsClientsModule {}
     // Configuration with validation - fails fast if required env vars missing
     ConfigModule.forRoot({
       envFilePath: ['.env.local', '.env'],
-      validate,
       isGlobal: true,
+      validate,
     }),
 
     // ── NATS ClientProxy — transport-agnostic microservice communication ──
@@ -108,13 +109,15 @@ export class NatsClientsModule {}
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply((req: any, res: any, next: any) => {
+      .apply((req: Request, res: Response, next: NextFunction) => {
         const { method, originalUrl } = req;
         const start = Date.now();
         res.on('finish', () => {
           const duration = Date.now() - start;
           const { statusCode } = res;
-          console.log(`[HTTP] ${method} ${originalUrl} ${statusCode} - ${duration}ms`);
+          console.log(
+            `[HTTP] ${method} ${originalUrl} ${String(statusCode)} - ${String(duration)}ms`,
+          );
         });
         next();
       })

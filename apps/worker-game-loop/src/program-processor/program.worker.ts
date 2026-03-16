@@ -3,16 +3,27 @@
  * BullMQ worker that processes program completion jobs
  */
 
-import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { getRedisConfig, RedisKeys } from '@repo/redis-client';
+import {
+  IProgramCompletionPayload,
+  NATS_SERVICE,
+  NatsPattern,
+  QueueName,
+} from '@repo/shared-types';
 import { Job, Worker } from 'bullmq';
+import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 
-import { getRedisConfig, RedisKeys } from '@repo/redis-client';
-import { IProgramCompletionPayload, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 import { LootCalculatorService } from './loot-calculator.service';
 import { ProgramProcessorService } from './program-processor.service';
-import Redis from 'ioredis';
 
 interface IProgramJobData {
   programId: string;
@@ -26,16 +37,17 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ProgramWorker.name);
   private worker!: Worker<IProgramJobData, IProgramCompletionPayload>;
   private redis: Redis;
-  
+
   constructor(
     private readonly programProcessor: ProgramProcessorService,
     private readonly lootCalculator: LootCalculatorService,
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
   ) {
     this.redis = new Redis(getRedisConfig());
   }
-  
-  async onModuleInit() {
+
+  onModuleInit() {
     this.logger.log('Initializing Program Worker...');
 
     this.worker = new Worker<IProgramJobData, IProgramCompletionPayload>(
@@ -76,7 +88,9 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
   /**
    * Process a completed program
    */
-  private async processProgram(job: Job<IProgramJobData>): Promise<IProgramCompletionPayload> {
+  private async processProgram(
+    job: Job<IProgramJobData>,
+  ): Promise<IProgramCompletionPayload> {
     const { programId, programSlug, userId } = job.data;
 
     this.logger.debug(
@@ -98,19 +112,19 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
 
     // 3. Roll for loot
     const lootDropped = this.lootCalculator.rollLoot(programType.lootTable);
-    
+
     // 4. Credit rewards via NATS -> svc-user-progression
     await firstValueFrom(
       this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-        userId,
         delta: earnedLoc,
+        userId,
       }),
     );
 
     await firstValueFrom(
       this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
-        userId,
         experience: earnedExp,
+        userId,
       }),
     );
 
@@ -118,16 +132,16 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
     for (const loot of lootDropped) {
       await firstValueFrom(
         this.progressionClient.send(NatsPattern.PROGRESSION_ADD_ITEM, {
-          userId,
           itemSlug: loot.itemSlug,
           quantity: loot.quantity,
+          userId,
         }),
       );
     }
-    
+
     // 6. Mark program as completed in DB
     await this.programProcessor.markProgramCompleted(userId, programSlug);
-    
+
     // 7. Create completion payload
     const completedAt = new Date();
     const completion: IProgramCompletionPayload = {
@@ -139,7 +153,7 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
       programSlug,
       userId,
     };
-    
+
     // 8. Notify user via Redis Pub/Sub (picked up by API Gateway -> WebSocket)
     await this.redis.publish(
       RedisKeys.CHANNEL_ACHIEVEMENT,
@@ -148,7 +162,7 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
         ...completion,
       }),
     );
-    
+
     this.logger.log(
       `Program ${programSlug} completed for ${userId}: +${earnedLoc} LoC, +${earnedExp} XP, ${lootDropped.length} items`,
     );

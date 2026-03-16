@@ -32,7 +32,7 @@ import { WorkerHealthController } from './worker-health.controller';
 type WorkerRole = 'all' | 'cron' | 'workers';
 
 /** Determine which feature modules to load based on WORKER_ROLE */
-const workerRole: WorkerRole = (process.env.WORKER_ROLE || 'all') as WorkerRole;
+const workerRole: WorkerRole = (process.env.WORKER_ROLE ?? 'all') as WorkerRole;
 
 const enableCron = workerRole === 'all' || workerRole === 'cron';
 const enableWorkers = workerRole === 'all' || workerRole === 'workers';
@@ -46,6 +46,7 @@ const featureModules = [
 ];
 
 @Module({
+  controllers: [WorkerHealthController],
   imports: [
     ConfigModule.forRoot({
       envFilePath: ['.env.local', '.env'],
@@ -72,6 +73,5 @@ const featureModules = [
     // Feature Modules (conditionally loaded based on WORKER_ROLE)
     ...featureModules,
   ],
-  controllers: [WorkerHealthController],
 })
 export class WorkerModule {}

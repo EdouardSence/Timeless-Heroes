@@ -35,7 +35,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     return {
       email: payload.email,
-      role: payload.role ?? Role.PLAYER, // Default for tokens issued before RBAC
+      role: payload.role, // Role field is always present in IJwtPayload
       userId: payload.sub,
       username: payload.username,
     };

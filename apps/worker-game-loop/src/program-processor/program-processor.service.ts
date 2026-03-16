@@ -12,6 +12,7 @@
 
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { prisma } from '@repo/prisma-client';
 import {
   IProgramRewards,
   IStartProgramRequest,
@@ -19,12 +20,17 @@ import {
   ProgramError,
   QueueName,
 } from '@repo/shared-types';
-import { prisma } from '@repo/prisma-client';
 import { Queue } from 'bullmq';
 
-// We define a local ProgramCategory here because it's used in the service logic 
+// We define a local ProgramCategory here because it's used in the service logic
 // even if the generated client export is having issues.
-type ProgramCategory = 'BUG_FIX' | 'FEATURE' | 'REFACTORING' | 'ARCHITECTURE' | 'DEPLOYMENT' | 'RESEARCH';
+type ProgramCategory =
+  | 'BUG_FIX'
+  | 'FEATURE'
+  | 'REFACTORING'
+  | 'ARCHITECTURE'
+  | 'DEPLOYMENT'
+  | 'RESEARCH';
 
 interface IProgramType {
   baseDurationSecs: number;
@@ -209,7 +215,7 @@ export class ProgramProcessorService {
       where: { userId },
     });
     const userLevel = progression?.level ?? 1;
-    
+
     if (userLevel < programTypeDef.unlockLevel) {
       return {
         durationSeconds: 0,
@@ -224,12 +230,12 @@ export class ProgramProcessorService {
 
     // 3. Get active programs count from DB
     const activeCount = await prisma.activeProgram.count({
-      where: { 
-        userId, 
+      where: {
         status: 'RUNNING',
+        userId,
       },
     });
-    
+
     if (activeCount >= this.MAX_CONCURRENT_PROGRAMS) {
       return {
         durationSeconds: 0,
@@ -245,30 +251,30 @@ export class ProgramProcessorService {
     // 4. Check if already running this program (via programType slug)
     // First ensure programType exists in DB
     const programType = await prisma.programType.upsert({
-      where: { slug: programSlug },
       create: {
-        slug: programSlug,
-        name: programTypeDef.name,
-        description: programTypeDef.description,
-        category: programTypeDef.category,
         baseDurationSecs: programTypeDef.baseDurationSecs,
         baseReward: programTypeDef.baseReward,
+        category: programTypeDef.category,
+        description: programTypeDef.description,
         experienceReward: programTypeDef.experienceReward,
-        rewardMultiplier: programTypeDef.rewardMultiplier,
-        unlockLevel: programTypeDef.unlockLevel,
         lootTable: programTypeDef.lootTable,
+        name: programTypeDef.name,
+        rewardMultiplier: programTypeDef.rewardMultiplier,
+        slug: programSlug,
+        unlockLevel: programTypeDef.unlockLevel,
       },
       update: {},
+      where: { slug: programSlug },
     });
-    
+
     const alreadyRunning = await prisma.activeProgram.findFirst({
       where: {
-        userId,
         programTypeId: programType.id,
         status: 'RUNNING',
+        userId,
       },
     });
-    
+
     if (alreadyRunning) {
       return {
         durationSeconds: 0,
@@ -307,12 +313,12 @@ export class ProgramProcessorService {
     // 8. Track active program in DB
     await prisma.activeProgram.create({
       data: {
-        userId,
+        bullJobId: programId,
+        estimatedEndAt,
         programTypeId: programType.id,
         startedAt,
-        estimatedEndAt,
         status: 'RUNNING',
-        bullJobId: programId,
+        userId,
       },
     });
 
@@ -356,9 +362,9 @@ export class ProgramProcessorService {
     // Find the active program in DB
     const activeProgram = await prisma.activeProgram.findFirst({
       where: {
-        userId,
         programType: { slug: programSlug },
         status: 'RUNNING',
+        userId,
       },
     });
 
@@ -373,18 +379,20 @@ export class ProgramProcessorService {
         if (job) {
           await job.remove();
         }
-      } catch (err) {
-        this.logger.warn(`Failed to remove job ${activeProgram.bullJobId}: ${err}`);
+      } catch (error) {
+        this.logger.warn(
+          `Failed to remove job ${activeProgram.bullJobId}: ${String(error)}`,
+        );
       }
     }
 
     // Update status in DB
     await prisma.activeProgram.update({
-      where: { id: activeProgram.id },
-      data: { 
-        status: 'CANCELLED',
+      data: {
         completedAt: new Date(),
+        status: 'CANCELLED',
       },
+      where: { id: activeProgram.id },
     });
 
     this.logger.log(`Program cancelled: ${programSlug} for user ${userId}`);
@@ -397,29 +405,32 @@ export class ProgramProcessorService {
    */
   async getActivePrograms(userId: string): Promise<string[]> {
     const activePrograms = await prisma.activeProgram.findMany({
-      where: {
-        userId,
-        status: 'RUNNING',
-      },
       include: { programType: true },
+      where: {
+        status: 'RUNNING',
+        userId,
+      },
     });
-    
-    return activePrograms.map((ap: any) => ap.programType.slug);
+
+    return activePrograms.map((ap) => ap.programType.slug);
   }
 
   /**
    * Remove program from tracking (called after completion)
    */
-  async markProgramCompleted(userId: string, programSlug: string): Promise<void> {
+  async markProgramCompleted(
+    userId: string,
+    programSlug: string,
+  ): Promise<void> {
     await prisma.activeProgram.updateMany({
+      data: {
+        completedAt: new Date(),
+        status: 'COMPLETED',
+      },
       where: {
-        userId,
         programType: { slug: programSlug },
         status: 'RUNNING',
-      },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
+        userId,
       },
     });
   }

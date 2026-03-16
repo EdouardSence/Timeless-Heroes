@@ -12,10 +12,15 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import {
+  IOfflineCalculation,
+  IProgressionData,
+  NATS_SERVICE,
+  NatsPattern,
+  QueueName,
+} from '@repo/shared-types';
 import { Queue } from 'bullmq';
 import { firstValueFrom } from 'rxjs';
-
-import { IOfflineCalculation, IProgressionData, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 
 interface IOfflineJobData {
   disconnectedAt: string; // ISO string
@@ -160,25 +165,27 @@ export class OfflineCalculatorService {
   async getUserOfflineStats(userId: string): Promise<IUserOfflineStats> {
     try {
       const progression = await firstValueFrom(
-        this.natsClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+        this.natsClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, {
+          userId,
+        }),
       );
-      
+
       return {
-        passiveMultiplier: progression.passiveMultiplier || 0,
-        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
         maxOfflineHours: this.DEFAULT_MAX_OFFLINE_HOURS,
+        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
+        passiveMultiplier: progression.passiveMultiplier || 0,
       };
     } catch (error) {
       this.logger.warn(
         `Failed to fetch progression for offline stats (user ${userId}), using defaults: ${
-          error instanceof Error ? error.message : error
+          error instanceof Error ? error.message : String(error)
         }`,
       );
       // Fallback to defaults if NATS call fails
       return {
-        passiveMultiplier: 0,
-        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
         maxOfflineHours: this.DEFAULT_MAX_OFFLINE_HOURS,
+        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
+        passiveMultiplier: 0,
       };
     }
   }
