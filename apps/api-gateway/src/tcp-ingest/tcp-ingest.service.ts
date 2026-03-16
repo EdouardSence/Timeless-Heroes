@@ -10,10 +10,10 @@ import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { ClickBufferService, RedisKeys } from '@repo/redis-client';
 import {
+  IProgressionData,
   KeyType,
   NATS_SERVICE,
   NatsPattern,
-  IProgressionData,
 } from '@repo/shared-types';
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
@@ -22,10 +22,10 @@ import { ClickProcessorService } from '../click-processor/click-processor.servic
 
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import {
-  ITcpKeyPressEvent,
-  ITcpAuthResponse,
-  KeyCategory,
   IAntiCheatResult,
+  ITcpAuthResponse,
+  ITcpKeyPressEvent,
+  KeyCategory,
 } from './tcp-ingest.types';
 
 @Injectable()
@@ -140,26 +140,24 @@ export class TcpIngestService {
     }
 
     // Fallback if progression is truly unreachable
-    if (!progression) {
-      progression = {
-        userId,
-        linesOfCode: '0',
-        clickMultiplier: 1.0,
-        criticalChance: 0.05,
-        criticalMultiplier: 2.0,
-        passiveMultiplier: 0.0,
-        level: 1,
-        totalLinesWritten: '0',
-        experience: '0',
-        experienceToNext: '100',
-      };
-    }
+    progression ??= {
+      clickMultiplier: 1,
+      criticalChance: 0.05,
+      criticalMultiplier: 2,
+      experience: '0',
+      experienceToNext: '100',
+      level: 1,
+      linesOfCode: '0',
+      passiveMultiplier: 0,
+      totalLinesWritten: '0',
+      userId,
+    };
 
     // 4. Delegate to ClickProcessorService to calculate final value (with multipliers) and buffer it
     // progression is guaranteed non-null here (fallback block above assigns a default)
     const clickResult = await this.clickProcessor.processClick(
-      { keyType, userId, timestamp },
-      progression!,
+      { keyType, timestamp, userId },
+      progression,
     );
 
     this.logger.debug(
@@ -209,6 +207,13 @@ export class TcpIngestService {
       experience: string;
       experienceToNext: string;
     } | null;
+    antiCheat: {
+      violations: number;
+      maxViolations: number;
+      banned: boolean;
+      /** Seconds until the violation key expires (≈ unban time). -1 if not banned. */
+      banExpiresIn: number;
+    };
   }> {
     let accepted = 0;
     let rejected = 0;
@@ -234,20 +239,18 @@ export class TcpIngestService {
     }
 
     // Fallback if progression is truly unreachable
-    if (!progression) {
-      progression = {
-        userId,
-        linesOfCode: '0',
-        clickMultiplier: 1.0,
-        criticalChance: 0.05,
-        criticalMultiplier: 2.0,
-        passiveMultiplier: 0.0,
-        level: 1,
-        totalLinesWritten: '0',
-        experience: '0',
-        experienceToNext: '100',
-      };
-    }
+    progression ??= {
+      clickMultiplier: 1,
+      criticalChance: 0.05,
+      criticalMultiplier: 2,
+      experience: '0',
+      experienceToNext: '100',
+      level: 1,
+      linesOfCode: '0',
+      passiveMultiplier: 0,
+      totalLinesWritten: '0',
+      userId,
+    };
 
     // ── Batch-level anti-cheat (instead of per-key) ──
     // The desktop buffers keys for ~2s and sends them in a single HTTP batch.
@@ -267,10 +270,21 @@ export class TcpIngestService {
     const maxViolations = this.antiCheatService.getMaxViolations();
 
     if (violationCount >= maxViolations) {
+      const ttl = await this.redis.ttl(RedisKeys.USER_VIOLATIONS(userId));
       this.logger.warn(
         `User ${userId} is banned (${violationCount} violations), rejecting batch`,
       );
-      return { accepted: 0, progression: null, rejected: events.length };
+      return {
+        accepted: 0,
+        antiCheat: {
+          banExpiresIn: ttl > 0 ? ttl : -1,
+          banned: true,
+          maxViolations,
+          violations: violationCount,
+        },
+        progression: null,
+        rejected: events.length,
+      };
     }
 
     // Compute average CPS from the batch timestamps (only for batches >= 5 keys)
@@ -308,9 +322,9 @@ export class TcpIngestService {
 
         try {
           // progression is guaranteed non-null here (fallback block above assigns a default)
-          lastClickResult = await this.clickProcessor.processClick(
-            { keyType, userId, timestamp: event.timestamp },
-            progression!,
+          await this.clickProcessor.processClick(
+            { keyType, timestamp: event.timestamp, userId },
+            progression,
           );
           accepted++;
         } catch (error) {
@@ -342,13 +356,16 @@ export class TcpIngestService {
         // Atomically read and clear the buffer (Lua script: HGETALL + DEL)
         const flushed = await this.clickBufferService.flushBuffer(userId);
 
-        if (flushed && parseFloat(flushed.locToAdd) > 0) {
+        if (flushed && Number.parseFloat(flushed.locToAdd) > 0) {
           // 1. Persist LoC to DB via NATS
           await firstValueFrom(
-            this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-              userId,
-              delta: flushed.locToAdd,
-            }),
+            this.progressionClient.send(
+              NatsPattern.PROGRESSION_UPDATE_BALANCE,
+              {
+                delta: flushed.locToAdd,
+                userId,
+              },
+            ),
           );
 
           // 2. Process XP and level-ups
@@ -381,23 +398,41 @@ export class TcpIngestService {
       }
     }
 
-    // Last resort fallback
-    if (!progressionResponse && progression) {
-      progressionResponse = {
-        linesOfCode: progression.linesOfCode,
-        level: progression.level,
-        clickMultiplier: progression.clickMultiplier,
-        passiveMultiplier: progression.passiveMultiplier,
-        experience: progression.experience,
-        experienceToNext: progression.experienceToNext ?? '100',
-      };
-    }
+    // Last resort fallback (progression is guaranteed non-null by fallback block above)
+    progressionResponse ??= {
+      clickMultiplier: progression.clickMultiplier,
+      experience: progression.experience,
+      experienceToNext: progression.experienceToNext,
+      level: progression.level,
+      linesOfCode: progression.linesOfCode,
+      passiveMultiplier: progression.passiveMultiplier,
+    };
+
+    // Re-read violation count (may have been incremented during this batch)
+    const finalViolations = await this.redis.get(
+      RedisKeys.USER_VIOLATIONS(userId),
+    );
+    const finalViolationCount = finalViolations
+      ? Number.parseInt(finalViolations, 10)
+      : 0;
+    const finalTtl = await this.redis.ttl(RedisKeys.USER_VIOLATIONS(userId));
 
     this.logger.debug(
       `Batch processed for ${userId}: ${accepted} accepted, ${rejected} rejected, balance=${progressionResponse.linesOfCode}`,
     );
 
-    return { accepted, progression: progressionResponse, rejected };
+    return {
+      accepted,
+      antiCheat: {
+        banExpiresIn:
+          finalViolationCount >= maxViolations && finalTtl > 0 ? finalTtl : -1,
+        banned: finalViolationCount >= maxViolations,
+        maxViolations,
+        violations: finalViolationCount,
+      },
+      progression: progressionResponse,
+      rejected,
+    };
   }
 
   /**
@@ -448,7 +483,10 @@ export class TcpIngestService {
     return {
       clickMultiplier: progression.clickMultiplier,
       experience: progression.experience,
-      experienceToNext: progression.experienceToNext ?? '100',
+      experienceToNext: progression.experienceToNext,
+      level: progression.level,
+      linesOfCode: totalLoc.toString(),
+      passiveMultiplier: progression.passiveMultiplier,
     };
   }
 

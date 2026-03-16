@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { GameState } from '../types/electron';
+import type { AntiCheatStatus, GameState } from '../types/electron';
 import { BongoCat } from './BongoCat';
 import './Widget.css';
 
@@ -28,6 +28,8 @@ export default function Widget() {
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [keyPressAnimation, setKeyPressAnimation] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [antiCheat, setAntiCheat] = useState<AntiCheatStatus | null>(null);
+  const antiCheatTimeoutRef = useRef<number | null>(null);
 
   // Combo Logic
   const [combo, setCombo] = useState(0);
@@ -55,15 +57,28 @@ export default function Widget() {
       setTimeout(() => setShowLevelUp(false), 2000);
     });
 
+    const disposeAntiCheat = window.electronAPI?.onAntiCheatWarning((status) => {
+      setAntiCheat(status);
+      if (antiCheatTimeoutRef.current) clearTimeout(antiCheatTimeoutRef.current);
+      if (!status.banned) {
+        antiCheatTimeoutRef.current = setTimeout(
+          () => setAntiCheat(null),
+          5000,
+        ) as unknown as number;
+      }
+    });
+
     return () => {
-      if (disposeState || disposeLevelUp) {
+      if (disposeState || disposeLevelUp || disposeAntiCheat) {
         disposeState?.();
         disposeLevelUp?.();
+        disposeAntiCheat?.();
       } else {
         window.electronAPI?.removeAllListeners();
       }
       if (comboTimeoutRef.current) clearTimeout(comboTimeoutRef.current);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (antiCheatTimeoutRef.current) clearTimeout(antiCheatTimeoutRef.current);
     };
   }, []);
 
@@ -135,6 +150,15 @@ export default function Widget() {
       {showLevelUp && (
         <div className="level-up-notification">
           🎉 Niveau {gameState.level}!
+        </div>
+      )}
+
+      {/* Anti-Cheat Warning / Ban */}
+      {antiCheat && (
+        <div className={`ac-banner ${antiCheat.banned ? 'ac-banner--ban' : 'ac-banner--warn'}`}>
+          {antiCheat.banned
+            ? `⛔ BANNED — ${Math.ceil(antiCheat.banExpiresIn)}s`
+            : `⚠ Warning ${antiCheat.violations}/${antiCheat.maxViolations}`}
         </div>
       )}
 

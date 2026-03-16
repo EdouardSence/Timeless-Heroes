@@ -31,6 +31,14 @@ import {
 export interface IBatchIngestResponse {
   /** Number of key events that were accepted (not blocked by anti-cheat) */
   accepted: number;
+  /** Anti-cheat status for the current user */
+  antiCheat: {
+    violations: number;
+    maxViolations: number;
+    banned: boolean;
+    /** Seconds until violations expire (≈ unban time). -1 if not banned. */
+    banExpiresIn: number;
+  };
   /** Server-authoritative game state */
   progression: {
     linesOfCode: string;
@@ -128,7 +136,13 @@ export class TcpIngestController {
     },
   ): Promise<IBatchIngestResponse> {
     if (!data.userId) {
-      return { accepted: 0, progression: null, rejected: 0, success: false };
+      return {
+        accepted: 0,
+        antiCheat: { banExpiresIn: -1, banned: false, maxViolations: 0, violations: 0 },
+        progression: null,
+        rejected: 0,
+        success: false,
+      };
     }
 
     // Cap batch size to prevent abuse (max 200 keys per batch)
@@ -149,6 +163,7 @@ export class TcpIngestController {
       );
       return {
         accepted: 0,
+        antiCheat: { banExpiresIn: -1, banned: false, maxViolations: 0, violations: 0 },
         progression: null,
         rejected: keys.length,
         success: true,
@@ -162,6 +177,7 @@ export class TcpIngestController {
 
     return {
       accepted: result.accepted,
+      antiCheat: result.antiCheat,
       progression: result.progression,
       rejected: keys.length - validKeys.length + result.rejected,
       success: true,

@@ -76,6 +76,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('backend-status', handler);
     };
   },
+  onAntiCheatWarning: (callback: (status: { violations: number; maxViolations: number; banned: boolean; banExpiresIn: number }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, status: { violations: number; maxViolations: number; banned: boolean; banExpiresIn: number }) =>
+      callback(status);
+    ipcRenderer.on('anti-cheat-warning', handler);
+    return () => {
+      ipcRenderer.removeListener('anti-cheat-warning', handler);
+    };
+  },
 
   // Cleanup — nuclear option, removes ALL listeners on every channel
   removeAllListeners: () => {
@@ -83,5 +91,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('user-keypress');
     ipcRenderer.removeAllListeners('level-up');
     ipcRenderer.removeAllListeners('backend-status');
+    ipcRenderer.removeAllListeners('anti-cheat-warning');
   },
 });
