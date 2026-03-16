@@ -278,7 +278,7 @@ export class GameGateway
       topPlayers.map(async (entry) => {
         let username = `Player_${entry.userId.slice(0, 8)}`;
         let level = 1;
-        const prestigeLevel = 0;
+        let prestigeLevel = 0;
 
         try {
           const rawProg: unknown = await firstValueFrom(
@@ -291,6 +291,7 @@ export class GameGateway
               ? (rawProg as { data: IProgressionData }).data
               : (rawProg as IProgressionData);
           level = progression.level;
+          prestigeLevel = progression.prestigeLevel;
         } catch {
           // Fallback to defaults if progression service is unavailable
         }
@@ -397,6 +398,7 @@ export class GameGateway
           entries.map(async (e) => {
             let username = `Player_${e.userId.slice(0, 8)}`;
             let level = 1;
+            let prestigeLevel = 0;
 
             try {
               const rawProg: unknown = await firstValueFrom(
@@ -409,6 +411,7 @@ export class GameGateway
                   ? (rawProg as { data: IProgressionData }).data
                   : (rawProg as IProgressionData);
               level = prog.level;
+              prestigeLevel = prog.prestigeLevel;
             } catch {
               // fallback
             }
@@ -432,7 +435,7 @@ export class GameGateway
 
             return {
               level,
-              prestigeLevel: 0,
+              prestigeLevel,
               rank: e.rank,
               score: e.score.toString(),
               userId: e.userId,
@@ -533,6 +536,8 @@ export class GameGateway
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
+      prestigeLevel: 0,
+      prestigeMultiplier: 1,
       totalLinesWritten: '0',
       userId,
     };

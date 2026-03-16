@@ -24,7 +24,11 @@ function formatNumber(num: number): string {
   return Math.floor(num).toString();
 }
 
-function calculateCost(baseCost: number, owned: number, costMultiplier = 1.15): number {
+function calculateCost(
+  baseCost: number,
+  owned: number,
+  costMultiplier = 1.15,
+): number {
   return Math.floor(baseCost * Math.pow(costMultiplier, owned));
 }
 
@@ -37,6 +41,8 @@ export default function Menu() {
     experienceToNext: 100,
     multiplier: 1.0,
     passiveRate: 0.0,
+    prestigeLevel: 0,
+    totalLinesWritten: 0,
   });
 
   const [items, setItems] = useState<ShopItemWithOwned[]>(SHOP_ITEMS);
@@ -48,6 +54,7 @@ export default function Menu() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [showPrestigeConfirm, setShowPrestigeConfirm] = useState(false);
   const itemsLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -146,7 +153,9 @@ export default function Menu() {
 
     // Client-side level check
     if (gameState.level < (item.unlockLevel ?? 1)) {
-      showNotification(`Niveau ${item.unlockLevel} requis pour acheter ${item.name}`);
+      showNotification(
+        `Niveau ${item.unlockLevel} requis pour acheter ${item.name}`,
+      );
       return;
     }
 
@@ -162,16 +171,21 @@ export default function Menu() {
 
     // The response structure is: { success, data: { success, data: { newQuantityOwned, ... }, error? } }
     const apiResponse = result?.data as Record<string, unknown> | undefined;
-    const purchaseData = apiResponse?.data as Record<string, unknown> | undefined;
+    const purchaseData = apiResponse?.data as
+      | Record<string, unknown>
+      | undefined;
     const purchaseSuccess = result?.success && apiResponse?.success !== false;
 
     if (purchaseSuccess) {
-      const newQuantityOwned = typeof purchaseData?.newQuantityOwned === 'number'
-        ? purchaseData.newQuantityOwned
-        : item.owned + 1;
+      const newQuantityOwned =
+        typeof purchaseData?.newQuantityOwned === 'number'
+          ? purchaseData.newQuantityOwned
+          : item.owned + 1;
 
       setItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, owned: newQuantityOwned } : i)),
+        prev.map((i) =>
+          i.id === itemId ? { ...i, owned: newQuantityOwned } : i,
+        ),
       );
 
       // Refresh game state (backendBuyItem already synced from server)
@@ -180,9 +194,10 @@ export default function Menu() {
 
       showNotification(`${item.name} acheté!`);
     } else {
-      const rawError = (apiResponse?.error as Record<string, unknown>)?.message
-        || result?.error
-        || 'Achat échoué!';
+      const rawError =
+        (apiResponse?.error as Record<string, unknown>)?.message ||
+        result?.error ||
+        'Achat échoué!';
 
       // Translate known server errors to user-friendly messages
       let errorMsg = String(rawError);
@@ -203,6 +218,24 @@ export default function Menu() {
   const handleLogout = () => {
     window.electronAPI?.logoutSession();
   };
+
+  const handlePrestige = async () => {
+    setShowPrestigeConfirm(false);
+    const result = await window.electronAPI?.backendPrestige();
+    if (result?.success) {
+      // Reset local item display (server already deleted all items)
+      setItems((prev) => prev.map((item) => ({ ...item, owned: 0 })));
+      // Refresh game state
+      const newState = await window.electronAPI?.getGameState();
+      if (newState) setGameState(newState);
+      showNotification('Prestige accompli! Multiplicateur augmente!');
+    } else {
+      showNotification(result?.error ?? 'Prestige echoue!');
+    }
+  };
+
+  const prestigeMultiplier = 1 + gameState.prestigeLevel * 2;
+  const nextPrestigeMultiplier = 1 + (gameState.prestigeLevel + 1) * 2;
 
   const expProgress =
     gameState.experienceToNext > 0
@@ -303,7 +336,11 @@ export default function Menu() {
         {activeTab === 'shop' && (
           <div className="shop-grid">
             {items.map((item) => {
-              const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
+              const cost = calculateCost(
+                item.baseCost,
+                item.owned,
+                item.costMultiplier,
+              );
               const canAfford = gameState.linesOfCode >= cost;
               const levelLocked = gameState.level < (item.unlockLevel ?? 1);
               const canBuy = canAfford && !levelLocked;
@@ -318,7 +355,9 @@ export default function Menu() {
                     <h3>{item.name}</h3>
                     <p className="item-desc">{item.description}</p>
                     {levelLocked ? (
-                      <p className="item-level-req">Niveau {item.unlockLevel} requis</p>
+                      <p className="item-level-req">
+                        Niveau {item.unlockLevel} requis
+                      </p>
                     ) : (
                       <p className="item-owned">Possédé: {item.owned}</p>
                     )}
@@ -328,7 +367,9 @@ export default function Menu() {
                     disabled={!canBuy}
                     onClick={() => handlePurchase(item.id)}
                   >
-                    {levelLocked ? `Niv.${item.unlockLevel}` : `${formatNumber(cost)} LoC`}
+                    {levelLocked
+                      ? `Niv.${item.unlockLevel}`
+                      : `${formatNumber(cost)} LoC`}
                   </button>
                 </div>
               );
@@ -338,6 +379,19 @@ export default function Menu() {
 
         {activeTab === 'stats' && (
           <div className="stats-panel">
+            {gameState.prestigeLevel > 0 && (
+              <div className="stat-card prestige-card">
+                <h3>👑 Prestige {gameState.prestigeLevel}</h3>
+                <div className="stat-row">
+                  <span>Multiplicateur prestige</span>
+                  <span>x{prestigeMultiplier}</span>
+                </div>
+                <div className="stat-row">
+                  <span>LoC total (historique)</span>
+                  <span>{formatNumber(gameState.totalLinesWritten)}</span>
+                </div>
+              </div>
+            )}
             <div className="stat-card">
               <h3>📊 Statistiques</h3>
               <div className="stat-row">
@@ -361,6 +415,42 @@ export default function Menu() {
                 <span>{gameState.passiveRate.toFixed(1)} LoC/sec</span>
               </div>
             </div>
+
+            {gameState.level >= 5 && (
+              <div className="prestige-section">
+                {showPrestigeConfirm ? (
+                  <div className="prestige-confirm">
+                    <p className="prestige-confirm-text">
+                      Ton niveau, LoC, XP et items seront reinitialises.
+                      <br />
+                      Multiplicateur: x{prestigeMultiplier} → x
+                      {nextPrestigeMultiplier}
+                    </p>
+                    <div className="prestige-confirm-actions">
+                      <button
+                        className="prestige-confirm-btn prestige-confirm-btn--yes"
+                        onClick={handlePrestige}
+                      >
+                        Confirmer
+                      </button>
+                      <button
+                        className="prestige-confirm-btn prestige-confirm-btn--no"
+                        onClick={() => setShowPrestigeConfirm(false)}
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="prestige-button"
+                    onClick={() => setShowPrestigeConfirm(true)}
+                  >
+                    ⭐ Prestige (x{nextPrestigeMultiplier})
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -401,6 +491,14 @@ export default function Menu() {
                     <span className="rank-score">
                       {formatNumber(entry.score)} LoC
                     </span>
+                    {entry.prestigeLevel > 0 && (
+                      <span
+                        className="rank-prestige"
+                        title={`Prestige ${entry.prestigeLevel}`}
+                      >
+                        👑{entry.prestigeLevel}{' '}
+                      </span>
+                    )}
                   </div>
                 ))
               )}

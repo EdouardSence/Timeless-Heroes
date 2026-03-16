@@ -19,6 +19,7 @@ export const NatsPattern = {
   PROGRESSION_GET_LEADERBOARD: 'progression.getLeaderboard',
   PROGRESSION_GET_RANKS: 'progression.getRanks',
   PROGRESSION_CALCULATE_COST: 'progression.calculateCost',
+  PROGRESSION_PRESTIGE: 'progression.prestige',
 
   // ── Shop Catalog ──
   SHOP_GET_CATALOG: 'shop.getCatalog',
@@ -462,6 +463,8 @@ export interface IProgressionData {
   passiveMultiplier: number;
   criticalChance: number;
   criticalMultiplier: number;
+  prestigeLevel: number;
+  prestigeMultiplier: number;
 }
 
 // ============================================================================

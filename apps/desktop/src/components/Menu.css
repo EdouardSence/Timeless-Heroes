@@ -567,3 +567,104 @@
         transform: translateX(-50%) translateY(0) scale(1);
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   § PRESTIGE SYSTEM
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.prestige-card {
+    border-color: rgba(255, 215, 135, 0.3) !important;
+    background: linear-gradient(135deg, rgba(255, 215, 135, 0.08), var(--cozy-bg-surface)) !important;
+}
+
+.prestige-card h3 {
+    color: var(--neon-gold) !important;
+    border-bottom-color: rgba(255, 215, 135, 0.15) !important;
+}
+
+.prestige-section {
+    margin-top: var(--space-3);
+}
+
+.prestige-button {
+    width: 100%;
+    padding: var(--space-3) var(--space-4);
+    background: linear-gradient(135deg, rgba(255, 215, 135, 0.2), rgba(244, 165, 193, 0.15));
+    border: 1px solid rgba(255, 215, 135, 0.4);
+    border-radius: var(--radius-md);
+    color: var(--neon-gold);
+    font-family: var(--font-display);
+    font-size: var(--text-md);
+    font-weight: var(--weight-bold);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-shadow: 0 0 12px var(--neon-gold-glow);
+}
+
+.prestige-button:hover {
+    background: linear-gradient(135deg, rgba(255, 215, 135, 0.3), rgba(244, 165, 193, 0.2));
+    border-color: var(--neon-gold);
+    box-shadow: 0 0 25px var(--neon-gold-glow);
+    transform: scale(1.02);
+}
+
+.prestige-confirm {
+    padding: var(--space-4);
+    background: var(--cozy-bg-surface);
+    border: 1px solid rgba(255, 215, 135, 0.3);
+    border-radius: var(--radius-lg);
+    text-align: center;
+}
+
+.prestige-confirm-text {
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    color: var(--text-secondary);
+    margin: 0 0 var(--space-3) 0;
+    line-height: 1.5;
+}
+
+.prestige-confirm-actions {
+    display: flex;
+    gap: var(--space-3);
+    justify-content: center;
+}
+
+.prestige-confirm-btn {
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-bold);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.prestige-confirm-btn--yes {
+    background: linear-gradient(135deg, var(--neon-gold), var(--neon-peach));
+    border: none;
+    color: var(--cozy-bg-void);
+}
+
+.prestige-confirm-btn--yes:hover {
+    box-shadow: 0 0 20px var(--neon-gold-glow);
+    transform: scale(1.05);
+}
+
+.prestige-confirm-btn--no {
+    background: var(--cozy-bg-elevated);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+}
+
+.prestige-confirm-btn--no:hover {
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+}
+
+/* Leaderboard prestige crown */
+.rank-prestige {
+    font-size: var(--text-sm);
+    color: var(--neon-gold);
+    text-shadow: 0 0 8px var(--neon-gold-glow);
+}

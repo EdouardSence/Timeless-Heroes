@@ -233,4 +233,14 @@ export class ProgressionController {
       timestamp: new Date().toISOString(),
     };
   }
+
+  // ── NATS: Prestige ────────────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_PRESTIGE)
+  async prestige(@Payload() data: { userId: string }) {
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_PRESTIGE}: ${data.userId}`,
+    );
+    return this.progressionService.prestige(data.userId);
+  }
 }

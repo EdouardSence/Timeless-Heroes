@@ -163,7 +163,7 @@ export class ProgressionController {
       );
       const totalPlayers = await this.leaderboardService.getTotalPlayers(key);
 
-      // Batch-fetch usernames from DB
+      // Batch-fetch usernames and prestige levels from DB
       const userIds = topPlayers.map((p) => p.userId);
       const users = await prisma.user.findMany({
         select: { id: true, username: true },
@@ -173,10 +173,19 @@ export class ProgressionController {
         users.map((u: { id: string; username: string }) => [u.id, u.username]),
       );
 
+      // Batch-fetch prestige levels
+      const progressions = await prisma.progression.findMany({
+        select: { prestigeLevel: true, userId: true },
+        where: { userId: { in: userIds } },
+      });
+      const prestigeMap = new Map(
+        progressions.map((p: { userId: string; prestigeLevel: number }) => [p.userId, p.prestigeLevel]),
+      );
+
       const entries = topPlayers.map((p) => ({
         ...p,
         level: 1, // simplified for now
-        prestigeLevel: 0,
+        prestigeLevel: prestigeMap.get(p.userId) ?? 0,
         username: usernameMap.get(p.userId) ?? `Player_${p.userId.slice(0, 8)}`,
       }));
 
@@ -243,5 +252,34 @@ export class ProgressionController {
     }
 
     return result as Record<string, unknown>;
+  }
+
+  /**
+   * POST /api/v1/progression/prestige
+   * Prestige the authenticated user — resets progress, gains permanent multiplier
+   */
+  @Post('prestige')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth('JWT')
+  @ApiOperation({ summary: 'Prestige — reset progress for permanent multiplier' })
+  async handlePrestige(@Request() req: IAuthenticatedRequest) {
+    const { userId } = req.user;
+
+    this.logger.log(`User ${userId} requesting prestige`);
+
+    const result: Record<string, unknown> = await firstValueFrom(
+      this.natsClient.send(NatsPattern.PROGRESSION_PRESTIGE, { userId }),
+    );
+
+    // Invalidate cache so multipliers are refreshed
+    try {
+      await this.clickProcessor.invalidateCache(userId);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to invalidate cache for ${userId}: ${String(error)}`,
+      );
+    }
+
+    return result;
   }
 }
