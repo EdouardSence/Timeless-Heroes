@@ -1,31 +1,26 @@
 /**
  * Progression Controller
- * REST API endpoints for user progression
+ * NATS @MessagePattern handlers for inter-service communication
+ * Called by api-gateway via ClientProxy (transport-agnostic)
  */
 
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Logger,
-  Param,
-  Post,
-} from '@nestjs/common';
+import { Controller, Get, Logger } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import {
   IApiResponse,
   IItemPurchaseRequest,
   IItemPurchaseResult,
   IProgressionData,
   LeaderboardType,
+  NatsPattern,
+  SHOP_ITEMS,
 } from '@repo/shared-types';
 
 import { ItemCostCalculatorService } from '../services/item-cost-calculator.service';
 import { LeaderboardSyncService } from '../services/leaderboard-sync.service';
 import { ProgressionService } from '../services/progression.service';
 
-@Controller('progression')
+@Controller()
 export class ProgressionController {
   private readonly logger = new Logger(ProgressionController.name);
 
@@ -35,33 +30,83 @@ export class ProgressionController {
     private readonly leaderboardSync: LeaderboardSyncService,
   ) {}
 
-  /**
-   * Get user progression
-   * GET /progression/:userId
-   */
-  @Get(':userId')
-  getProgression(
-    @Param('userId') userId: string,
-  ): IApiResponse<IProgressionData> {
-    const data = this.progressionService.getProgression(userId);
+  // ── HTTP: Health check ────────────────────────────────────────────
+
+  @Get('health')
+  health() {
+    return {
+      service: 'svc-user-progression',
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // ── NATS: Health check ────────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.HEALTH_CHECK)
+  handleHealthCheck() {
+    return { service: 'svc-user-progression', status: 'ok' };
+  }
+
+  // ── NATS: Get user progression ────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_GET)
+  async getProgression(
+    @Payload() data: { userId: string },
+  ): Promise<IApiResponse<IProgressionData>> {
+    this.logger.debug(`NATS ${NatsPattern.PROGRESSION_GET}: ${data.userId}`);
+    const result = await this.progressionService.getProgression(data.userId);
 
     return {
-      data,
+      data: result,
       success: true,
       timestamp: new Date().toISOString(),
     };
   }
 
-  /**
-   * Purchase an item
-   * POST /progression/purchase
-   */
-  @Post('purchase')
-  @HttpCode(HttpStatus.OK)
-  purchaseItem(
-    @Body() request: IItemPurchaseRequest,
-  ): IApiResponse<IItemPurchaseResult> {
-    const result = this.progressionService.purchaseItem(request);
+  // ── NATS: Update balance ──────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_UPDATE_BALANCE)
+  async updateBalance(
+    @Payload() data: { userId: string; delta: string },
+  ): Promise<IApiResponse<IProgressionData>> {
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_UPDATE_BALANCE}: ${data.userId} delta=${data.delta}`,
+    );
+    const result = await this.progressionService.updateBalance(
+      data.userId,
+      data.delta,
+    );
+
+    return {
+      data: result,
+      success: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // ── NATS: Add experience ──────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_ADD_EXPERIENCE)
+  async addExperience(
+    @Payload() data: { userId: string; experience: string },
+  ): Promise<{ newLevel: number; leveledUp: boolean }> {
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_ADD_EXPERIENCE}: ${data.userId}`,
+    );
+    return this.progressionService.addExperience(data.userId, data.experience);
+  }
+
+  // ── NATS: Purchase item ───────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_PURCHASE_ITEM)
+  async purchaseItem(
+    @Payload() request: IItemPurchaseRequest,
+  ): Promise<IApiResponse<IItemPurchaseResult>> {
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_PURCHASE_ITEM}: ${request.userId} → ${request.itemSlug}`,
+    );
+    const result = await this.progressionService.purchaseItem(request);
 
     return {
       data: result,
@@ -76,30 +121,27 @@ export class ProgressionController {
     };
   }
 
-  /**
-   * Get available items for a user
-   * GET /progression/:userId/items
-   */
-  @Get(':userId/items')
-  getAvailableItems(@Param('userId') userId: string): {
-    success: boolean;
-    data: {
-      item: {
-        slug: string;
-        name: string;
-        baseCost: string;
-        costMultiplier: number;
-        baseEffect: number;
-        effectType: string;
-        unlockLevel: number;
-      };
-      owned: number;
-      nextCost: string;
-      canAfford: boolean;
-    }[];
-    timestamp: string;
-  } {
-    const items = this.progressionService.getAvailableItems(userId);
+  // ── NATS: Add item to inventory ───────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_ADD_ITEM)
+  async addItem(
+    @Payload() data: { userId: string; itemSlug: string; quantity: number },
+  ): Promise<boolean> {
+    this.logger.debug(
+      `NATS ${NatsPattern.PROGRESSION_ADD_ITEM}: ${data.userId} +${data.quantity}x ${data.itemSlug}`,
+    );
+    return this.progressionService.addItem(
+      data.userId,
+      data.itemSlug,
+      data.quantity,
+    );
+  }
+
+  // ── NATS: Get available items ─────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_GET_ITEMS)
+  async getAvailableItems(@Payload() data: { userId: string }) {
+    const items = await this.progressionService.getAvailableItems(data.userId);
 
     return {
       data: items.map((i) => ({
@@ -121,14 +163,11 @@ export class ProgressionController {
     };
   }
 
-  /**
-   * Calculate item cost
-   * POST /progression/calculate-cost
-   */
-  @Post('calculate-cost')
-  @HttpCode(HttpStatus.OK)
+  // ── NATS: Calculate cost ──────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_CALCULATE_COST)
   calculateCost(
-    @Body()
+    @Payload()
     body: {
       baseCost: string;
       amountOwned: number;
@@ -153,39 +192,43 @@ export class ProgressionController {
       quantity,
       multiplier,
     );
-
     return { cost, quantity };
   }
 
-  /**
-   * Get leaderboard
-   * GET /progression/leaderboard/:type
-   */
-  @Get('leaderboard/:type')
-  async getLeaderboard(@Param('type') type: string) {
-    const leaderboardType = type.toUpperCase() as LeaderboardType;
+  // ── NATS: Get leaderboard ─────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_GET_LEADERBOARD)
+  async getLeaderboard(@Payload() data: { type: string }) {
+    const leaderboardType = data.type.toUpperCase() as LeaderboardType;
     const entries = await this.leaderboardSync.getLeaderboard(leaderboardType);
 
     return {
-      data: {
-        entries,
-        type: leaderboardType,
-      },
+      data: { entries, type: leaderboardType },
       success: true,
       timestamp: new Date().toISOString(),
     };
   }
 
-  /**
-   * Get user's ranks across leaderboards
-   * GET /progression/:userId/ranks
-   */
-  @Get(':userId/ranks')
-  async getUserRanks(@Param('userId') userId: string) {
-    const ranks = await this.leaderboardSync.getUserRanks(userId);
+  // ── NATS: Get user ranks ──────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.PROGRESSION_GET_RANKS)
+  async getUserRanks(@Payload() data: { userId: string }) {
+    const ranks = await this.leaderboardSync.getUserRanks(data.userId);
 
     return {
       data: ranks,
+      success: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // ── NATS: Get shop catalog ────────────────────────────────────────
+
+  @MessagePattern(NatsPattern.SHOP_GET_CATALOG)
+  getShopCatalog() {
+    // SHOP_ITEMS is now the single source of truth — pass through directly
+    return {
+      data: SHOP_ITEMS,
       success: true,
       timestamp: new Date().toISOString(),
     };

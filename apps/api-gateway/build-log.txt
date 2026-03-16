@@ -1,0 +1,35 @@
+[96msrc/auth/auth.controller.ts[0m:[93m29[0m:[93m8[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m29[0m } from '@nestjs/swagger';
+[7m  [0m [91m       ~~~~~~~~~~~~~~~~~[0m
+[96msrc/auth/auth.controller.ts[0m:[93m30[0m:[93m29[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m30[0m import { ApiProperty } from '@nestjs/swagger';
+[7m  [0m [91m                            ~~~~~~~~~~~~~~~~~[0m
+[96msrc/gateway/game.gateway.ts[0m:[93m46[0m:[93m10[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'ClickValidatorService'.
+
+[7m46[0m import { ClickValidatorService } from '../click-processor/click-validator.service';
+[7m  [0m [91m         ~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/gateway/game.gateway.ts[0m:[93m58[0m:[93m10[0m - [91merror[0m[90m TS2300: [0mDuplicate identifier 'ClickValidatorService'.
+
+[7m58[0m import { ClickValidatorService } from '../click-processor/click-validator.service';
+[7m  [0m [91m         ~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/health/health.controller.ts[0m:[93m16[0m:[93m8[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m16[0m } from '@nestjs/swagger';
+[7m  [0m [91m       ~~~~~~~~~~~~~~~~~[0m
+[96msrc/main.ts[0m:[93m15[0m:[93m48[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m15[0m import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+[7m  [0m [91m                                               ~~~~~~~~~~~~~~~~~[0m
+[96msrc/progression/progression.controller.ts[0m:[93m29[0m:[93m8[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m29[0m } from '@nestjs/swagger';
+[7m  [0m [91m       ~~~~~~~~~~~~~~~~~[0m
+[96msrc/tcp-ingest/tcp-ingest.controller.ts[0m:[93m18[0m:[93m8[0m - [91merror[0m[90m TS2307: [0mCannot find module '@nestjs/swagger' or its corresponding type declarations.
+
+[7m18[0m } from '@nestjs/swagger';
+[7m  [0m [91m       ~~~~~~~~~~~~~~~~~[0m
+
+Found 8 error(s).
+

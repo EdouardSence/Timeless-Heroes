@@ -1,0 +1,69 @@
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +27ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +5ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +3ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +79ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mClick Buffer Flush Service initialized[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mFlush schedule: every 5 seconds (distributed lock)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +53ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker role: all[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mCron flush uses distributed Redis lock (multi-replica safe)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 12:45:04 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +54ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mWorkerModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mDiscoveryModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +10ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:44 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mScheduleModule dependencies initialized[39m[38;5;3m +2ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +85ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mBullModule dependencies initialized[39m[38;5;3m +1ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClientsModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mProgramProcessorModule dependencies initialized[39m[38;5;3m +2ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mClickBufferModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mOfflineCalculatorModule dependencies initialized[39m[38;5;3m +0ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mClick Buffer Flush Service initialized[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mFlush schedule: every 5 seconds (distributed lock)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mInitializing Program Worker...[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[ProgramWorker] [39m[32mProgram Worker initialized[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[NestMicroservice] [39m[32mNest microservice successfully started[39m[38;5;3m +102ms[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker Game Loop started (NATS: nats://nats:4222)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mWorker role: all[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mBullMQ processors active: click-buffer, programs, offline[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mCron flush uses distributed Redis lock (multi-replica safe)[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:03:45 PM [32m    LOG[39m [38;5;3m[WorkerGameLoop] [39m[32mNo HTTP port — health check via NATS health.check pattern[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:00 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:14:00 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mQueued 1 flush jobs (20 clicks) in 13ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:00 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 46be5e28-7504-4a72-914a-625d0d294b68: 20 clicks, 20 LoC[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:00 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 46be5e28-7504-4a72-914a-625d0d294b68 in 43ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:00 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 123 completed for user 46be5e28-7504-4a72-914a-625d0d294b68[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:14:05 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mQueued 1 flush jobs (12 clicks) in 3ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 46be5e28-7504-4a72-914a-625d0d294b68: 12 clicks, 12 LoC[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 46be5e28-7504-4a72-914a-625d0d294b68 in 17ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:14:05 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 124 completed for user 46be5e28-7504-4a72-914a-625d0d294b68[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:16:15 PM [95m  DEBUG[39m [38;5;3m[ClickBufferFlushService] [39m[95mFlushing buffers for 1 users[39m
+timeless-worker-game-loop  | [32m[Nest] 1  - [39m03/15/2026, 1:16:15 PM [32m    LOG[39m [38;5;3m[ClickBufferFlushService] [39m[32mQueued 1 flush jobs (6 clicks) in 3ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:16:15 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mProcessing buffer flush for 46be5e28-7504-4a72-914a-625d0d294b68: 6 clicks, 8 LoC[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:16:15 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mBuffer flush completed for 46be5e28-7504-4a72-914a-625d0d294b68 in 19ms[39m
+timeless-worker-game-loop  | [95m[Nest] 1  - [39m03/15/2026, 1:16:15 PM [95m  DEBUG[39m [38;5;3m[ClickBufferWorker] [39m[95mJob 125 completed for user 46be5e28-7504-4a72-914a-625d0d294b68[39m

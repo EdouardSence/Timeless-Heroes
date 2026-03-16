@@ -2,94 +2,20 @@
  * Menu Component - Shop, Stats, Leaderboard
  */
 
+import { IShopItem, SHOP_ITEMS as SHOP_CATALOG } from '@repo/shared-types';
 import { useEffect, useRef, useState } from 'react';
-import type { GameState } from '../types/electron';
+import type { GameState, LeaderboardEntry } from '../types/electron';
 import './Menu.css';
 
-interface ShopItem {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  baseCost: number;
+interface ShopItemWithOwned extends IShopItem {
   owned: number;
-  effect: { type: 'multiplier' | 'passive' | 'click'; value: number };
 }
 
-const SHOP_ITEMS: ShopItem[] = [
-  {
-    id: 'mechanical-keyboard',
-    name: 'Clavier Mécanique',
-    description: '+1 LoC par frappe',
-    icon: '⌨️',
-    baseCost: 100,
-    owned: 0,
-    effect: { type: 'click', value: 1 },
-  },
-  {
-    id: 'monitor-4k',
-    name: 'Écran 4K',
-    description: '+2 LoC par frappe',
-    icon: '🖥️',
-    baseCost: 500,
-    owned: 0,
-    effect: { type: 'click', value: 2 },
-  },
-  {
-    id: 'coffee-machine',
-    name: 'Machine à Café',
-    description: '+10% multiplicateur',
-    icon: '☕',
-    baseCost: 2500,
-    owned: 0,
-    effect: { type: 'multiplier', value: 0.1 },
-  },
-  {
-    id: 'junior-dev',
-    name: 'Dev Junior',
-    description: '+0.5 keys/sec auto',
-    icon: '👨‍💻',
-    baseCost: 1000,
-    owned: 0,
-    effect: { type: 'passive', value: 0.5 },
-  },
-  {
-    id: 'senior-dev',
-    name: 'Dev Senior',
-    description: '+5 keys/sec auto',
-    icon: '👩‍💻',
-    baseCost: 10000,
-    owned: 0,
-    effect: { type: 'passive', value: 5 },
-  },
-  {
-    id: 'cloud-server',
-    name: 'Serveur Cloud',
-    description: '+50 keys/sec auto',
-    icon: '☁️',
-    baseCost: 50000,
-    owned: 0,
-    effect: { type: 'passive', value: 50 },
-  },
-  {
-    id: 'ai-copilot',
-    name: 'AI Copilot',
-    description: '+200 keys/sec auto',
-    icon: '🤖',
-    baseCost: 250000,
-    owned: 0,
-    effect: { type: 'passive', value: 200 },
-  },
-  {
-    id: 'quantum-computer',
-    name: 'Ordinateur Quantique',
-    description: 'x2 multiplicateur global',
-    icon: '⚛️',
-    baseCost: 1000000,
-    owned: 0,
-    effect: { type: 'multiplier', value: 1.0 },
-  },
-];
+// Initialize shop items from shared catalog
+const SHOP_ITEMS: ShopItemWithOwned[] = SHOP_CATALOG.map((item) => ({
+  ...item,
+  owned: 0,
+}));
 
 function formatNumber(num: number): string {
   if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(2) + 'B';
@@ -98,8 +24,8 @@ function formatNumber(num: number): string {
   return Math.floor(num).toString();
 }
 
-function calculateCost(baseCost: number, owned: number): number {
-  return Math.floor(baseCost * Math.pow(1.15, owned));
+function calculateCost(baseCost: number, owned: number, costMultiplier = 1.15): number {
+  return Math.floor(baseCost * Math.pow(costMultiplier, owned));
 }
 
 export default function Menu() {
@@ -113,11 +39,15 @@ export default function Menu() {
     passiveRate: 0.0,
   });
 
-  const [items, setItems] = useState<ShopItem[]>(SHOP_ITEMS);
+  const [items, setItems] = useState<ShopItemWithOwned[]>(SHOP_ITEMS);
   const [activeTab, setActiveTab] = useState<'shop' | 'stats' | 'leaderboard'>(
     'shop',
   );
   const [notification, setNotification] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const itemsLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -138,45 +68,70 @@ export default function Menu() {
       itemsLoadedRef.current = true;
     });
 
+    // Check backend status on mount
+    window.electronAPI?.backendStatus().then((status) => {
+      setBackendOnline(status?.online ?? false);
+      setUsername(status?.username ?? null);
+    });
+
     // Listen for updates
     const disposeState = window.electronAPI?.onGameStateUpdate(setGameState);
+    const disposeBackend = window.electronAPI?.onBackendStatus((status) => {
+      setBackendOnline(status?.online ?? false);
+      setUsername(status?.username ?? null);
+    });
 
     return () => {
-      if (disposeState) {
-        disposeState();
-      } else {
+      if (disposeState) disposeState();
+      if (disposeBackend) disposeBackend();
+      if (!disposeState && !disposeBackend) {
         window.electronAPI?.removeAllListeners();
       }
     };
   }, []);
 
-  // Update multiplier and passive when items change (only after initial load)
+  // Fetch leaderboard — always attempt, even if backendOnline state is stale.
+  // The IPC handler will return an error gracefully if not authenticated.
+  const fetchLeaderboard = () => {
+    setLeaderboardLoading(true);
+    window.electronAPI
+      ?.backendLeaderboard('GLOBAL')
+      .then((res) => {
+        if (res?.success && res.data?.entries) {
+          setLeaderboard(res.data.entries);
+        }
+      })
+      .catch(() => {
+        // Silently fail — leaderboard stays at last-known state
+      })
+      .finally(() => {
+        setLeaderboardLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'leaderboard') return;
+    if (!backendOnline) return;
+
+    fetchLeaderboard();
+
+    // Auto-refresh every 15 seconds while on the leaderboard tab
+    const interval = setInterval(fetchLeaderboard, 15000);
+    return () => clearInterval(interval);
+  }, [activeTab, backendOnline]);
+
+  // Persist item ownership when items change (only after initial load).
+  // NOTE: multiplier and passiveRate are controlled by the server — we only save
+  // the owned-count map locally so the shop UI can display it immediately on load.
   useEffect(() => {
     // Skip if items haven't been loaded from storage yet
     if (!itemsLoadedRef.current) return;
 
-    let newMultiplier = 1.0;
-    let newPassive = 0.0; // This is now "keys per second" which generates LoC
-    let clickBonus = 0;
     const itemsToSave: Record<string, number> = {};
-
     items.forEach((item) => {
       itemsToSave[item.id] = item.owned;
-
-      if (item.effect.type === 'multiplier') {
-        newMultiplier += item.effect.value * item.owned;
-      } else if (item.effect.type === 'passive') {
-        // Passive is now "keys per second" - the actual LoC rate = passive * multiplier
-        newPassive += item.effect.value * item.owned;
-      } else if (item.effect.type === 'click') {
-        clickBonus += item.effect.value * item.owned;
-      }
     });
 
-    newMultiplier = (1 + clickBonus) * newMultiplier;
-
-    window.electronAPI?.updateMultiplier(newMultiplier);
-    window.electronAPI?.updatePassiveRate(newPassive);
     window.electronAPI?.saveItems(itemsToSave);
   }, [items]);
 
@@ -189,29 +144,64 @@ export default function Menu() {
     const item = items.find((i) => i.id === itemId);
     if (!item) return;
 
-    const cost = calculateCost(item.baseCost, item.owned);
-
-    if (gameState.linesOfCode < cost) {
-      showNotification('❌ Pas assez de LoC!');
+    // Client-side level check
+    if (gameState.level < (item.unlockLevel ?? 1)) {
+      showNotification(`Niveau ${item.unlockLevel} requis pour acheter ${item.name}`);
       return;
     }
 
-    const success = await window.electronAPI?.subtractLoC(cost);
+    const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
 
-    if (success) {
+    if (gameState.linesOfCode < cost) {
+      showNotification('Pas assez de LoC!');
+      return;
+    }
+
+    // Use backend purchase — server deducts LoC, updates multipliers, and syncs state
+    const result = await window.electronAPI?.backendBuyItem(item.id);
+
+    // The response structure is: { success, data: { success, data: { newQuantityOwned, ... }, error? } }
+    const apiResponse = result?.data as Record<string, unknown> | undefined;
+    const purchaseData = apiResponse?.data as Record<string, unknown> | undefined;
+    const purchaseSuccess = result?.success && apiResponse?.success !== false;
+
+    if (purchaseSuccess) {
+      const newQuantityOwned = typeof purchaseData?.newQuantityOwned === 'number'
+        ? purchaseData.newQuantityOwned
+        : item.owned + 1;
+
       setItems((prev) =>
-        prev.map((i) => (i.id === itemId ? { ...i, owned: i.owned + 1 } : i)),
+        prev.map((i) => (i.id === itemId ? { ...i, owned: newQuantityOwned } : i)),
       );
 
+      // Refresh game state (backendBuyItem already synced from server)
       const newState = await window.electronAPI?.getGameState();
       if (newState) setGameState(newState);
 
-      showNotification(`✅ ${item.name} acheté!`);
+      showNotification(`${item.name} acheté!`);
+    } else {
+      const rawError = (apiResponse?.error as Record<string, unknown>)?.message
+        || result?.error
+        || 'Achat échoué!';
+
+      // Translate known server errors to user-friendly messages
+      let errorMsg = String(rawError);
+      if (errorMsg.includes('LEVEL_TOO_LOW')) {
+        errorMsg = `Niveau ${item.unlockLevel} requis pour acheter ${item.name}`;
+      } else if (errorMsg.includes('INSUFFICIENT_FUNDS')) {
+        errorMsg = 'Pas assez de LoC!';
+      }
+
+      showNotification(errorMsg);
     }
   };
 
   const handleClose = () => {
     window.electronAPI?.hideMenu();
+  };
+
+  const handleLogout = () => {
+    window.electronAPI?.logoutSession();
   };
 
   const expProgress =
@@ -231,13 +221,24 @@ export default function Menu() {
           <span className="logo-icon">💎</span>
           <h1>Timeless Heroes</h1>
         </div>
-        <button
-          className="close-button"
-          onClick={handleClose}
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          ✕
-        </button>
+        <div className="menu-header-actions">
+          {username && <span className="menu-username">@{username}</span>}
+          <button
+            className="logout-button"
+            onClick={handleLogout}
+            title="Se déconnecter"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            ⏻
+          </button>
+          <button
+            className="close-button"
+            onClick={handleClose}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            ✕
+          </button>
+        </div>
       </header>
 
       <div
@@ -302,26 +303,32 @@ export default function Menu() {
         {activeTab === 'shop' && (
           <div className="shop-grid">
             {items.map((item) => {
-              const cost = calculateCost(item.baseCost, item.owned);
+              const cost = calculateCost(item.baseCost, item.owned, item.costMultiplier);
               const canAfford = gameState.linesOfCode >= cost;
+              const levelLocked = gameState.level < (item.unlockLevel ?? 1);
+              const canBuy = canAfford && !levelLocked;
 
               return (
                 <div
                   key={item.id}
-                  className={`shop-item ${canAfford ? 'affordable' : 'locked'}`}
+                  className={`shop-item ${levelLocked ? 'level-locked' : canAfford ? 'affordable' : 'locked'}`}
                 >
                   <div className="item-icon">{item.icon}</div>
                   <div className="item-info">
                     <h3>{item.name}</h3>
                     <p className="item-desc">{item.description}</p>
-                    <p className="item-owned">Possédé: {item.owned}</p>
+                    {levelLocked ? (
+                      <p className="item-level-req">Niveau {item.unlockLevel} requis</p>
+                    ) : (
+                      <p className="item-owned">Possédé: {item.owned}</p>
+                    )}
                   </div>
                   <button
-                    className={`buy-button ${canAfford ? '' : 'disabled'}`}
-                    disabled={!canAfford}
+                    className={`buy-button ${canBuy ? '' : 'disabled'}`}
+                    disabled={!canBuy}
                     onClick={() => handlePurchase(item.id)}
                   >
-                    {formatNumber(cost)} LoC
+                    {levelLocked ? `Niv.${item.unlockLevel}` : `${formatNumber(cost)} LoC`}
                   </button>
                 </div>
               );
@@ -360,20 +367,43 @@ export default function Menu() {
         {activeTab === 'leaderboard' && (
           <div className="leaderboard-panel">
             <div className="leaderboard-card">
-              <h3>🏆 Classement</h3>
-              <p className="coming-soon">
-                Le classement multijoueur arrive bientôt!
-              </p>
-              <p className="hint">
-                Connecte-toi au serveur NestJS pour la compétition.
-              </p>
-              <div className="your-rank">
-                <span className="rank-number">#1</span>
-                <span className="rank-name">Toi 👑</span>
-                <span className="rank-score">
-                  {formatNumber(gameState.linesOfCode)} LoC
-                </span>
+              <div className="leaderboard-header">
+                <h3>🏆 Classement</h3>
+                {backendOnline && (
+                  <button
+                    className="refresh-button"
+                    onClick={fetchLeaderboard}
+                    disabled={leaderboardLoading}
+                    title="Actualiser"
+                  >
+                    {leaderboardLoading ? '⏳' : '🔄'}
+                  </button>
+                )}
               </div>
+              {!backendOnline ? (
+                <>
+                  <p className="coming-soon">
+                    Connecte-toi au backend pour voir le classement.
+                  </p>
+                  <p className="hint">
+                    Utilise le menu de connexion pour te connecter au serveur.
+                  </p>
+                </>
+              ) : leaderboardLoading && leaderboard.length === 0 ? (
+                <p className="coming-soon">Chargement du classement...</p>
+              ) : leaderboard.length === 0 ? (
+                <p className="coming-soon">Aucun joueur dans le classement.</p>
+              ) : (
+                leaderboard.map((entry) => (
+                  <div key={entry.userId} className="your-rank">
+                    <span className="rank-number">#{entry.rank}</span>
+                    <span className="rank-name">{entry.username}</span>
+                    <span className="rank-score">
+                      {formatNumber(entry.score)} LoC
+                    </span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}

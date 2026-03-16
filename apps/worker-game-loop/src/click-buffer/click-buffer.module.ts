@@ -1,25 +1,30 @@
+/* istanbul ignore file */
 /**
  * Click Buffer Worker Module
  * Handles flushing the Redis click buffer to PostgreSQL
- * 
+ *
  * This implements the Write-Behind pattern:
  * - Clicks are accumulated in Redis (fast)
  * - Every 5 seconds, this worker batch-updates PostgreSQL
  * - Reduces database IOPS significantly
+ *
+ * SCALABILITY: The flush cron fires on every replica but only one acquires
+ * the distributed Redis lock (DistributedLock / SET NX). BullMQ workers
+ * are inherently safe for multi-replica (Redis-based job locking).
  */
 
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ClickBufferService, LeaderboardService } from '@repo/redis-client';
-import { QueueName } from '@repo/shared-types';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import Redis from 'ioredis';
 
+import { ClickBufferService } from '@repo/redis-client';
+import { NATS_SERVICE, QueueName } from '@repo/shared-types';
 import { ClickBufferFlushService } from './click-buffer-flush.service';
 import { ClickBufferWorker } from './click-buffer.worker';
 
-// Redis client provider
+// Redis client provider (shared by ClickBufferService and DistributedLock)
 const RedisClientProvider = {
   inject: [ConfigService],
   provide: 'REDIS_CLIENT',
@@ -40,26 +45,32 @@ const ClickBufferServiceProvider = {
   useFactory: (redis: Redis) => new ClickBufferService(redis),
 };
 
-// Leaderboard Service provider
-const LeaderboardServiceProvider = {
-  inject: ['REDIS_CLIENT'],
-  provide: LeaderboardService,
-  useFactory: (redis: Redis) => new LeaderboardService(redis),
-};
-
 @Module({
   exports: [ClickBufferFlushService],
   imports: [
     ConfigModule,
-    ScheduleModule.forRoot(),
     BullModule.registerQueue({
       name: QueueName.CLICK_BUFFER,
     }),
+    ClientsModule.registerAsync([
+      {
+        name: NATS_SERVICE.PROGRESSION,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.NATS,
+          options: {
+            servers: [
+              configService.get<string>('NATS_URL', 'nats://localhost:4222'),
+            ],
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   providers: [
     RedisClientProvider,
     ClickBufferServiceProvider,
-    LeaderboardServiceProvider,
     ClickBufferWorker,
     ClickBufferFlushService,
   ],

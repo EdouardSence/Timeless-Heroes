@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 /**
  * Redis Module - Provides Redis services for the api-gateway
  */
@@ -5,13 +6,12 @@
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-    ClickBufferService,
-    DistributedLock,
-    LeaderboardService,
-    ThrottleService,
+  ClickBufferService,
+  DistributedLock,
+  LeaderboardService,
+  ThrottleService,
 } from '@repo/redis-client';
 import Redis from 'ioredis';
-
 
 // Redis client provider
 const RedisClientProvider = {
@@ -25,15 +25,15 @@ const RedisClientProvider = {
       password: configService.get<string>('REDIS_PASSWORD'),
       port: configService.get<number>('REDIS_PORT', 6379),
     });
-    
+
     redis.on('connect', () => {
       console.log('✅ Redis connected');
     });
-    
+
     redis.on('error', (err) => {
       console.error('❌ Redis error:', err);
     });
-    
+
     return redis;
   },
 };

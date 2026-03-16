@@ -1,47 +1,52 @@
 /**
- * ╔═══════════════════════════════════════════════════════════════════════════╗
- * ║      🎮 COMMAND CENTER — Cozy Dev Dashboard                               ║
- * ╠═══════════════════════════════════════════════════════════════════════════╣
- * ║  A gamified IDE-style dashboard for CodeTyper RPG                         ║
- * ║  Features dev jargon: LoC, Version, Daily Commits, Package Manager        ║
- * ╚═══════════════════════════════════════════════════════════════════════════╝
+ * COMMAND CENTER -- Cozy Dev Dashboard
+ * A gamified IDE-style dashboard for CodeTyper RPG
+ * Features dev jargon: LoC, Version, Daily Commits, Package Manager
+ *
+ * BUG-09 FIX: Replaced hardcoded mockData with real API calls
+ * to /api/v1/auth/me and /api/v1/progression/me
  */
 
 'use client';
 
-import { GlassCard, NeonProgress, NeonButton, StatCard } from '@repo/ui';
+import { SHOP_ITEMS } from '@repo/shared-types';
+import { GlassCard, NeonButton, NeonProgress, StatCard } from '@repo/ui';
+import { useEffect, useState } from 'react';
+
 
 import styles from './dashboard.module.css';
 
-// Mock data - in production, this would come from your API
-const mockData = {
-  dailyCommits: [
-    { completed: true, id: 1, title: 'Push 1,000 lines of code', xp: 500 },
-    { completed: true, id: 2, title: 'Maintain a 50x combo streak', xp: 300 },
-    { completed: false, id: 3, title: 'Code for 30 minutes straight', xp: 400 },
-    { completed: false, id: 4, title: 'Reach version milestone', xp: 1000 },
-  ],
-  shopItems: [
-    { icon: '⌨️', id: 1, name: 'RGB Keyboard', price: 5000 },
-    { icon: '🥽', id: 2, name: 'VR Upgrade', price: 12_000 },
-    { icon: '🧥', id: 3, name: 'Neon Hoodie', price: 3500 },
-    { icon: '😺', id: 4, name: 'Hacker Cat', price: 25_000 },
-  ],
-  user: {
-    experience: 7420,
-    experienceToNext: 10_000,
-    level: 23,
-    linesOfCode: 1_847_293,
-    multiplier: 2.4,
-    name: 'CyberDev42',
-    passiveRate: 12.5,
-    streak: 14,
-    tier: 'MID-LEVEL',
-    totalKeyPresses: 892_451,
-  },
-};
+// ── Types ───────────────────────────────────────────────────────────────────
 
-// Helper functions
+interface IUserInfo {
+  email: string;
+  userId: string;
+  username: string;
+}
+
+interface IProgressionData {
+  clickMultiplier: number;
+  criticalChance: number;
+  criticalMultiplier: number;
+  experience: string;
+  level: number;
+  linesOfCode: string;
+  passiveMultiplier: number;
+  userId: string;
+}
+
+// Daily commits are not yet backed by a real system -- placeholder quests
+const DAILY_COMMITS = [
+  { completed: false, id: 1, title: 'Push 1,000 lines of code', xp: 500 },
+  { completed: false, id: 2, title: 'Maintain a 50x combo streak', xp: 300 },
+  { completed: false, id: 3, title: 'Code for 30 minutes straight', xp: 400 },
+  { completed: false, id: 4, title: 'Reach version milestone', xp: 1000 },
+];
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
 function formatNumber(num: number): string {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
   if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
@@ -54,9 +59,129 @@ function levelToVersion(level: number): string {
   return `${major}.${minor}.0`;
 }
 
+function getTier(level: number): string {
+  if (level >= 50) return 'SENIOR';
+  if (level >= 30) return 'MID-LEVEL';
+  if (level >= 15) return 'JUNIOR';
+  if (level >= 5) return 'INTERN';
+  return 'NOOB';
+}
+
+/**
+ * Estimate experience-to-next from level (same formula as progression service).
+ * This is a client-side approximation since IProgressionData does not include it.
+ */
+function experienceToNext(level: number): number {
+  return Math.floor(100 * Math.pow(1.15, level - 1));
+}
+
+// ── Component ───────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
-  const { dailyCommits, shopItems, user } = mockData;
-  const buildProgress = (user.experience / user.experienceToNext) * 100;
+  const [user, setUser] = useState<IUserInfo | null>(null);
+  const [progression, setProgression] = useState<IProgressionData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = localStorage.getItem('jwt_token');
+
+    if (!token) {
+      setError('Not logged in. Please log in first.');
+      setLoading(false);
+      return;
+    }
+
+    const headers = { Authorization: `Bearer ${token}` };
+
+    // Fetch user info and progression in parallel
+    Promise.all([
+      fetch(`${API_BASE}/api/v1/auth/me`, { headers }).then((r) => {
+        if (!r.ok) throw new Error('Failed to fetch user info');
+        return r.json();
+      }),
+      fetch(`${API_BASE}/api/v1/progression/me`, { headers }).then((r) => {
+        if (!r.ok) throw new Error('Failed to fetch progression');
+        return r.json();
+      }),
+    ])
+      .then(([userData, progressionData]) => {
+        setUser(userData as IUserInfo);
+        setProgression(progressionData as IProgressionData);
+      })
+      .catch((error_) => {
+        setError(error_ instanceof Error ? error_.message : 'Unknown error');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  // ── Loading / Error states ──────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className={styles.commandCenter}>
+        <div className={styles.bgCanvas}>
+          <div className={`${styles.bgOrb} ${styles['bgOrb--cyan']}`} />
+          <div className={`${styles.bgOrb} ${styles['bgOrb--lavender']}`} />
+          <div className={`${styles.bgOrb} ${styles['bgOrb--pink']}`} />
+          <div className={styles.circuitGrid} />
+        </div>
+        <main
+          className={styles.main}
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'center',
+            minHeight: '60vh',
+          }}
+        >
+          <p style={{ color: 'var(--color-cyan, #00e5ff)', fontSize: '1.2rem' }}>
+            Loading dashboard...
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !user || !progression) {
+    return (
+      <div className={styles.commandCenter}>
+        <div className={styles.bgCanvas}>
+          <div className={`${styles.bgOrb} ${styles['bgOrb--cyan']}`} />
+          <div className={`${styles.bgOrb} ${styles['bgOrb--lavender']}`} />
+          <div className={`${styles.bgOrb} ${styles['bgOrb--pink']}`} />
+          <div className={styles.circuitGrid} />
+        </div>
+        <main
+          className={styles.main}
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            justifyContent: 'center',
+            minHeight: '60vh',
+          }}
+        >
+          <p style={{ color: '#ff5252', fontSize: '1.2rem' }}>
+            {error || 'Failed to load data'}
+          </p>
+        </main>
+      </div>
+    );
+  }
+
+  // ── Derived values ──────────────────────────────────────────────────
+
+  const linesOfCode = Number(progression.linesOfCode) || 0;
+  const experience = Number(progression.experience) || 0;
+  const expToNext = experienceToNext(progression.level);
+  const buildProgress =
+    expToNext > 0 ? Math.min((experience / expToNext) * 100, 100) : 0;
+  const tier = getTier(progression.level);
+
+  // Use first 4 shop items for the dashboard quick-buy section
+  const shopItems = SHOP_ITEMS.slice(0, 4);
 
   return (
     <div className={styles.commandCenter}>
@@ -85,11 +210,11 @@ export default function DashboardPage() {
             >
               ~/dashboard
             </a>
-            <a href="#" className={styles.navLink}>
-              ~/inventory
+            <a href="/game" className={styles.navLink}>
+              ~/game
             </a>
             <a href="#" className={styles.navLink}>
-              ~/marketplace
+              ~/inventory
             </a>
             <a href="#" className={styles.navLink}>
               ~/achievements
@@ -99,9 +224,9 @@ export default function DashboardPage() {
           <div className={styles.userPill}>
             <div className={styles.userAvatar}>😺</div>
             <div className={styles.userInfo}>
-              <span className={styles.userName}>{user.name}</span>
+              <span className={styles.userName}>{user.username}</span>
               <span className={styles.userVersion}>
-                v{levelToVersion(user.level)}
+                v{levelToVersion(progression.level)}
               </span>
             </div>
           </div>
@@ -118,12 +243,12 @@ export default function DashboardPage() {
               <span className={styles.locLabel}>
                 {'// Total Lines of Code'}
               </span>
-              <span className={styles.locTierBadge}>{user.tier}</span>
+              <span className={styles.locTierBadge}>{tier}</span>
             </div>
 
             <div className={styles.locValue}>
               <span className={styles.locNumber}>
-                {formatNumber(user.linesOfCode)}
+                {formatNumber(linesOfCode)}
               </span>
               <span className={styles.locUnit}>LoC</span>
             </div>
@@ -134,7 +259,7 @@ export default function DashboardPage() {
                   <span className={styles.buildIcon}>▶</span>
                   build:
                   <span className={styles.buildVersion}>
-                    v{levelToVersion(user.level)}
+                    v{levelToVersion(progression.level)}
                   </span>
                 </span>
                 <span className={styles.buildPercent}>
@@ -157,10 +282,10 @@ export default function DashboardPage() {
               <div className={styles.avatarGlow} />
               <div className={styles.avatarImage}>🐱</div>
             </div>
-            <div className={styles.avatarName}>{user.name}</div>
+            <div className={styles.avatarName}>{user.username}</div>
             <div className={styles.avatarTitle}>
               {'// '}
-              {user.tier}
+              {tier}
               {' DEVELOPER'}
             </div>
           </div>
@@ -176,29 +301,29 @@ export default function DashboardPage() {
           <div className={styles.statsGrid}>
             <StatCard
               icon="⚡"
-              value={`×${user.multiplier.toFixed(1)}`}
-              label="Boost Multiplier"
+              value={`×${progression.clickMultiplier.toFixed(1)}`}
+              label="Click Multiplier"
               color="cyan"
             />
 
             <StatCard
               icon="◎"
-              value={`+${user.passiveRate.toFixed(1)}`}
+              value={`+${progression.passiveMultiplier.toFixed(1)}`}
               label="Passive LoC/sec"
               color="lavender"
             />
 
             <StatCard
-              icon="⌨"
-              value={formatNumber(user.totalKeyPresses)}
-              label="Total Keystrokes"
+              icon="🎯"
+              value={`${(progression.criticalChance * 100).toFixed(0)}%`}
+              label="Crit Chance"
               color="pink"
             />
 
             <StatCard
               icon="🔥"
-              value={user.streak}
-              label="Day Streak"
+              value={`×${progression.criticalMultiplier.toFixed(1)}`}
+              label="Crit Multiplier"
               color="mint"
             />
           </div>
@@ -211,13 +336,13 @@ export default function DashboardPage() {
             <div className={styles.cardHeader}>
               <h3 className={styles.cardTitle}>📋 Daily Commits</h3>
               <span className={styles.cardBadge}>
-                {dailyCommits.filter((q) => q.completed).length}/
-                {dailyCommits.length}
+                {DAILY_COMMITS.filter((q) => q.completed).length}/
+                {DAILY_COMMITS.length}
               </span>
             </div>
 
             <div className={styles.questList}>
-              {dailyCommits.map((quest) => (
+              {DAILY_COMMITS.map((quest) => (
                 <div
                   key={quest.id}
                   className={`${styles.questItem} ${quest.completed ? styles['questItem--completed'] : ''}`}
@@ -256,8 +381,8 @@ export default function DashboardPage() {
                     <div className={styles.shopItemIcon}>{item.icon}</div>
                     <div className={styles.shopItemName}>{item.name}</div>
                     <div className={styles.shopItemPrice}>
-                      <span>💎</span>
-                      {formatNumber(item.price)}
+                      <span>LoC </span>
+                      {formatNumber(item.baseCost)}
                     </div>
                     <NeonButton
                       variant="secondary"

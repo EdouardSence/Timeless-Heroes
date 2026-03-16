@@ -3,7 +3,7 @@
  * Centralized Redis configuration and utilities for Timeless-Heroes
  */
 
-import { Job, Queue, QueueEvents, Worker } from 'bullmq';
+import { Job, JobsOptions, Queue, QueueEvents, Worker } from 'bullmq';
 import Redis from 'ioredis';
 import type { RedisOptions } from 'ioredis';
 
@@ -83,6 +83,10 @@ export const RedisKeys = {
   // Click buffer: stores accumulated clicks per user
   CLICK_BUFFER: (userId: string) => `buffer:clicks:${userId}`,
   CLICK_BUFFER_PATTERN: 'buffer:clicks:*',
+
+  // In-flight buffer: LOC that has been flushed from buffer but not yet persisted to DB.
+  // This prevents the "balance regression" window where buffer=0 but DB hasn't been updated yet.
+  INFLIGHT_CLICKS: (userId: string) => `inflight:clicks:${userId}`,
 
   // User session tracking
   USER_SESSION: (userId: string) => `session:${userId}`,
@@ -174,20 +178,115 @@ export class ClickBufferService {
   }
 
   /**
-   * Get and delete buffer (atomic operation for batch processing)
+   * Lua script for atomic HGETALL + DEL.
+   * Returns the hash fields as a flat array [field, value, field, value, ...]
+   * This eliminates the race condition where incrementBuffer() writes are lost
+   * between a non-atomic HGETALL and DEL.
+   */
+  private static readonly FLUSH_LUA = `
+    local data = redis.call('HGETALL', KEYS[1])
+    if #data > 0 then
+      redis.call('DEL', KEYS[1])
+    end
+    return data
+  `;
+
+  /**
+   * Atomically get and delete buffer using a Lua script.
+   * No writes can interleave between the read and the delete.
    */
   async flushBuffer(userId: string): Promise<IClickBufferData | null> {
     const key = RedisKeys.CLICK_BUFFER(userId);
 
-    // Get all fields
+    const raw = (await this.redis.eval(
+      ClickBufferService.FLUSH_LUA,
+      1,
+      key,
+    )) as string[];
+
+    // Lua returns a flat array: ['clicks', '5', 'locToAdd', '12.5', 'lastUpdate', '1700000000000']
+    if (!raw || raw.length === 0) {
+      return null;
+    }
+
+    // Convert flat array to object
+    const data: Record<string, string> = {};
+    for (let i = 0; i < raw.length; i += 2) {
+      data[raw[i]] = raw[i + 1];
+    }
+
+    if (!data.clicks) {
+      return null;
+    }
+
+    return {
+      clicks: parseInt(data.clicks, 10),
+      locToAdd: data.locToAdd || '0',
+      lastUpdate: parseInt(data.lastUpdate ?? '0', 10) || Date.now(),
+    };
+  }
+
+  /**
+   * Set in-flight LOC for a user (called by flush service AFTER atomic flush, BEFORE enqueueing job).
+   * This ensures getCurrentProgression() can include LOC that is "in transit" to the DB.
+   * TTL is set to 60s as a safety net; the worker clears it explicitly on success.
+   */
+  async setInflight(userId: string, locToAdd: string, clicks: number): Promise<void> {
+    const key = RedisKeys.INFLIGHT_CLICKS(userId);
+    const pipeline = this.redis.pipeline();
+    // Use HINCRBYFLOAT/HINCRBY so multiple in-flight batches stack correctly
+    pipeline.hincrbyfloat(key, 'locToAdd', parseFloat(locToAdd));
+    pipeline.hincrby(key, 'clicks', clicks);
+    pipeline.expire(key, 60);
+    await pipeline.exec();
+  }
+
+  /**
+   * Get in-flight LOC for a user (called by getCurrentProgression to include in balance).
+   */
+  async getInflight(userId: string): Promise<{ locToAdd: string; clicks: number } | null> {
+    const key = RedisKeys.INFLIGHT_CLICKS(userId);
+    const data = await this.redis.hgetall(key);
+    if (!data || (!data.locToAdd && !data.clicks)) {
+      return null;
+    }
+    return {
+      locToAdd: data.locToAdd || '0',
+      clicks: parseInt(data.clicks || '0', 10),
+    };
+  }
+
+  /**
+   * Clear in-flight LOC after the DB write succeeds.
+   * Uses HINCRBYFLOAT with negative value to subtract only the completed amount
+   * (in case new in-flight amounts were added concurrently by a newer flush cycle).
+   */
+  async clearInflight(userId: string, locToAdd: string, clicks: number): Promise<void> {
+    const key = RedisKeys.INFLIGHT_CLICKS(userId);
+    const pipeline = this.redis.pipeline();
+    pipeline.hincrbyfloat(key, 'locToAdd', -parseFloat(locToAdd));
+    pipeline.hincrby(key, 'clicks', -clicks);
+    await pipeline.exec();
+
+    // Clean up: if both fields are at or below 0, delete the key entirely
+    const remaining = await this.redis.hgetall(key);
+    const remainingLoc = parseFloat(remaining?.locToAdd || '0');
+    const remainingClicks = parseInt(remaining?.clicks || '0', 10);
+    if (remainingLoc <= 0.001 && remainingClicks <= 0) {
+      await this.redis.del(key);
+    }
+  }
+
+  /**
+   * Get current buffer without clearing it
+   */
+  async getBuffer(userId: string): Promise<IClickBufferData | null> {
+    const key = RedisKeys.CLICK_BUFFER(userId);
     const data = await this.redis.hgetall(key);
 
     if (!data || !data.clicks) {
       return null;
     }
-
-    // Delete the key
-    await this.redis.del(key);
 
     return {
       clicks: parseInt(data.clicks, 10),
@@ -201,7 +300,8 @@ export class ClickBufferService {
    */
   async getAllBufferedUsers(): Promise<string[]> {
     const keys = await this.redis.keys(RedisKeys.CLICK_BUFFER_PATTERN);
-    return keys.map((key) => key.replace('buffer:clicks:', ''));
+    // RedisKeys.CLICK_BUFFER is "buffer:clicks:{userId}"
+    return keys.map((key) => key.split(':').pop() || '');
   }
 }
 
@@ -232,8 +332,8 @@ export class LeaderboardService {
     leaderboardKey: string = RedisKeys.LEADERBOARD_GLOBAL,
   ): Promise<number> {
     const numericScore = typeof score === 'string' ? parseFloat(score) : score;
-    // ZADD returns 1 if new member, 0 if existed
-    return this.redis.zadd(leaderboardKey, numericScore, userId);
+    // GT flag: only update if new score > existing score (prevents score regression)
+    return this.redis.zadd(leaderboardKey, 'GT', numericScore, userId);
   }
 
   /**
@@ -441,7 +541,7 @@ export class ThrottleService {
 
 export const createQueue = <T>(
   name: string,
-  defaultJobOptions?: Record<string, any>,
+  defaultJobOptions?: Partial<JobsOptions>,
 ): Queue<T> => {
   return new Queue<T>(name, {
     connection: getRedisConfig() as RedisOptions,
@@ -552,3 +652,4 @@ export class DistributedLock {
 // ============================================================================
 
 export { Job, Queue, QueueEvents, Redis, Worker };
+export type { JobsOptions };

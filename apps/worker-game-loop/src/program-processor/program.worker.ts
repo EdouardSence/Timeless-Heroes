@@ -3,18 +3,16 @@
  * BullMQ worker that processes program completion jobs
  */
 
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
-import { getRedisConfig } from '@repo/redis-client';
-import { IProgramCompletionPayload, QueueName } from '@repo/shared-types';
+import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { Job, Worker } from 'bullmq';
+import { firstValueFrom } from 'rxjs';
 
+import { getRedisConfig, RedisKeys } from '@repo/redis-client';
+import { IProgramCompletionPayload, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 import { LootCalculatorService } from './loot-calculator.service';
 import { ProgramProcessorService } from './program-processor.service';
+import Redis from 'ioredis';
 
 interface IProgramJobData {
   programId: string;
@@ -27,18 +25,21 @@ interface IProgramJobData {
 export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ProgramWorker.name);
   private worker!: Worker<IProgramJobData, IProgramCompletionPayload>;
-
+  private redis: Redis;
+  
   constructor(
     private readonly programProcessor: ProgramProcessorService,
     private readonly lootCalculator: LootCalculatorService,
-  ) {}
-
-  onModuleInit() {
+    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+  ) {
+    this.redis = new Redis(getRedisConfig());
+  }
+  
+  async onModuleInit() {
     this.logger.log('Initializing Program Worker...');
 
     this.worker = new Worker<IProgramJobData, IProgramCompletionPayload>(
       QueueName.PROGRAM_COMPLETION,
-      // eslint-disable-next-line @typescript-eslint/require-await
       async (job: Job<IProgramJobData>) => this.processProgram(job),
       {
         concurrency: 20, // Process 20 programs in parallel
@@ -68,13 +69,14 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     await this.worker.close();
+    await this.redis.quit();
     this.logger.log('Program Worker destroyed');
   }
 
   /**
    * Process a completed program
    */
-  private processProgram(job: Job<IProgramJobData>): IProgramCompletionPayload {
+  private async processProgram(job: Job<IProgramJobData>): Promise<IProgramCompletionPayload> {
     const { programId, programSlug, userId } = job.data;
 
     this.logger.debug(
@@ -96,15 +98,37 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
 
     // 3. Roll for loot
     const lootDropped = this.lootCalculator.rollLoot(programType.lootTable);
+    
+    // 4. Credit rewards via NATS -> svc-user-progression
+    await firstValueFrom(
+      this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+        userId,
+        delta: earnedLoc,
+      }),
+    );
 
-    // 4. Update user progression (via gRPC or direct DB in production)
-    // FUTURE: Implement gRPC call to svc-user-progression
-    // When ready: progressionClient.updateBalance(userId, earnedLoc)
+    await firstValueFrom(
+      this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+        userId,
+        experience: earnedExp,
+      }),
+    );
 
-    // 5. Mark program as completed
-    this.programProcessor.markProgramCompleted(userId, programSlug);
-
-    // 6. Create completion payload
+    // 5. Add loot items via NATS
+    for (const loot of lootDropped) {
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_ADD_ITEM, {
+          userId,
+          itemSlug: loot.itemSlug,
+          quantity: loot.quantity,
+        }),
+      );
+    }
+    
+    // 6. Mark program as completed in DB
+    await this.programProcessor.markProgramCompleted(userId, programSlug);
+    
+    // 7. Create completion payload
     const completedAt = new Date();
     const completion: IProgramCompletionPayload = {
       completedAt,
@@ -115,11 +139,16 @@ export class ProgramWorker implements OnModuleInit, OnModuleDestroy {
       programSlug,
       userId,
     };
-
-    // 7. Notify user (via Redis Pub/Sub in production)
-    // This would be picked up by the API Gateway and sent to the user via WebSocket
-    // await redis.publish('channel:program-complete', JSON.stringify(completion));
-
+    
+    // 8. Notify user via Redis Pub/Sub (picked up by API Gateway -> WebSocket)
+    await this.redis.publish(
+      RedisKeys.CHANNEL_ACHIEVEMENT,
+      JSON.stringify({
+        type: 'PROGRAM_COMPLETED',
+        ...completion,
+      }),
+    );
+    
     this.logger.log(
       `Program ${programSlug} completed for ${userId}: +${earnedLoc} LoC, +${earnedExp} XP, ${lootDropped.length} items`,
     );

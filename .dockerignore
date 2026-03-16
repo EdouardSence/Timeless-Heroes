@@ -27,6 +27,11 @@ out
 docker-compose.yml
 docker-compose.*.yml
 
+# Prisma native binaries (regenerated in Docker for Alpine)
+packages/prisma-client/generated/client/*.node
+**/libquery_engine*.node
+**/*.dll.node
+
 # Desktop app
 apps/desktop
 apps/keylogger

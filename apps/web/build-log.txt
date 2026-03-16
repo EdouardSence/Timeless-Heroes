@@ -1,0 +1,26 @@
+
+> web@0.1.0 build C:\Users\Aurelien\Desktop\YNOV M2\WebGame\Timeless-Heroes\apps\web
+> next build
+
+▲ Next.js 16.1.5 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 4.6s
+  Running TypeScript ...
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/6) ...
+  Generating static pages using 11 workers (1/6) 
+  Generating static pages using 11 workers (2/6) 
+  Generating static pages using 11 workers (4/6) 
+✓ Generating static pages using 11 workers (6/6) in 750.0ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /dashboard
+└ ○ /game
+
+
+○  (Static)  prerendered as static content
+

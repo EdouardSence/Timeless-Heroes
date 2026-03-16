@@ -5,33 +5,23 @@
  * Architecture:
  * 1. ClickBufferFlushService schedules periodic flush (every 5s)
  * 2. Flush collects all pending clicks from Redis
- * 3. This worker processes each user's buffer and persists to PostgreSQL
+ * 3. This worker processes each user's buffer and persists via NATS to svc-user-progression
  */
 
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
-import { LeaderboardService, RedisKeys } from '@repo/redis-client';
-import { QueueName, IBufferFlushResult } from '@repo/shared-types';
+import { ClientProxy } from '@nestjs/microservices';
 import { Job } from 'bullmq';
-import Redis from 'ioredis';
+import { firstValueFrom } from 'rxjs';
 
-// FUTURE: Import PrismaService when available
-// import { PrismaService } from '@repo/prisma-client';
+import { RedisKeys, ClickBufferService } from '@repo/redis-client';
+import { IProgressionData, NATS_SERVICE, NatsPattern, QueueName, IBufferFlushResult } from '@repo/shared-types';
 
 interface IBufferFlushJob {
   clicks: number;
   locToAdd: string;
   timestamp: number;
   userId: string;
-}
-
-interface IRedisProgression {
-  experience: string;
-  experienceToNext: string;
-  level: number;
-  linesOfCode: string;
-  totalClicks: number;
-  totalLinesWritten: string;
 }
 
 @Processor(QueueName.CLICK_BUFFER, {
@@ -43,21 +33,20 @@ interface IRedisProgression {
 })
 export class ClickBufferWorker extends WorkerHost {
   private readonly logger = new Logger(ClickBufferWorker.name);
+  private readonly clickBufferService: ClickBufferService;
 
   constructor(
-    // FUTURE: Inject PrismaService when available
-    // private readonly prisma: PrismaService,
-    private readonly leaderboardService: LeaderboardService,
-    @Inject('REDIS_CLIENT') private readonly redis: Redis,
+    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject('REDIS_CLIENT') private readonly redis: import('ioredis').default,
   ) {
     super();
+    this.clickBufferService = new ClickBufferService(this.redis);
   }
 
   /**
    * Process a single buffer flush job
-   * Updates PostgreSQL with accumulated clicks for a user
+   * Persists accumulated clicks to PostgreSQL via NATS -> svc-user-progression
    */
-  // FUTURE: This is a simplified version. In production, inject PrismaService.
   async process(job: Job<IBufferFlushJob>): Promise<IBufferFlushResult> {
     const { clicks, locToAdd, userId } = job.data;
     const startTime = Date.now();
@@ -66,65 +55,48 @@ export class ClickBufferWorker extends WorkerHost {
       `Processing buffer flush for ${userId}: ${clicks} clicks, ${locToAdd} LoC`,
     );
 
+    let balanceUpdated = false;
+
     try {
-      // FUTURE: Replace with actual Prisma calls when PrismaService is available
-      // For now, we'll use Redis to store progression (demo purposes)
+      // 1. Update balance via NATS -> svc-user-progression (persists to PostgreSQL)
+      const rawUpdate = await firstValueFrom(
+        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
+          userId,
+          delta: locToAdd,
+        }),
+      );
+      
+      balanceUpdated = true;
 
-      const progressionKey = `progression:${userId}`;
-      const progressionData = await this.redis.get(progressionKey);
+      const updatedProgression = (rawUpdate && typeof rawUpdate === 'object' && 'data' in rawUpdate) 
+        ? rawUpdate.data as IProgressionData 
+        : rawUpdate as IProgressionData;
 
-      const defaultProgression: IRedisProgression = {
-        experience: '0',
-        experienceToNext: '100',
-        level: 1,
-        linesOfCode: '0',
-        totalClicks: 0,
-        totalLinesWritten: '0',
-      };
-      const progression: IRedisProgression = progressionData
-        ? (JSON.parse(progressionData) as IRedisProgression)
-        : defaultProgression;
-
-      // 2. Calculate new values
-      const locAmount = BigInt(Math.floor(Number.parseFloat(locToAdd)));
-      const newLinesOfCode = BigInt(progression.linesOfCode) + locAmount;
-      const newTotalLines = BigInt(progression.totalLinesWritten) + locAmount;
-      const newTotalClicks = BigInt(progression.totalClicks) + BigInt(clicks);
-
-      // 3. Calculate experience and level ups
-      let experience = BigInt(progression.experience);
-      let experienceToNext = BigInt(progression.experienceToNext);
-      let level = progression.level;
-
-      experience += BigInt(clicks); // 1 XP per click
-
-      // Check for level ups
-      while (experience >= experienceToNext) {
-        experience -= experienceToNext;
-        level++;
-        experienceToNext = BigInt(Math.floor(Number(experienceToNext) * 1.5));
-
-        this.logger.log(`🎉 User ${userId} reached level ${level}!`);
-
-        // Publish level up event
-        await this.publishLevelUp(userId, level);
+      // 2. Add experience (1 XP per click) via NATS
+      //    If this fails, balance is already persisted — do NOT re-add to buffer
+      try {
+        await firstValueFrom(
+          this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
+            userId,
+            experience: clicks,
+          }),
+        );
+      } catch (xpError) {
+        this.logger.warn(
+          `XP update failed for ${userId} (balance was persisted OK, skipping XP): ${xpError instanceof Error ? xpError.message : xpError}`,
+        );
       }
 
-      // 4. Update progression (Redis for demo, Prisma in production)
-      const updatedProgression = {
-        experience: experience.toString(),
-        experienceToNext: experienceToNext.toString(),
-        level,
-        linesOfCode: newLinesOfCode.toString(),
-        totalClicks: newTotalClicks.toString(),
-        totalLinesWritten: newTotalLines.toString(),
-        updatedAt: new Date().toISOString(),
-      };
+      // 3. Clear in-flight marker — DB write succeeded, balance is now in PostgreSQL
+      await this.clickBufferService.clearInflight(userId, locToAdd, clicks);
 
-      await this.redis.set(progressionKey, JSON.stringify(updatedProgression));
+      // 4. Invalidate progression cache so subsequent reads see the new DB value
+      await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
 
-      // 5. Update leaderboard in Redis
-      await this.leaderboardService.updateScore(userId, Number(newTotalLines));
+      // 5. Publish level-up event if applicable
+      if (updatedProgression && updatedProgression.level > 1) {
+        await this.publishLevelUp(userId, updatedProgression.level);
+      }
 
       const processingTime = Date.now() - startTime;
       this.logger.debug(
@@ -133,9 +105,9 @@ export class ClickBufferWorker extends WorkerHost {
 
       return {
         clicksProcessed: clicks,
-        locAdded: locAmount.toString(),
-        newBalance: newLinesOfCode.toString(),
-        newLevel: level,
+        locAdded: locToAdd,
+        newBalance: updatedProgression?.linesOfCode || '0',
+        newLevel: updatedProgression?.level || 1,
         processingTimeMs: processingTime,
         success: true,
         userId,
@@ -145,8 +117,18 @@ export class ClickBufferWorker extends WorkerHost {
         `Failed to flush buffer for ${userId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
 
-      // Re-add to buffer on failure (so data isn't lost)
-      await this.reAddToBuffer(userId, locToAdd, clicks);
+      // Clear in-flight since we're re-adding to buffer (avoids double-counting)
+      await this.clickBufferService.clearInflight(userId, locToAdd, clicks);
+
+      // Re-add to buffer on failure (so data isn't lost) — only if balance wasn't already persisted
+      if (!balanceUpdated) {
+        await this.reAddToBuffer(userId, locToAdd, clicks);
+      } else {
+        // Balance was persisted but something else failed — don't re-add (would cause double credit)
+        this.logger.warn(
+          `Balance for ${userId} was already persisted; NOT re-adding to buffer to avoid double credit`,
+        );
+      }
 
       return {
         clicksProcessed: 0,
@@ -177,7 +159,9 @@ export class ClickBufferWorker extends WorkerHost {
   }
 
   /**
-   * Re-add to buffer if flush fails (data recovery)
+   * Re-add to buffer if flush fails (data recovery).
+   * Uses HINCRBY/HINCRBYFLOAT to match the hash type written by ClickBufferService.
+   * A Lua SET was previously used here, causing a WRONGTYPE conflict.
    */
   private async reAddToBuffer(
     userId: string,
@@ -186,26 +170,11 @@ export class ClickBufferWorker extends WorkerHost {
   ): Promise<void> {
     const key = RedisKeys.CLICK_BUFFER(userId);
 
-    // Use Lua script for atomic re-addition
-    const script = `
-      local current = redis.call('GET', KEYS[1])
-      local locAmount = tonumber(current and cjson.decode(current).locToAdd or "0")
-      local clickCount = tonumber(current and cjson.decode(current).clicks or 0)
-      
-      local newData = cjson.encode({
-        locToAdd = tostring(locAmount + tonumber(ARGV[1])),
-        clicks = clickCount + tonumber(ARGV[2])
-      })
-      
-      redis.call('SET', KEYS[1], newData)
-      return 1
-    `;
-
     try {
-      await this.redis.eval(script, 1, key, locToAdd, clicks.toString());
-      this.logger.warn(
-        `Re-added ${clicks} clicks to buffer for ${userId} after flush failure`,
-      );
+      // Atomically increment both hash fields — same type as ClickBufferService.incrementBuffer
+      await this.redis.hincrby(key, 'clicks', clicks);
+      await this.redis.hincrbyfloat(key, 'locToAdd', Number(locToAdd));
+      this.logger.warn(`Re-added ${clicks} clicks to buffer for ${userId} after flush failure`);
     } catch (error) {
       this.logger.error(
         `Failed to re-add to buffer for ${userId}: ${String(error)}`,

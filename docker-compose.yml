@@ -8,25 +8,28 @@
 #
 # ARCHITECTURE:
 # ┌──────────────────┐    ┌───────────────────┐    ┌──────────────────┐
-# │ Desktop Agent    │───>│  API Gateway      │───>│  Redis           │
-# │ (Electron)       │REST│  (NestJS Hybrid)  │    │  (Hot Storage)   │
-# └──────────────────┘    └───────┬───────────┘    └────────┬─────────┘
-#                          HTTP/WS │                         │ BullMQ Jobs
-#                                  │                         ▼
-#                          ┌───────▼──────┐        ┌──────────────────┐
-#                          │  Frontend    │        │  Worker Game Loop│
-#                          │  (Next.js)   │        │  (BullMQ Worker) │
-#                          └──────────────┘        └────────┬─────────┘
-#                                                           │ Prisma
-#                  ┌───────────────────┐                    ▼
-#                  │  svc-payment      │           ┌──────────────────┐
-#                  │  (Stripe + BullMQ)│──────────>│  PostgreSQL      │
-#                  └───────────────────┘           │  (Persistence)   │
-#                                                  └──────────────────┘
-#                  ┌───────────────────┐
-#                  │ svc-user-progress │
-#                  │ (XP, Levels, Shop)│
-#                  └───────────────────┘
+# │ PowerShell Agent │───>│  API Gateway      │───>│  NATS            │
+# │ (Local PC)       │HTTP│  (NestJS Hybrid)  │    │  (Message Bus)   │
+# └──────────────────┘    └───────────────────┘    └────────┬─────────┘
+#                                │                          │
+#                         WebSocket + NATS          ClientProxy
+#                                │                   ┌──────┴─────────┐
+#                                ▼                   ▼                ▼
+#                         ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+#                         │ Frontend     │  │ svc-progress │  │ svc-payment  │
+#                         │ (Next.js)    │  │  (NATS MS)   │  │  (Hybrid)    │
+#                         └──────────────┘  └──────────────┘  └──────────────┘
+#                                                  │
+#                                           Redis + BullMQ
+#                                                  │
+#                                           ┌──────────────┐
+#                                           │ worker-loop  │
+#                                           │ (BullMQ+NATS)│
+#                                           └──────┬───────┘
+#                                                  ▼
+#                                           ┌──────────────┐
+#                                           │  PostgreSQL  │
+#                                           └──────────────┘
 
 services:
   # ============================================================================
@@ -76,6 +79,22 @@ services:
       retries: 5
     networks:
       - timeless-net
+  
+  nats:
+    image: nats:2-alpine
+    container_name: timeless-nats
+    restart: unless-stopped
+    ports:
+      - "4222:4222"   # Client connections
+      - "8222:8222"   # HTTP monitoring
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - timeless-net
 
   # Redis Commander - Redis GUI (development only)
   redis-commander:
@@ -113,10 +132,12 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
-      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required - set it in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
-      MAX_CPS: ${MAX_CPS:-20}
+      MAX_CPS: ${MAX_CPS:-100}
+      MAX_VIOLATIONS: ${MAX_VIOLATIONS:-50}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      NATS_URL: nats://nats:4222
       # Service discovery
       SVC_USER_PROGRESSION_HOST: svc-user-progression
       SVC_USER_PROGRESSION_PORT: 3001
@@ -126,6 +147,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     networks:
       - timeless-net
@@ -145,10 +168,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     networks:
       - timeless-net
@@ -159,19 +185,20 @@ services:
       dockerfile: ./apps/worker-game-loop/Dockerfile
     container_name: timeless-worker-game-loop
     restart: unless-stopped
-    expose:
-      - '3002'
+    # No HTTP port exposed — pure NATS microservice + BullMQ worker
     environment:
       NODE_ENV: ${NODE_ENV:-production}
-      WORKER_PORT: 3002
       DATABASE_URL: postgresql://${POSTGRES_USER:-timeless}:${POSTGRES_PASSWORD:-timeless_secret}@postgres:5432/${POSTGRES_DB:-timeless_heroes}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     networks:
       - timeless-net
@@ -193,10 +220,13 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secret}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_placeholder}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      NATS_URL: nats://nats:4222
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     networks:
       - timeless-net

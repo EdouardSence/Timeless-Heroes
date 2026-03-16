@@ -1,147 +1,129 @@
-# 🎮 Timeless-Heroes
+# Timeless Heroes
 
-## Dev-Idle Terminal Game Backend
+**Dev-Idle Terminal Game** — Un jeu idle/clicker sur le thème du développement, avec un backend NestJS distribué (BullMQ, Redis, NATS, PostgreSQL) et deux frontends : une app Electron desktop et un frontend web Next.js.
 
-Un jeu de type Idle/Clicker sur le thème du développement informatique, avec un backend NestJS hautement scalable utilisant BullMQ, Redis, et PostgreSQL.
-
-> 📚 **Documentation Architecture complète** : voir [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+> Documentation architecture complète : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## 📋 Table des matières
+## Table des matières
 
 1. [Architecture](#architecture)
 2. [Stack Technique](#stack-technique)
-3. [Installation](#installation)
-4. [Keylogger Sécurisé](#keylogger-sécurisé)
-5. [Services](#services)
+3. [Ports & Services](#ports--services)
+4. [Installation](#installation)
+5. [Lancement Complet](#lancement-complet)
 6. [API Reference](#api-reference)
-7. [Configuration](#configuration)
-8. [Gestion de l'Idempotence](#gestion-de-lidempotence)
+7. [Configuration (.env)](#configuration-env)
+8. [Sécurité & Anti-Cheat](#sécurité--anti-cheat)
 
 ---
 
-## 🏗️ Architecture
-
-```mermaid
-graph TD
-    subgraph Client_Local ["🖥️ PC Utilisateur (Client)"]
-        Hook[PowerShell Agent<br/>keyboard-hook-secure.ps1] 
-        Browser[Frontend Next.js]
-    end
-
-    subgraph Cloud ["☁️ Infrastructure Docker"]
-        Gateway[API Gateway<br/>TCP :9999 + HTTP :3000]
-        Redis[(Redis<br/>Buffer + BullMQ)]
-        Worker[Worker Game Loop<br/>BullMQ Processor]
-        DB[(PostgreSQL)]
-    end
-
-    Hook -->|"TCP: KEY_PRESS (anonymisé)"| Gateway
-    Gateway -->|Buffer| Redis
-    Redis -->|Job 5s| Worker
-    Worker -->|Persist| DB
-    Worker -->|Pub/Sub| Redis
-    Redis -->|Notify| Gateway
-    Gateway -->|WebSocket| Browser
-```
-
-### Flux de données détaillé
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                  CLIENTS                                     │
-│              (PowerShell Agent / Terminal / Web / Mobile)                    │
-└────────────────────────────────────┬────────────────────────────────────────┘
-                                     │ TCP :9999 (Keylogger)
-                                     │ WebSocket / REST :3000
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                            API-GATEWAY (Port 3000 + 9999)                    │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐   │
-│  │  TCP Ingest ⚡   │  │  WebSocket GW    │  │  Auth Service            │   │
-│  │  - Anonymous     │  │  - KEY_PRESS     │  │  - JWT                   │   │
-│  │  - Anti-Cheat    │  │  - Balance       │  │  - Sessions              │   │
-│  │  - Heuristics    │  │  - Programs      │  │                          │   │
-│  └──────────────────┘  └──────────────────┘  └──────────────────────────┘   │
-└─────────────────────────────────────┬───────────────────────────────────────┘
-                                      │
-        ┌─────────────────────────────┼─────────────────────────────────────┐
-        │                             │                                     │
-        ▼                             ▼                                     ▼
-┌───────────────┐           ┌─────────────────┐               ┌─────────────────┐
-│    REDIS      │           │   PostgreSQL    │               │    BullMQ       │
-│  - Buffers    │           │   (Prisma)      │               │  - Click Buffer │
-│  - Leaderboard│           │   - Users       │               │  - Programs     │
-│  - Cache      │           │   - Items       │               │  - Offline      │
-│  - Pub/Sub    │           │   - Progression │               │  - Achievements │
-└───────────────┘           └─────────────────┘               └─────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                          CLIENTS                                     │
+│                                                                      │
+│  ┌──────────────────┐        ┌──────────────────────────────────┐   │
+│  │  Desktop (Electron)│      │  Web (Next.js :3001)             │   │
+│  │  :4000 (Vite dev) │       │  - Landing / Login               │   │
+│  │  - Keylogger local│       │  - Dashboard (stats réelles)     │   │
+│  │  - Boutique       │       │  - Jeu (Socket.IO)               │   │
+│  │  - Leaderboard    │       │  - Classement                    │   │
+│  └────────┬──────────┘       └──────────────┬───────────────────┘   │
+└───────────┼──────────────────────────────────┼─────────────────────┘
+            │ HTTP REST + WebSocket            │ HTTP REST + WebSocket
+            ▼                                  ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   API-GATEWAY  :3000                                 │
+│  ┌────────────────┐  ┌─────────────────┐  ┌──────────────────────┐  │
+│  │  Auth JWT       │  │  WebSocket /game│  │  REST Ingest         │  │
+│  │  /auth/login    │  │  KEY_PRESS      │  │  POST /ingest/key    │  │
+│  │  /auth/register │  │  CLICK_PROCESSED│  │  (keylogger desktop) │  │
+│  │  /auth/me       │  │  LEADERBOARD    │  └──────────────────────┘  │
+│  └────────────────┘  └─────────────────┘                             │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │  REST Progression : /progression/me  /progression/leaderboard│    │
+│  └──────────────────────────────────────────────────────────────┘    │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          │ NATS (publish/subscribe + request/reply)
+          ┌───────────────┼────────────────────────────┐
+          ▼               ▼                            ▼
+┌──────────────────┐ ┌──────────────────┐   ┌──────────────────────┐
+│ svc-user-        │ │ worker-game-loop │   │ svc-payment          │
+│ progression      │ │ (BullMQ workers) │   │ :3003                │
+│ NATS microservice│ │ - click-buffer   │   │ - Stripe Webhook     │
+│ - getProgression │ │ - program-proc.  │   │ - Provisioning       │
+│ - updateBalance  │ │ - offline-calc.  │   │   (LoC/items/boosts) │
+│ - addExperience  │ └────────┬─────────┘   └──────────────────────┘
+│ - addItem        │          │ NATS
+│ - leaderboard    │ ←────────┘
+└──────────┬───────┘
+           │ Prisma
+           ▼
+┌─────────────────┐      ┌──────────────────┐
+│   PostgreSQL    │      │      Redis        │
+│   :5432         │      │      :6379        │
+│ Users           │      │ - Click buffers  │
+│ Progressions    │      │ - Leaderboards   │
+│ OwnedItems      │      │ - Sessions JWT   │
+│ Transactions    │      │ - Boosts actifs  │
+└─────────────────┘      │ - Abonnements    │
+                         │ - BullMQ queues  │
+                         └──────────────────┘
 ```
 
 ---
 
-## 🛠️ Stack Technique
+## Stack Technique
 
 | Composant | Technologie |
 |-----------|-------------|
-| **Framework** | NestJS (Monorepo) |
-| **Base de données** | PostgreSQL + Prisma ORM |
-| **Cache & Broker** | Redis (Pub/Sub, Sorted Sets) |
-| **File d'attente** | BullMQ |
-| **WebSocket** | Socket.IO |
-| **TCP Microservice** | NestJS Microservices |
-| **Auth** | JWT + Passport |
-| **Paiements** | Stripe |
-| **Container** | Docker + Docker Compose |
-| **Package Manager** | pnpm + Turborepo |
+| Framework backend | NestJS (monorepo Turborepo) |
+| Base de données | PostgreSQL 16 + Prisma ORM |
+| Cache & Message Bus | Redis 7 (Pub/Sub, Sorted Sets, BullMQ) |
+| Microservices | NATS 2 |
+| File d'attente | BullMQ |
+| WebSocket | Socket.IO |
+| Auth | JWT + Passport |
+| Frontend web | Next.js 16 (App Router) |
+| Frontend desktop | Electron 35 + Vite + React |
+| Paiements | Stripe |
+| Containers | Docker + Docker Compose |
+| Package Manager | pnpm 8 + Turborepo |
 
 ---
 
-## 🔒 Keylogger Sécurisé
+## Ports & Services
 
-Le keylogger PowerShell est **anonymisé** et **authentifié** :
-
-### Sécurité
-
-- ✅ **Anonymisation** : Seule la *catégorie* de touche est envoyée (CHAR, ENTER, TAB...), jamais le code réel
-- ✅ **JWT Auth** : Authentification obligatoire avant envoi
-- ✅ **Anti-Cheat** : Détection heuristique des bots (variance de timing)
-
-### Utilisation
-
-```powershell
-# Obtenir un token JWT depuis le dashboard web
-$token = "votre-jwt-token"
-
-# Lancer l'agent sécurisé
-./apps/keylogger/keyboard-hook-secure.ps1 -Token $token
-```
-
-### Catégories anonymisées
-
-| Catégorie | Description | Bonus LoC |
-|-----------|-------------|-----------|
-| `CHAR` | Lettres, chiffres | 1 |
-| `ENTER` | Fin de ligne | 3 |
-| `TAB` | Indentation | 2 |
-| `FUNCTION` | F1-F12 | 2 |
-| `MODIFIER` | Shift, Ctrl | 1 |
+| Service | Port | Description |
+|---------|------|-------------|
+| **API Gateway** | `3000` | HTTP REST + WebSocket `/game` |
+| **svc-user-progression** | NATS only | Microservice NATS (pas d'HTTP en dev) |
+| **worker-game-loop** | — | BullMQ workers (pas d'HTTP) |
+| **svc-payment** | `3003` | HTTP REST + Stripe Webhook |
+| **Web (Next.js)** | `3001` | Frontend web (dev) |
+| **Desktop (Vite)** | `4000` | Renderer Electron (dev) |
+| **PostgreSQL** | `5432` | Base de données |
+| **Redis** | `6379` | Cache + BullMQ + Pub/Sub |
+| **NATS** | `4222` | Message bus inter-services |
+| **NATS monitoring** | `8222` | Dashboard NATS (HTTP) |
+| **Redis Commander** | `8081` | GUI Redis (profil `dev`) |
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prérequis
+
 - Node.js 18+
-- pnpm 8+
-- Docker & Docker Compose
-- PostgreSQL 16+ (ou via Docker)
-- Redis 7+ (ou via Docker)
+- pnpm 8+ (`npm install -g pnpm@8`)
+- Docker Desktop
 
 ### 1. Cloner et installer
 
 ```bash
-# Cloner le projet
 git clone <repository-url>
 cd Timeless-Heroes
 
@@ -149,250 +131,331 @@ cd Timeless-Heroes
 pnpm install
 ```
 
-### 2. Configuration
+> **Windows uniquement :** Si `pnpm install` échoue avec `EBUSY: resource busy or locked` sur `node_modules/electron/dist/resources/default_app.asar`, ferme tous les processus Electron et réessaie. Si le problème persiste, l'antivirus Windows bloque parfois ce fichier temporairement.
+
+### 2. Configurer l'environnement
 
 ```bash
-# Copier le fichier d'environnement
 cp .env.example .env
-
-# Éditer .env avec vos valeurs
 ```
 
-### 3. Démarrage avec Docker
+Édite `.env` et remplace au minimum :
+```env
+JWT_SECRET=un-secret-de-32-caracteres-minimum-ici
+```
+
+Les autres valeurs fonctionnent par défaut pour le développement local.
+
+### 3. Appliquer les migrations de base de données
 
 ```bash
-# Démarrer l'infrastructure (PostgreSQL, Redis)
-docker-compose up -d postgres redis
+# Démarrer PostgreSQL
+docker-compose up -d postgres
 
 # Générer le client Prisma
-pnpm -F @repo/prisma-client generate
+pnpm db:generate
 
 # Appliquer les migrations
-pnpm -F @repo/prisma-client migrate:dev
+pnpm db:migrate
+```
 
-# Démarrer les services en dev
+---
+
+## Lancement Complet
+
+Il y a deux modes : **tout en Docker** (recommandé pour tester) ou **infra Docker + services locaux** (pour développer).
+
+---
+
+### Mode A — Tout en Docker + frontends locaux (recommandé)
+
+Ce mode démarre tout le backend dans Docker, puis les frontends localement.
+
+#### Étape 1 — Démarrer tout le backend
+
+```bash
+# Depuis la racine du projet
+docker-compose up -d
+```
+
+Cela démarre :
+- PostgreSQL `:5432`
+- Redis `:6379`
+- NATS `:4222` + monitoring `:8222`
+- API Gateway `:3000`
+- svc-user-progression (NATS)
+- worker-game-loop (BullMQ)
+- svc-payment `:3003`
+
+Vérifier que tout est healthy :
+```bash
+docker-compose ps
+```
+
+Optionnel — activer Redis Commander (GUI) :
+```bash
+docker-compose --profile dev up -d redis-commander
+# Accessible sur http://localhost:8081
+```
+
+#### Étape 2 — Démarrer le frontend Web (Next.js)
+
+Dans un nouveau terminal :
+```bash
+pnpm -F web dev
+# ou
+cd apps/web && pnpm dev
+```
+
+Accessible sur **http://localhost:3001**
+
+#### Étape 3 — Démarrer l'app Desktop (Electron)
+
+Dans un nouveau terminal :
+```bash
+cd apps/desktop && pnpm dev
+```
+
+Cela lance :
+1. Le serveur Vite sur **http://localhost:4000** (renderer React)
+2. L'app Electron qui charge `localhost:4000`
+
+L'app apparaît dans la barre des tâches Windows sous forme de widget compact.
+
+---
+
+### Mode B — Infrastructure Docker + services locaux (développement)
+
+Pour le hot-reload sur tous les services backend :
+
+#### Étape 1 — Démarrer uniquement l'infrastructure
+
+```bash
+pnpm infra:up
+# équivalent de : docker-compose up -d postgres redis nats
+```
+
+#### Étape 2 — Lancer tous les services en dev (hot-reload)
+
+```bash
 pnpm dev
 ```
 
-### 4. Démarrage production Docker
+Turbo démarre en parallèle :
+- `api-gateway` sur `:3000`
+- `svc-user-progression` (NATS)
+- `worker-game-loop` (BullMQ)
+- `svc-payment` sur `:3003`
+- `web` sur `:3001`
+- `desktop` sur `:4000` (Vite) + Electron
 
-```bash
-# Construire et démarrer tous les services
-docker-compose up -d --build
-```
-
----
-
-## 🔧 Services
-
-### API Gateway (Port 3000)
-Point d'entrée principal avec WebSocket et validation des clics.
-
-**WebSocket Events:**
-- `KEY_PRESS` - Événement de clic
-- `BALANCE_UPDATE` - Mise à jour du solde
-- `LEADERBOARD_UPDATE` - Mise à jour du classement
-- `PROGRAM_COMPLETED` - Programme terminé
-- `OFFLINE_REWARDS` - Récompenses hors-ligne
-
-### SVC-User-Progression (Port 3001)
-Gestion de la progression des joueurs et calcul des coûts.
-
-**Formule de coût:**
-```
-Price = BaseCost × 1.15^AmountOwned
-```
-
-### Worker-Game-Loop (Port 3002)
-Workers BullMQ pour les programmes et le calcul offline.
-
-**Jobs gérés:**
-- `program-completion` - Fin de programme (delayed)
-- `offline-calculation` - Calcul AFK
-
-### SVC-Payment (Port 3003)
-Gestion des paiements Stripe avec résilience.
-
-**Webhook:** `POST /webhooks/stripe`
+> **Attention :** En mode `pnpm dev`, `svc-user-progression` utilise le port 3001 comme port NATS d'écoute interne. Il n'y a pas de conflit avec Next.js car le service progression ne monte pas de serveur HTTP en dev.
 
 ---
 
-## 📚 API Reference
+### Launcher Windows intégré
 
-### WebSocket Connection
+Un script batch est disponible à la racine :
 
-```javascript
-const socket = io('ws://localhost:3000/game', {
-  auth: {
-    token: 'your-jwt-token',
-    userId: 'user-123',
-    username: 'Player'
-  }
-});
-
-// Envoyer un clic
-socket.emit('KEY_PRESS', {
-  timestamp: Date.now(),
-  keyType: 'NORMAL' // NORMAL | SPECIAL | FUNCTION
-});
-
-// Recevoir le résultat
-socket.on('CLICK_PROCESSED', (result) => {
-  console.log('LoC earned:', result.finalValue);
-  console.log('New balance:', result.newBalance);
-  console.log('Critical hit:', result.isCritical);
-});
+```
+START-GAME.bat
 ```
 
-### REST Endpoints
+Il :
+1. Vérifie que Docker est lancé
+2. Démarre tout le backend via `docker-compose up -d`
+3. Ouvre l'app Electron dans un nouveau terminal
+
+---
+
+## Première utilisation
+
+### Créer un compte
 
 ```bash
-# Get user progression
-GET /api/v1/progression/:userId
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"player@example.com","password":"secret123","username":"Player1"}'
+```
 
-# Purchase item
-POST /api/v1/progression/purchase
-{
-  "userId": "user-123",
-  "itemSlug": "mechanical-keyboard",
-  "quantity": 1
+Réponse : `{ "access_token": "eyJ..." }`
+
+### Se connecter
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"player@example.com","password":"secret123"}'
+```
+
+### Via l'interface web
+
+1. Aller sur **http://localhost:3001**
+2. Créer un compte ou se connecter
+3. Redirection automatique vers le dashboard
+4. Cliquer sur "Jouer" pour accéder au jeu Socket.IO
+
+### Via l'app Desktop
+
+1. Lancer **START-GAME.bat** ou `cd apps/desktop && pnpm dev`
+2. Cliquer sur l'icône du widget dans la barre des tâches
+3. Aller dans l'onglet "Connexion" et entrer ses identifiants
+4. Les frappes clavier sont automatiquement envoyées au backend
+
+---
+
+## API Reference
+
+### Authentification
+
+```http
+POST /api/v1/auth/register
+Body: { "email": string, "password": string, "username": string }
+Response: { "access_token": string }
+
+POST /api/v1/auth/login
+Body: { "email": string, "password": string }
+Response: { "access_token": string }
+
+GET /api/v1/auth/me
+Headers: Authorization: Bearer <token>
+Response: { "userId": string, "email": string, "username": string }
+```
+
+### Progression
+
+```http
+GET /api/v1/progression/me
+Headers: Authorization: Bearer <token>
+Response: {
+  "userId": string,
+  "linesOfCode": string,
+  "level": number,
+  "experience": string,
+  "clickMultiplier": number,
+  "passiveMultiplier": number,
+  "criticalChance": number,
+  "criticalMultiplier": number
 }
 
-# Get leaderboard
-GET /api/v1/progression/leaderboard/GLOBAL
+GET /api/v1/progression/leaderboard?type=GLOBAL
+Headers: Authorization: Bearer <token>
+Query: type = GLOBAL | WEEKLY | DAILY
+Response: {
+  "success": true,
+  "data": {
+    "type": "GLOBAL",
+    "entries": [{ "userId": string, "score": number, "rank": number }]
+  }
+}
+```
+
+### Ingest (Keylogger Desktop)
+
+```http
+POST /api/v1/ingest/auth
+Headers: Authorization: Bearer <token>
+Body: {}
+Response: { "sessionId": string }
+
+POST /api/v1/ingest/key
+Headers: Authorization: Bearer <token>
+Body: {
+  "sessionId": string,
+  "keyCategory": "CHAR" | "ENTER" | "SPACE" | "TAB" | "MODIFIER" | "FUNCTION" | "NAVIGATION" | "BACKSPACE" | "UNKNOWN",
+  "timestamp": number
+}
+```
+
+### WebSocket `/game`
+
+```javascript
+// Connexion avec auth JWT
+const socket = io('http://localhost:3000/game', {
+  auth: { token: 'eyJ...' }
+});
+
+// Envoyer une frappe
+socket.emit('KEY_PRESS', { timestamp: Date.now() });
+
+// Écouter les mises à jour
+socket.on('CLICK_PROCESSED', (data) => {
+  // { finalValue, newBalance, isCritical, multiplier }
+});
+socket.on('BALANCE_UPDATE', (data) => {
+  // { linesOfCode, level, experience }
+});
+socket.on('LEADERBOARD_UPDATE', (data) => {
+  // [{ userId, username, score, rank, level }]
+});
+socket.on('OFFLINE_REWARDS', (data) => {
+  // { locEarned, xpEarned, durationSeconds }
+});
 ```
 
 ---
 
-## ⚙️ Configuration
+## Configuration (.env)
 
 | Variable | Description | Défaut |
 |----------|-------------|--------|
-| `DATABASE_URL` | URL PostgreSQL | - |
-| `REDIS_HOST` | Host Redis | localhost |
-| `REDIS_PORT` | Port Redis | 6379 |
-| `JWT_SECRET` | Secret JWT | - |
-| `MAX_CPS` | Max clics/seconde | 20 |
-| `STRIPE_SECRET_KEY` | Clé Stripe | - |
+| `DATABASE_URL` | URL PostgreSQL complète | `postgresql://timeless:timeless_secret@localhost:5432/timeless_heroes` |
+| `REDIS_HOST` | Host Redis | `localhost` |
+| `REDIS_PORT` | Port Redis | `6379` |
+| `REDIS_PASSWORD` | Mot de passe Redis | `redis_secret` |
+| `JWT_SECRET` | **Requis** — min 32 caractères | — |
+| `JWT_EXPIRES_IN` | Durée du token | `7d` |
+| `NATS_URL` | URL du serveur NATS | `nats://localhost:4222` |
+| `MAX_CPS` | Clics max par seconde (anti-cheat) | `20` |
+| `STRIPE_SECRET_KEY` | Clé secrète Stripe | `sk_test_...` |
+| `STRIPE_WEBHOOK_SECRET` | Secret webhook Stripe | `whsec_...` |
 
 ---
 
-## 🔐 Gestion de l'Idempotence (Paiements)
+## Sécurité & Anti-Cheat
 
-### Problématique
-Empêcher qu'un paiement soit crédité plusieurs fois en cas de:
-- Webhook Stripe reçu en double
-- Retry du job BullMQ après échec
-- Crash pendant le provisioning
+### Keylogger Desktop
 
-### Solution Implémentée
+- **Anonymisation** : seule la *catégorie* de touche est envoyée (CHAR, ENTER, TAB...), jamais la touche réelle ni son code
+- **Authentification JWT** : obligatoire avant tout envoi
+- **Anti-cheat** : détection heuristique des bots
+  - Max 20 CPS (configurable via `MAX_CPS`)
+  - Intervalle minimum 30ms entre deux touches
+  - Régularité de timing suspecte → ban temporaire
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FLUX DE TRAITEMENT PAYMENT                        │
-└─────────────────────────────────────────────────────────────────────┘
+### Boosts & Abonnements (Redis)
 
-1. Stripe Webhook reçu
-         │
-         ▼
-2. Extraction de l'idempotencyKey depuis metadata
-         │
-         ▼
-3. Création Job BullMQ PROVISION_ORDER
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    DANS LE WORKER                                    │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  4. checkAndLock(idempotencyKey)                                    │
-│         │                                                            │
-│         ├── Key existe + COMPLETED → Return (déjà traité)           │
-│         │                                                            │
-│         ├── Key existe + PROCESSING (< 5min) → Return (en cours)    │
-│         │                                                            │
-│         └── Key n'existe pas OU FAILED → Continuer                  │
-│                   │                                                  │
-│                   ▼                                                  │
-│  5. Set status = PROCESSING (avec TTL 7 jours)                      │
-│                   │                                                  │
-│                   ▼                                                  │
-│  6. provisionOrder() - Créditer l'utilisateur                       │
-│         │                                                            │
-│         ├── Succès → markCompleted() → status = COMPLETED           │
-│         │                                                            │
-│         └── Échec → markFailed() + releaseLock() → BullMQ retry     │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Clés Redis Utilisées
+Les boosts et abonnements achetés sont stockés dans Redis avec TTL :
 
 ```
-idempotency:{key}     → Record { status, createdAt, transactionId }
-lock:payment:{key}    → Distributed lock (30s TTL)
+boost:{userId}:{boostType}   → JSON { multiplier, activatedAt, expiresAt }  — TTL = durationSeconds
+subscription:{userId}        → JSON { type, activatedAt, expiresAt }         — TTL = durationDays × 86400
 ```
 
-### Garanties
+Multiplicateurs d'abonnement : `PREMIUM=1.5×` · `VIP=2.0×` · `ELITE=3.0×`
 
-1. **At-Most-Once Delivery**: Un paiement ne peut être crédité qu'une seule fois
-2. **Recovery**: Si un worker crash pendant PROCESSING (> 5min), le retry est autorisé
-3. **Audit Trail**: Les records sont conservés 7 jours pour debugging
-4. **Distributed Lock**: Empêche les race conditions entre workers
+### Idempotence des Paiements
 
----
+Chaque webhook Stripe est traité exactement une fois grâce à une clé d'idempotence Redis :
 
-## 📊 Schéma de Données Principal
-
-```prisma
-model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  username      String        @unique
-  password      String
-  progression   Progression?
-  ownedItems    OwnedItem[]
-  activePrograms ActiveProgram[]
-  transactions  Transaction[]
-}
-
-model Progression {
-  userId              String   @unique
-  linesOfCode         Decimal  @db.Decimal(30, 0)
-  clickMultiplier     Float    @default(1.0)
-  passiveMultiplier   Float    @default(0.0)
-  level               Int      @default(1)
-}
-
-model OwnedItem {
-  userId      String
-  itemId      String
-  quantity    Int      @default(1)
-  @@unique([userId, itemId])
-}
-
-model ActiveProgram {
-  userId          String
-  programTypeId   String
-  startedAt       DateTime
-  estimatedEndAt  DateTime
-  status          ProgramStatus @default(RUNNING)
-  bullJobId       String?
-}
+```
+idempotency:{key}   → { status: PROCESSING | COMPLETED | FAILED, createdAt }  — TTL 7 jours
+lock:payment:{key}  → distributed lock (30s TTL)
 ```
 
 ---
 
-## 🚀 Prochaines Étapes
+## Prochaines étapes
 
 - [ ] Intégration gRPC pour communication inter-services
 - [ ] Système de prestige
 - [ ] Événements temporaires
-- [ ] Guildes/Équipes
-- [ ] Mode compétitif
+- [ ] Achievements (infrastructure Redis déjà en place)
+- [ ] Guildes / Équipes
+- [ ] Mode compétitif PvP
 
 ---
 
-## 📝 License
+## License
 
 MIT © Timeless-Heroes Team

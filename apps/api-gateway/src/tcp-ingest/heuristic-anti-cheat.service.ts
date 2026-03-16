@@ -26,18 +26,20 @@ export class HeuristicAntiCheatService {
 
   // Configuration
   private readonly MAX_CPS: number;
+  private readonly MAX_VIOLATIONS: number;
   private readonly WINDOW_SIZE = 20; // Keep last 20 key presses for analysis
-  private readonly MIN_DELTA_MS = 30; // Minimum realistic time between keypresses
-  private readonly MAX_REGULARITY_SCORE = 0.9; // Above this = too regular = bot
-  private readonly MIN_STD_DEV = 15; // Human typing has at least 15ms variance
+  private readonly MIN_DELTA_MS = 15; // Relaxed from 30ms
+  private readonly MAX_REGULARITY_SCORE = 0.95; // Relaxed from 0.9
+  private readonly MIN_STD_DEV = 5; // Relaxed from 15ms
   private readonly TIMING_TTL = 300; // 5 minutes TTL for timing data
 
   constructor(
     private readonly configService: ConfigService,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
   ) {
-    this.MAX_CPS = this.configService.get<number>('MAX_CPS', 20);
-    this.logger.log(`Anti-cheat initialized: MAX_CPS=${this.MAX_CPS}`);
+    this.MAX_CPS = this.configService.get<number>('MAX_CPS', 100);
+    this.MAX_VIOLATIONS = this.configService.get<number>('MAX_VIOLATIONS', 50);
+    this.logger.log(`Anti-cheat initialized: MAX_CPS=${this.MAX_CPS}, MAX_VIOLATIONS=${this.MAX_VIOLATIONS}`);
   }
 
   /**
@@ -50,7 +52,7 @@ export class HeuristicAntiCheatService {
   ): Promise<IAntiCheatResult> {
     // 1. Check if user is banned
     const violations = await this.redis.get(RedisKeys.USER_VIOLATIONS(userId));
-    if (violations && Number.parseInt(violations, 10) >= 10) {
+    if (violations && Number.parseInt(violations, 10) >= this.MAX_VIOLATIONS) {
       return {
         allowed: false,
         humanScore: 0,
@@ -197,6 +199,16 @@ export class HeuristicAntiCheatService {
       allowed: true,
       humanScore,
     };
+  }
+
+  /** Expose MAX_CPS for batch-level validation */
+  getMaxCPS(): number {
+    return this.MAX_CPS;
+  }
+
+  /** Expose MAX_VIOLATIONS for batch-level validation */
+  getMaxViolations(): number {
+    return this.MAX_VIOLATIONS;
   }
 
   /**

@@ -13,7 +13,19 @@ import { JwtService } from '@nestjs/jwt';
 import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 
+import { Role } from '@repo/shared-types';
+
 import { IJwtPayload } from './jwt.strategy';
+
+/**
+ * Extended Socket interface with authenticated user data
+ */
+export interface IAuthenticatedSocket extends Socket {
+  userId?: string;
+  email?: string;
+  username?: string;
+  role?: Role;
+}
 
 @Injectable()
 export class WsJwtGuard implements CanActivate {
@@ -23,7 +35,7 @@ export class WsJwtGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      const client: Socket = context.switchToWs().getClient();
+      const client = context.switchToWs().getClient<IAuthenticatedSocket>();
       const token = this.extractToken(client);
 
       if (!token) {
@@ -33,9 +45,10 @@ export class WsJwtGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync<IJwtPayload>(token);
 
       // Attach user info to socket for later use
-      (client as unknown as { userId: string }).userId = payload.sub;
-      (client as unknown as { email: string }).email = payload.email;
-      (client as unknown as { username: string }).username = payload.username;
+      client.userId = payload.sub;
+      client.email = payload.email;
+      client.username = payload.username;
+      client.role = payload.role ?? Role.PLAYER;
 
       return true;
     } catch (error) {

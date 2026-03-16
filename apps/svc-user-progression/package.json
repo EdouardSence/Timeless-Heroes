@@ -22,6 +22,7 @@
     "@repo/shared-types": "workspace:*",
     "bullmq": "^5.25.0",
     "ioredis": "^5.4.1",
+    "nats": "^2.29.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"
   },
@@ -32,7 +33,10 @@
     "@repo/eslint-config": "workspace:*",
     "@repo/jest-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/jest": "^29.5.14",
     "@types/node": "^22.19.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "typescript": "5.5.4"
   }
 }

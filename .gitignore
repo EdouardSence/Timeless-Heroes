@@ -24,6 +24,9 @@ playwright-report/
 # Turbo
 .turbo
 
+# Prisma generated client (platform-specific binaries, should never be committed)
+packages/prisma-client/generated/
+
 # Vercel
 .vercel
 
@@ -57,6 +60,19 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Debug / temp files
+*-logs.txt
+*-logs-*.txt
+build-log.txt
+build-errors*.txt
+errors.txt
+test_*.js
+tmp_*.js
+session.md
+
 # Misc
 .DS_Store
 *.pem
+
+# Windows system files
+nul

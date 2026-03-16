@@ -1,12 +1,20 @@
 /**
  * Auth Service
- * Handles user authentication and token generation
+ * Handles user authentication and token generation via Prisma + JWT
  */
 
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { prisma } from '@repo/prisma-client';
 import * as bcrypt from 'bcrypt';
 
+import { LeaderboardService } from '@repo/redis-client';
+import { Role } from '@repo/shared-types';
 import { IJwtPayload } from './jwt.strategy';
 
 interface IUserCredentials {
@@ -18,7 +26,7 @@ interface IRegisterData extends IUserCredentials {
   username: string;
 }
 
-interface IAuthResult {
+export interface IAuthResult {
   accessToken: string;
   user: {
     id: string;
@@ -32,54 +40,51 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly SALT_ROUNDS = 10;
 
-  constructor(private readonly jwtService: JwtService) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly leaderboardService: LeaderboardService,
+  ) {}
 
   /**
    * Validate user credentials and return JWT token
    */
   async login(credentials: IUserCredentials): Promise<IAuthResult> {
-    // eslint-disable-next-line sonarjs/todo-tag
-    // TODO: Integrate with Prisma to fetch user
-    // For now, mock validation
-
     const { email, password } = credentials;
 
-    // Mock user (in production, fetch from DB)
-    const mockUser = {
-      email: 'test@example.com',
-      id: 'user-123',
-      passwordHash: await bcrypt.hash('password123', this.SALT_ROUNDS),
-      username: 'TestPlayer',
-    };
+    const user = await prisma.user.findUnique({ where: { email } });
 
-    if (email !== mockUser.email) {
+    if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(
-      password,
-      mockUser.passwordHash,
-    );
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Update last login timestamp
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      email: mockUser.email,
-      sub: mockUser.id,
-      username: mockUser.username,
+      sub: user.id,
+      email: user.email,
+      username: user.username,
+      role: (user.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
 
-    this.logger.log(`User logged in: ${mockUser.email}`);
+    this.logger.log(`User logged in: ${user.email}`);
 
     return {
       accessToken,
       user: {
-        email: mockUser.email,
-        id: mockUser.id,
-        username: mockUser.username,
+        id: user.id,
+        email: user.email,
+        username: user.username,
       },
     };
   }
@@ -90,26 +95,51 @@ export class AuthService {
   async register(data: IRegisterData): Promise<IAuthResult> {
     const { email, password, username } = data;
 
-    // eslint-disable-next-line sonarjs/todo-tag
-    // TODO: Check if user exists with Prisma
-    // eslint-disable-next-line sonarjs/todo-tag
-    // TODO: Create user in DB
+    // Check if user already exists
+    const existing = await prisma.user.findFirst({
+      where: { OR: [{ email }, { username }] },
+    });
 
-    // Hash password
+    if (existing) {
+      const field = existing.email === email ? 'email' : 'username';
+      throw new ConflictException(`A user with this ${field} already exists`);
+    }
+
+    // Hash password and create user
     const passwordHash = await bcrypt.hash(password, this.SALT_ROUNDS);
 
-    // Mock user creation
-    const newUser = {
-      email,
-      id: `user-${Date.now()}`,
-      passwordHash,
-      username,
-    };
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        username,
+        password: passwordHash,
+      },
+    });
+
+    // Create default progression row
+    await prisma.progression.create({
+      data: {
+        userId: newUser.id,
+        linesOfCode: 0,
+        totalClicks: 0,
+        level: 1,
+        experience: 0,
+        experienceToNext: 100,
+        clickMultiplier: 1.0,
+        passiveMultiplier: 0.0,
+        criticalChance: 0.05,
+        criticalMultiplier: 2.0,
+      },
+    });
+
+    // Seed leaderboard so the new user appears immediately (score 0)
+    await this.leaderboardService.updateScore(newUser.id, 0);
 
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
       email: newUser.email,
       sub: newUser.id,
       username: newUser.username,
+      role: (newUser.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -149,6 +179,7 @@ export class AuthService {
       email,
       sub: userId,
       username,
+      role: Role.PLAYER,
     };
 
     return this.jwtService.signAsync(payload);

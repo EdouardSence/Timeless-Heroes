@@ -10,9 +10,12 @@
  */
 
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
-import { IOfflineCalculation, QueueName } from '@repo/shared-types';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { Queue } from 'bullmq';
+import { firstValueFrom } from 'rxjs';
+
+import { IOfflineCalculation, IProgressionData, NATS_SERVICE, NatsPattern, QueueName } from '@repo/shared-types';
 
 interface IOfflineJobData {
   disconnectedAt: string; // ISO string
@@ -45,6 +48,8 @@ export class OfflineCalculatorService {
   constructor(
     @InjectQueue(QueueName.OFFLINE_CALCULATION)
     private readonly offlineQueue: Queue<IOfflineJobData>,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly natsClient: ClientProxy,
   ) {}
 
   /**
@@ -149,16 +154,33 @@ export class OfflineCalculatorService {
   }
 
   /**
-   * Get user's offline stats (would come from DB/cache in production)
+   * Get user's offline stats from real progression data via NATS
+   * BUG-10 FIX: Replaced hardcoded stats with real progression lookup
    */
-  // FUTURE: Fetch from user's upgrades/subscription
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getUserOfflineStats(_userId?: string): IUserOfflineStats {
-    return {
-      maxOfflineHours: this.DEFAULT_MAX_OFFLINE_HOURS,
-      offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
-      passiveMultiplier: 1, // Default, would be calculated from items
-    };
+  async getUserOfflineStats(userId: string): Promise<IUserOfflineStats> {
+    try {
+      const progression = await firstValueFrom(
+        this.natsClient.send<IProgressionData>(NatsPattern.PROGRESSION_GET, { userId }),
+      );
+      
+      return {
+        passiveMultiplier: progression.passiveMultiplier || 0,
+        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
+        maxOfflineHours: this.DEFAULT_MAX_OFFLINE_HOURS,
+      };
+    } catch (error) {
+      this.logger.warn(
+        `Failed to fetch progression for offline stats (user ${userId}), using defaults: ${
+          error instanceof Error ? error.message : error
+        }`,
+      );
+      // Fallback to defaults if NATS call fails
+      return {
+        passiveMultiplier: 0,
+        offlineEfficiency: this.DEFAULT_OFFLINE_EFFICIENCY,
+        maxOfflineHours: this.DEFAULT_MAX_OFFLINE_HOURS,
+      };
+    }
   }
 
   /**

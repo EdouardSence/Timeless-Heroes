@@ -1,41 +1,38 @@
+/* istanbul ignore file */
 /**
  * User Progression Service - Main Entry Point
- * Core business logic for user progression
+ * Hybrid app: HTTP for /health + NATS transport for business logic
  */
 
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 import { ProgressionModule } from './progression.module';
 
 async function bootstrap() {
   const logger = new Logger('SvcUserProgression');
 
-  // Create HTTP app for REST endpoints
+  // 1. Create HTTP app (health endpoint only)
   const app = await NestFactory.create(ProgressionModule);
   const port = process.env.PROGRESSION_PORT ?? 3001;
+
+  // 2. Connect NATS transport for inter-service communication
+  const natsUrl = process.env.NATS_URL ?? 'nats://localhost:4222';
+  app.connectMicroservice<MicroserviceOptions>({
+    options: {
+      queue: 'svc-user-progression', // Load-balanced queue group
+      servers: [natsUrl],
+    },
+    transport: Transport.NATS,
+  });
+
+  // 3. Start both transports
+  await app.startAllMicroservices();
   await app.listen(port);
 
-  logger.log(`📊 User Progression Service running on port ${port}`);
-
-  // eslint-disable-next-line sonarjs/todo-tag
-  // TODO: Add gRPC microservice
-  /*
-  const grpcApp = await NestFactory.createMicroservice<MicroserviceOptions>(
-    ProgressionModule,
-    {
-      transport: Transport.GRPC,
-      options: {
-        package: 'progression',
-        protoPath: join(__dirname, '../proto/progression.proto'),
-        url: 'localhost:5001',
-      },
-    },
-  );
-  
-  await grpcApp.listen();
-  logger.log('📡 gRPC server available on port 5001');
-  */
+  logger.log(`📊 User Progression Service running on port ${port} (health)`);
+  logger.log(`📡 NATS transport connected to ${natsUrl}`);
 }
 
 void bootstrap();

@@ -1,7 +1,8 @@
+/* istanbul ignore file */
 /**
  * Ingest Module (HTTP REST)
  * Receives keylogger events via HTTP endpoints
- * 
+ *
  * Provides proper authentication and validation
  * for anonymized key press events.
  */
@@ -11,6 +12,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 
 import { RedisModule } from '../redis/redis.module';
+import { ClickProcessorModule } from '../click-processor/click-processor.module';
 
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import { TcpIngestController } from './tcp-ingest.controller';
@@ -22,11 +24,12 @@ import { TcpIngestService } from './tcp-ingest.service';
   imports: [
     ConfigModule,
     RedisModule,
+    ClickProcessorModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET', 'your-super-secret-jwt-key'),
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: configService.get<string>('JWT_EXPIRES_IN', '7d'),
         },
