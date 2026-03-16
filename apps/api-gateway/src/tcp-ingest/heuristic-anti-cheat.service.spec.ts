@@ -44,9 +44,10 @@ describe('HeuristicAntiCheatService', () => {
     };
 
     mockConfigService = {
-      get: jest.fn((key: string, defaultValue?: any) => {
-        const config: Record<string, any> = {
+      get: jest.fn((key: string, defaultValue?: unknown) => {
+        const config: Record<string, number> = {
           MAX_CPS: 20,
+          MAX_VIOLATIONS: 10,
         };
         return config[key] ?? defaultValue;
       }),

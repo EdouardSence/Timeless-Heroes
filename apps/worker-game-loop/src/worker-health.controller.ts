@@ -6,13 +6,12 @@
 
 import { Controller } from '@nestjs/common';
 import { MessagePattern } from '@nestjs/microservices';
-
 import { NatsPattern } from '@repo/shared-types';
 
 @Controller()
 export class WorkerHealthController {
   @MessagePattern(NatsPattern.HEALTH_CHECK)
   handleHealthCheck() {
-    return { status: 'ok', service: 'worker-game-loop' };
+    return { service: 'worker-game-loop', status: 'ok' };
   }
 }

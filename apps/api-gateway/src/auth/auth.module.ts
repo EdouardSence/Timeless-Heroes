@@ -16,6 +16,7 @@ import { RolesGuard } from './roles.guard';
 import { WsJwtGuard } from './ws-jwt.guard';
 
 @Module({
+  controllers: [AuthController],
   exports: [JwtModule, WsJwtGuard, RolesGuard, AuthService],
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -30,7 +31,6 @@ import { WsJwtGuard } from './ws-jwt.guard';
       }),
     }),
   ],
-  controllers: [AuthController],
   providers: [JwtStrategy, WsJwtGuard, RolesGuard, AuthService],
 })
 export class AuthModule {}

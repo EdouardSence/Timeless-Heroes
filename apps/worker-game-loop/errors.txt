@@ -1,2 +1,0 @@
-src/program-processor/program-processor.service.ts(22,18): error TS2614: Module '"@repo/prisma-client"' has no exported member 'ProgramCategory'. Did you mean to use 'import ProgramCategory from "@repo/prisma-client"' instead?
-src/program-processor/program-processor.service.ts(403,32): error TS7006: Parameter 'ap' implicitly has an 'any' type.

@@ -21,8 +21,8 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { ClientProxy } from '@nestjs/microservices';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -31,8 +31,8 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { firstValueFrom } from 'rxjs';
-
+import { PrismaClient } from '@repo/prisma-client';
+import { LeaderboardService, RedisKeys } from '@repo/redis-client';
 import {
   IApiResponse,
   NATS_SERVICE,
@@ -40,8 +40,8 @@ import {
   IProgressionData,
   SHOP_ITEMS,
 } from '@repo/shared-types';
-import { LeaderboardService, RedisKeys } from '@repo/redis-client';
-import { PrismaClient } from '@repo/prisma-client';
+import { firstValueFrom } from 'rxjs';
+
 import { ClickProcessorService } from '../click-processor/click-processor.service';
 
 const prisma = new PrismaClient();
@@ -59,7 +59,7 @@ function unwrapNats<T>(response: IApiResponse<T>): T {
   if (response.success) {
     return response.data as T;
   }
-  throw new Error(response.error?.message || 'NATS request failed');
+  throw new Error(response.error?.message ?? 'NATS request failed');
 }
 
 @ApiTags('Progression')
@@ -93,9 +93,12 @@ export class ProgressionController {
     this.logger.debug(`Fetching progression for user ${userId}`);
 
     const response = await firstValueFrom(
-      this.natsClient.send<IApiResponse<IProgressionData>>(NatsPattern.PROGRESSION_GET, {
-        userId,
-      }),
+      this.natsClient.send<IApiResponse<IProgressionData>>(
+        NatsPattern.PROGRESSION_GET,
+        {
+          userId,
+        },
+      ),
     );
 
     // Unwrap IApiResponse envelope if present
@@ -113,10 +116,10 @@ export class ProgressionController {
   @ApiOperation({ summary: 'Get shop catalog' })
   @ApiOkResponse({ description: 'List of all purchasable items' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
-  async getShopCatalog() {
+  getShopCatalog() {
     return {
-      success: true,
       data: SHOP_ITEMS,
+      success: true,
       timestamp: new Date().toISOString(),
     };
   }
@@ -130,62 +133,73 @@ export class ProgressionController {
   @ApiBearerAuth('JWT')
   @ApiOperation({ summary: 'Get leaderboard rankings' })
   @ApiQuery({
+    description: 'Leaderboard type (defaults to GLOBAL)',
+    enum: ['GLOBAL', 'WEEKLY', 'DAILY'],
     name: 'type',
     required: false,
-    enum: ['GLOBAL', 'WEEKLY', 'DAILY'],
-    description: 'Leaderboard type (defaults to GLOBAL)',
   })
   @ApiOkResponse({
     description: 'Leaderboard entries with ranks, scores and usernames',
   })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT' })
-  async getLeaderboard(@Query('type') type?: string) {
-    const leaderboardType = type || 'GLOBAL';
-
-    this.logger.debug(`Fetching leaderboard directly from Redis: ${leaderboardType}`);
+  async getLeaderboard(@Query('type') leaderboardType = 'GLOBAL') {
+    this.logger.debug(
+      `Fetching leaderboard directly from Redis: ${leaderboardType}`,
+    );
 
     try {
       // Get data directly from Redis (bypass NATS for speed and reliability)
       const count = 100;
-      const key = leaderboardType === 'WEEKLY' ? RedisKeys.LEADERBOARD_WEEKLY 
-                : leaderboardType === 'DAILY' ? RedisKeys.LEADERBOARD_DAILY 
-                : RedisKeys.LEADERBOARD_GLOBAL;
+      let key: string = RedisKeys.LEADERBOARD_GLOBAL;
+      if (leaderboardType === 'WEEKLY') {
+        key = RedisKeys.LEADERBOARD_WEEKLY;
+      } else if (leaderboardType === 'DAILY') {
+        key = RedisKeys.LEADERBOARD_DAILY;
+      }
 
-      const topPlayers = await this.leaderboardService.getTopPlayers(count, key);
+      const topPlayers = await this.leaderboardService.getTopPlayers(
+        count,
+        key,
+      );
       const totalPlayers = await this.leaderboardService.getTotalPlayers(key);
 
       // Batch-fetch usernames from DB
-      const userIds = topPlayers.map(p => p.userId);
+      const userIds = topPlayers.map((p) => p.userId);
       const users = await prisma.user.findMany({
+        select: { id: true, username: true },
         where: { id: { in: userIds } },
-        select: { id: true, username: true }
       });
-      const usernameMap = new Map(users.map((u: { id: string; username: string }) => [u.id, u.username]));
+      const usernameMap = new Map(
+        users.map((u: { id: string; username: string }) => [u.id, u.username]),
+      );
 
-      const entries = topPlayers.map(p => ({
+      const entries = topPlayers.map((p) => ({
         ...p,
-        username: usernameMap.get(p.userId) ?? `Player_${p.userId.slice(0, 8)}`,
         level: 1, // simplified for now
-        prestigeLevel: 0
+        prestigeLevel: 0,
+        username: usernameMap.get(p.userId) ?? `Player_${p.userId.slice(0, 8)}`,
       }));
 
       return {
-        success: true,
         data: {
-          type: leaderboardType,
           entries,
-          totalPlayers
+          totalPlayers,
+          type: leaderboardType,
         },
+        success: true,
         timestamp: new Date().toISOString(),
       };
-    } catch (error: any) {
-      this.logger.error(`Failed to fetch leaderboard from NATS: ${error.message}`, error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        `Failed to fetch leaderboard from NATS: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       return {
-        success: false,
         error: {
           code: 'LEADERBOARD_FETCH_FAILED',
           message: 'Could not retrieve leaderboard data',
         },
+        success: false,
         timestamp: new Date().toISOString(),
       };
     }
@@ -207,10 +221,10 @@ export class ProgressionController {
 
     this.logger.log(`User ${userId} purchasing item: ${data.itemSlug}`);
 
-    const result = await firstValueFrom(
+    const result: unknown = await firstValueFrom(
       this.natsClient.send(NatsPattern.PROGRESSION_PURCHASE_ITEM, {
-        userId,
         itemSlug: data.itemSlug,
+        userId,
       }),
     );
 
@@ -219,11 +233,15 @@ export class ProgressionController {
     // and keys processed in that window would use the pre-purchase multiplier.
     try {
       await this.clickProcessor.invalidateCache(userId);
-      this.logger.debug(`Invalidated progression cache for ${userId} after purchase`);
-    } catch (e) {
-      this.logger.warn(`Failed to invalidate cache for ${userId}: ${e}`);
+      this.logger.debug(
+        `Invalidated progression cache for ${userId} after purchase`,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to invalidate cache for ${userId}: ${String(error)}`,
+      );
     }
 
-    return result;
+    return result as Record<string, unknown>;
   }
 }

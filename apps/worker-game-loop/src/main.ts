@@ -17,18 +17,18 @@ import { WorkerModule } from './worker.module';
 
 async function bootstrap() {
   const logger = new Logger('WorkerGameLoop');
-  const natsUrl = process.env.NATS_URL || 'nats://localhost:4222';
+  const natsUrl = process.env.NATS_URL ?? 'nats://localhost:4222';
 
   // Pure NATS microservice — no HTTP port exposed
   // BullMQ @Processor workers auto-start via NestJS module initialization
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     WorkerModule,
     {
-      transport: Transport.NATS,
       options: {
-        servers: [natsUrl],
         queue: 'worker-game-loop', // Load-balanced queue group
+        servers: [natsUrl],
       },
+      transport: Transport.NATS,
     },
   );
 

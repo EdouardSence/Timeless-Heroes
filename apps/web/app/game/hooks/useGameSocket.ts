@@ -54,7 +54,9 @@ export function useGameSocket(): UseGameSocketReturn {
   // ── Notification helper ──────────────────────────────────────────────
   const showNotification = useCallback((msg: string) => {
     setNotification(msg);
-    setTimeout(() => { setNotification(null); }, 3000);
+    setTimeout(() => {
+      setNotification(null);
+    }, 3000);
   }, []);
 
   // ── Socket.IO lifecycle ──────────────────────────────────────────────
@@ -97,7 +99,8 @@ export function useGameSocket(): UseGameSocketReturn {
         setGameState((prev) => ({
           ...prev,
           level: data.level ?? prev.level,
-          linesOfCode: Number.parseFloat(data.linesOfCode || '0') || prev.linesOfCode,
+          linesOfCode:
+            Number.parseFloat(data.linesOfCode ?? '0') || prev.linesOfCode,
           multiplier: data.clickMultiplier ?? prev.multiplier,
           passiveRate: data.passiveMultiplier ?? prev.passiveRate,
         }));
@@ -112,7 +115,8 @@ export function useGameSocket(): UseGameSocketReturn {
       }) => {
         setGameState((prev) => ({
           ...prev,
-          linesOfCode: Number.parseFloat(result.newBalance || '0') || prev.linesOfCode,
+          linesOfCode:
+            Number.parseFloat(result.newBalance ?? '0') || prev.linesOfCode,
           multiplier: result.multipliers?.totalMultiplier ?? prev.multiplier,
           totalKeyPresses: prev.totalKeyPresses + 1,
         }));
@@ -133,15 +137,15 @@ export function useGameSocket(): UseGameSocketReturn {
             ...prev,
             items: {
               ...prev.items,
-              [result.itemSlug || '']: result.newQuantityOwned || 0,
+              [result.itemSlug ?? '']: result.newQuantityOwned ?? 0,
             },
             linesOfCode:
-              Number.parseFloat(result.newBalance || '0') || prev.linesOfCode,
+              Number.parseFloat(result.newBalance ?? '0') || prev.linesOfCode,
           }));
           showNotification('Achat effectue !');
         } else {
           showNotification(
-            `Echec de l'achat: ${result.error || 'Erreur inconnue'}`,
+            `Echec de l'achat: ${result.error ?? 'Erreur inconnue'}`,
           );
         }
       },
@@ -159,7 +163,7 @@ export function useGameSocket(): UseGameSocketReturn {
     socket.on(
       WebSocketEvent.OFFLINE_REWARDS,
       (data: { earnedLoc?: string }) => {
-        const earnedLoc = Number.parseFloat(data.earnedLoc || '0') || 0;
+        const earnedLoc = Number.parseFloat(data.earnedLoc ?? '0') || 0;
         if (earnedLoc > 0) {
           showNotification(
             `Recompenses hors-ligne : +${formatNumber(earnedLoc)} LoC !`,
@@ -199,7 +203,7 @@ export function useGameSocket(): UseGameSocketReturn {
   // ── Derive shop items from game state (memoized) ────────────────────
   const items = useMemo<ShopItem[]>(() => {
     return SHOP_ITEMS.map((item: IShopItem) => {
-      const owned = gameState.items[item.id] || 0;
+      const owned = gameState.items[item.id] ?? 0;
       const nextCost = calculateCost(item.baseCost, item.costMultiplier, owned);
       return {
         baseCost: item.baseCost,
@@ -234,7 +238,9 @@ export function useGameSocket(): UseGameSocketReturn {
       sendKeyPress();
     };
     globalThis.addEventListener('keydown', handleKeyDown);
-    return () => { globalThis.removeEventListener('keydown', handleKeyDown); };
+    return () => {
+      globalThis.removeEventListener('keydown', handleKeyDown);
+    };
   }, [sendKeyPress]);
 
   // ── Purchase handler ─────────────────────────────────────────────────
@@ -263,7 +269,9 @@ export function useGameSocket(): UseGameSocketReturn {
     if (activeTab !== 'leaderboard') return;
     requestLeaderboard();
     const interval = setInterval(requestLeaderboard, 15_000);
-    return () => { clearInterval(interval); };
+    return () => {
+      clearInterval(interval);
+    };
   }, [activeTab, requestLeaderboard]);
 
   // ── Derived values ───────────────────────────────────────────────────
