@@ -529,6 +529,7 @@ export class GameGateway
       criticalChance: 0.05,
       criticalMultiplier: 2,
       experience: '0',
+      experienceToNext: '100',
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
