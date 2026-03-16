@@ -4,7 +4,7 @@
 # ============================================================================
 # PRUNE STAGE - Generate pruned monorepo subset
 # ============================================================================
-FROM node:20-alpine AS builder
+FROM node:20-alpine3.21 AS builder
 
 RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
@@ -17,7 +17,7 @@ RUN pnpm dlx turbo prune @app/worker-game-loop --docker
 # ============================================================================
 # INSTALL & BUILD STAGE
 # ============================================================================
-FROM node:20-alpine AS installer
+FROM node:20-alpine3.21 AS installer
 
 RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app
@@ -50,7 +50,7 @@ RUN pnpm run build --filter=@app/worker-game-loop
 # ============================================================================
 # PRODUCTION STAGE
 # ============================================================================
-FROM node:20-alpine AS runner
+FROM node:20-alpine3.21 AS runner
 
 RUN apk add --no-cache openssl libssl3
 
