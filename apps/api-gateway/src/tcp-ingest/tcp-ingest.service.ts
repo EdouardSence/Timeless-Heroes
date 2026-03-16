@@ -244,7 +244,9 @@ export class TcpIngestService {
     //   2. Compute the average CPS over the batch's own timestamp span.
     //   3. If the batch CPS is reasonable, accept all keys.
     //   4. If the batch CPS is too high, reject the entire batch.
-    // This correctly handles the "buffered keys sent at once" pattern.
+    // Small batches (< 5 keys) are exempt from CPS checks because
+    // keyboard shortcuts (Ctrl+C, etc.) produce 2-3 keys in <15ms,
+    // giving artificially high CPS that is not representative.
 
     const violations = await this.redis.get(RedisKeys.USER_VIOLATIONS(userId));
     const violationCount = violations ? Number.parseInt(violations, 10) : 0;
@@ -255,9 +257,9 @@ export class TcpIngestService {
       return { accepted: 0, rejected: events.length, progression: null };
     }
 
-    // Compute average CPS from the batch timestamps
+    // Compute average CPS from the batch timestamps (only for batches >= 5 keys)
     let batchRejected = false;
-    if (events.length >= 2) {
+    if (events.length >= 5) {
       const sortedTs = events.map(e => e.timestamp).sort((a, b) => a - b);
       const spanMs = sortedTs[sortedTs.length - 1]! - sortedTs[0]!;
       if (spanMs > 0) {
@@ -268,7 +270,10 @@ export class TcpIngestService {
             `Batch rejected for ${userId}: CPS=${batchCPS.toFixed(1)} exceeds max=${maxCPS}`,
           );
           batchRejected = true;
-          await this.redis.incr(RedisKeys.USER_VIOLATIONS(userId));
+          // Increment violations with a 10-minute TTL so they expire naturally
+          const violKey = RedisKeys.USER_VIOLATIONS(userId);
+          await this.redis.incr(violKey);
+          await this.redis.expire(violKey, 600);
         }
       }
     }

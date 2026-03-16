@@ -526,10 +526,16 @@ function startKeyboardListener(): void {
 
       // Track total key presses locally (for display/stats only)
       gameState.totalKeyPresses = (gameState.totalKeyPresses || 0) + 1;
+
+      // Optimistic update: add LoC locally so the UI feels instant.
+      // The server remains the source of truth — applyServerProgression()
+      // will replace this value with the server's authoritative balance
+      // every 2s when the flush response arrives.
+      const locPerKey = gameState.multiplier ?? 1.0;
+      gameState.linesOfCode = (gameState.linesOfCode || 0) + locPerKey;
+
       store.set('gameState', gameState);
 
-      // Display always shows the server-authoritative value (gameState.linesOfCode).
-      // LoC will update when the next flush response arrives from the server.
       if (widgetWindow && !widgetWindow.isDestroyed()) {
           widgetWindow.webContents.send('game-state-update', gameState);
           widgetWindow.webContents.send('user-keypress'); // Explicit event for combo
@@ -872,18 +878,14 @@ function startPassiveIncomeLoop(): void {
     };
 
     if (gameState && gameState.passiveRate > 0) {
-      // passiveRate = keys/sec, each key generates `multiplier` LoC
-      const keysGenerated = gameState.passiveRate;
-      const locGained = Math.floor(keysGenerated * gameState.multiplier);
-      
-      // DO NOT add LOC locally — the server is the single source of truth.
-      // Display updates when the flush response arrives from the server.
-      
-      // Also add virtual key presses for stats display (local-only stat)
-      gameState.totalKeyPresses += Math.floor(keysGenerated);
+      // passiveRate = LoC per second (from server's passiveMultiplier).
+      // This is INDEPENDENT from clickMultiplier — do NOT multiply by gameState.multiplier.
+      const locGained = Math.floor(gameState.passiveRate);
+
+      // Optimistic update: show passive LoC gain instantly in the UI
+      gameState.linesOfCode = (gameState.linesOfCode || 0) + locGained;
       store.set('gameState', gameState);
 
-      // Send the authoritative server state — no optimistic bonus
       if (widgetWindow && !widgetWindow.isDestroyed()) {
         widgetWindow.webContents.send('game-state-update', gameState);
       }

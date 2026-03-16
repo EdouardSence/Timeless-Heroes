@@ -206,6 +206,16 @@ export class TcpIngestController {
       data.seconds = maxSeconds;
     }
 
+    // Server-side validation: cap locAmount to passiveMultiplier * seconds (+ 20% tolerance)
+    const currentProg = await this.tcpIngestService.getCurrentProgression(data.userId);
+    if (currentProg) {
+      const maxExpected = Math.ceil(currentProg.passiveMultiplier * data.seconds * 1.2);
+      if (data.locAmount > maxExpected && maxExpected > 0) {
+        this.logger.warn(`Passive income too high from ${data.userId}: claimed=${data.locAmount}, max=${maxExpected} (rate=${currentProg.passiveMultiplier}, seconds=${data.seconds}). Capping.`);
+        data.locAmount = maxExpected;
+      }
+    }
+
     const result = await this.tcpIngestService.processPassiveIncome(
       data.userId,
       data.locAmount,
