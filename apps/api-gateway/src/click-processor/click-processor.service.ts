@@ -74,7 +74,7 @@ export class ClickProcessorService {
     // 6. Get estimated new balance (from cache + buffer)
     // Guard against float strings like "123.45" — BigInt() only accepts integers
     const cachedBalance = BigInt(
-      Math.floor(Number.parseFloat(String(progression.linesOfCode)) || 0),
+      Math.floor(Number.parseFloat(progression.linesOfCode) || 0),
     );
     const bufferedAmount = BigInt(
       Math.floor(Number.parseFloat(bufferResult.locToAdd)),
@@ -137,8 +137,9 @@ export class ClickProcessorService {
    * Boosts are stored at `boost:{userId}:{boostType}` with TTL (auto-expire)
    * Subscriptions are stored at `subscription:{userId}` with TTL
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   private async getActiveBoostMultiplier(userId: string): Promise<number> {
-    let multiplier = 1.0;
+    let multiplier = 1;
 
     try {
       // 1. Check active temporary boosts (boost:{userId}:*)
@@ -181,7 +182,9 @@ export class ClickProcessorService {
         try {
           const subscription = JSON.parse(subscriptionRaw) as { type: string };
           // Apply subscription tier multiplier
-          const subMultiplier = this.getSubscriptionMultiplier(subscription.type);
+          const subMultiplier = this.getSubscriptionMultiplier(
+            subscription.type,
+          );
           multiplier *= subMultiplier;
         } catch {
           // Skip malformed subscription data
@@ -189,7 +192,7 @@ export class ClickProcessorService {
       }
     } catch (error) {
       this.logger.warn(
-        `Failed to fetch boost data for ${userId}, using default multiplier: ${error instanceof Error ? error.message : error}`,
+        `Failed to fetch boost data for ${userId}, using default multiplier: ${error instanceof Error ? error.message : String(error)}`,
       );
       // On Redis error, default to 1.0 (no bonus) rather than crashing
     }
@@ -202,14 +205,18 @@ export class ClickProcessorService {
    */
   private getSubscriptionMultiplier(subscriptionType: string): number {
     switch (subscriptionType.toUpperCase()) {
-      case 'PREMIUM':
+      case 'PREMIUM': {
         return 1.5;
-      case 'VIP':
-        return 2.0;
-      case 'ELITE':
-        return 3.0;
-      default:
-        return 1.0;
+      }
+      case 'VIP': {
+        return 2;
+      }
+      case 'ELITE': {
+        return 3;
+      }
+      default: {
+        return 1;
+      }
     }
   }
 

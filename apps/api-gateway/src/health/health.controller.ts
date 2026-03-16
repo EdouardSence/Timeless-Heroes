@@ -4,8 +4,8 @@
  */
 
 import { Controller, Get, Inject, Logger, UseGuards } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
 import { ClientProxy } from '@nestjs/microservices';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiOkResponse,

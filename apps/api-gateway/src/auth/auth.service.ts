@@ -11,10 +11,10 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { prisma } from '@repo/prisma-client';
-import * as bcrypt from 'bcrypt';
-
 import { LeaderboardService } from '@repo/redis-client';
 import { Role } from '@repo/shared-types';
+import * as bcrypt from 'bcrypt';
+
 import { IJwtPayload } from './jwt.strategy';
 
 interface IUserCredentials {
@@ -64,15 +64,15 @@ export class AuthService {
 
     // Update last login timestamp
     await prisma.user.update({
-      where: { id: user.id },
       data: { lastLoginAt: new Date() },
+      where: { id: user.id },
     });
 
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
-      sub: user.id,
       email: user.email,
+      role: user.role as Role,
+      sub: user.id,
       username: user.username,
-      role: (user.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -82,8 +82,8 @@ export class AuthService {
     return {
       accessToken,
       user: {
-        id: user.id,
         email: user.email,
+        id: user.id,
         username: user.username,
       },
     };
@@ -111,24 +111,24 @@ export class AuthService {
     const newUser = await prisma.user.create({
       data: {
         email,
-        username,
         password: passwordHash,
+        username,
       },
     });
 
     // Create default progression row
     await prisma.progression.create({
       data: {
-        userId: newUser.id,
-        linesOfCode: 0,
-        totalClicks: 0,
-        level: 1,
+        clickMultiplier: 1,
+        criticalChance: 0.05,
+        criticalMultiplier: 2,
         experience: 0,
         experienceToNext: 100,
-        clickMultiplier: 1.0,
-        passiveMultiplier: 0.0,
-        criticalChance: 0.05,
-        criticalMultiplier: 2.0,
+        level: 1,
+        linesOfCode: 0,
+        passiveMultiplier: 0,
+        totalClicks: 0,
+        userId: newUser.id,
       },
     });
 
@@ -137,9 +137,9 @@ export class AuthService {
 
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
       email: newUser.email,
+      role: newUser.role as Role,
       sub: newUser.id,
       username: newUser.username,
-      role: (newUser.role as Role) ?? Role.PLAYER,
     };
 
     const accessToken = await this.jwtService.signAsync(payload);
@@ -177,9 +177,9 @@ export class AuthService {
   ): Promise<string> {
     const payload: Omit<IJwtPayload, 'iat' | 'exp'> = {
       email,
+      role: Role.PLAYER,
       sub: userId,
       username,
-      role: Role.PLAYER,
     };
 
     return this.jwtService.signAsync(payload);

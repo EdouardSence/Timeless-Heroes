@@ -11,11 +11,16 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
+import { RedisKeys, ClickBufferService } from '@repo/redis-client';
+import {
+  IProgressionData,
+  NATS_SERVICE,
+  NatsPattern,
+  QueueName,
+  IBufferFlushResult,
+} from '@repo/shared-types';
 import { Job } from 'bullmq';
 import { firstValueFrom } from 'rxjs';
-
-import { RedisKeys, ClickBufferService } from '@repo/redis-client';
-import { IProgressionData, NATS_SERVICE, NatsPattern, QueueName, IBufferFlushResult } from '@repo/shared-types';
 
 interface IBufferFlushJob {
   clicks: number;
@@ -36,7 +41,8 @@ export class ClickBufferWorker extends WorkerHost {
   private readonly clickBufferService: ClickBufferService;
 
   constructor(
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
     @Inject('REDIS_CLIENT') private readonly redis: import('ioredis').default,
   ) {
     super();
@@ -59,31 +65,34 @@ export class ClickBufferWorker extends WorkerHost {
 
     try {
       // 1. Update balance via NATS -> svc-user-progression (persists to PostgreSQL)
-      const rawUpdate = await firstValueFrom(
-        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-          userId,
+      const rawUpdate: unknown = await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
           delta: locToAdd,
+          userId,
         }),
       );
-      
+
       balanceUpdated = true;
 
-      const updatedProgression = (rawUpdate && typeof rawUpdate === 'object' && 'data' in rawUpdate) 
-        ? rawUpdate.data as IProgressionData 
-        : rawUpdate as IProgressionData;
+      const updatedProgression =
+        rawUpdate !== null &&
+        typeof rawUpdate === 'object' &&
+        'data' in rawUpdate
+          ? (rawUpdate as { data: IProgressionData }).data
+          : (rawUpdate as IProgressionData);
 
       // 2. Add experience (1 XP per click) via NATS
       //    If this fails, balance is already persisted — do NOT re-add to buffer
       try {
         await firstValueFrom(
-          this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
-            userId,
+          this.progressionClient.send(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
             experience: clicks,
+            userId,
           }),
         );
       } catch (xpError) {
         this.logger.warn(
-          `XP update failed for ${userId} (balance was persisted OK, skipping XP): ${xpError instanceof Error ? xpError.message : xpError}`,
+          `XP update failed for ${userId} (balance was persisted OK, skipping XP): ${xpError instanceof Error ? xpError.message : String(xpError)}`,
         );
       }
 
@@ -94,7 +103,7 @@ export class ClickBufferWorker extends WorkerHost {
       await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
 
       // 5. Publish level-up event if applicable
-      if (updatedProgression && updatedProgression.level > 1) {
+      if (updatedProgression.level > 1) {
         await this.publishLevelUp(userId, updatedProgression.level);
       }
 
@@ -106,8 +115,8 @@ export class ClickBufferWorker extends WorkerHost {
       return {
         clicksProcessed: clicks,
         locAdded: locToAdd,
-        newBalance: updatedProgression?.linesOfCode || '0',
-        newLevel: updatedProgression?.level || 1,
+        newBalance: updatedProgression.linesOfCode,
+        newLevel: updatedProgression.level,
         processingTimeMs: processingTime,
         success: true,
         userId,
@@ -121,13 +130,13 @@ export class ClickBufferWorker extends WorkerHost {
       await this.clickBufferService.clearInflight(userId, locToAdd, clicks);
 
       // Re-add to buffer on failure (so data isn't lost) — only if balance wasn't already persisted
-      if (!balanceUpdated) {
-        await this.reAddToBuffer(userId, locToAdd, clicks);
-      } else {
+      if (balanceUpdated) {
         // Balance was persisted but something else failed — don't re-add (would cause double credit)
         this.logger.warn(
           `Balance for ${userId} was already persisted; NOT re-adding to buffer to avoid double credit`,
         );
+      } else {
+        await this.reAddToBuffer(userId, locToAdd, clicks);
       }
 
       return {
@@ -174,7 +183,9 @@ export class ClickBufferWorker extends WorkerHost {
       // Atomically increment both hash fields — same type as ClickBufferService.incrementBuffer
       await this.redis.hincrby(key, 'clicks', clicks);
       await this.redis.hincrbyfloat(key, 'locToAdd', Number(locToAdd));
-      this.logger.warn(`Re-added ${clicks} clicks to buffer for ${userId} after flush failure`);
+      this.logger.warn(
+        `Re-added ${clicks} clicks to buffer for ${userId} after flush failure`,
+      );
     } catch (error) {
       this.logger.error(
         `Failed to re-add to buffer for ${userId}: ${String(error)}`,

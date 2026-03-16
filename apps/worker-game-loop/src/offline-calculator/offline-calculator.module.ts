@@ -8,8 +8,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-
 import { NATS_SERVICE, QueueName } from '@repo/shared-types';
+
 import { OfflineCalculatorService } from './offline-calculator.service';
 import { OfflineWorker } from './offline.worker';
 
@@ -22,17 +22,17 @@ import { OfflineWorker } from './offline.worker';
     }),
     ClientsModule.registerAsync([
       {
-        name: NATS_SERVICE.PROGRESSION,
         imports: [ConfigModule],
+        inject: [ConfigService],
+        name: NATS_SERVICE.PROGRESSION,
         useFactory: (configService: ConfigService) => ({
-          transport: Transport.NATS,
           options: {
             servers: [
               configService.get<string>('NATS_URL', 'nats://localhost:4222'),
             ],
           },
+          transport: Transport.NATS,
         }),
-        inject: [ConfigService],
       },
     ]),
   ],

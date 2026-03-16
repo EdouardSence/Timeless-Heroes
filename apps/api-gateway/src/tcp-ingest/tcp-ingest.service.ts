@@ -9,11 +9,17 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ClientProxy } from '@nestjs/microservices';
 import { ClickBufferService, RedisKeys } from '@repo/redis-client';
-import { KeyType, NATS_SERVICE, NatsPattern, IProgressionData } from '@repo/shared-types';
+import {
+  KeyType,
+  NATS_SERVICE,
+  NatsPattern,
+  IProgressionData,
+} from '@repo/shared-types';
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 
 import { ClickProcessorService } from '../click-processor/click-processor.service';
+
 import { HeuristicAntiCheatService } from './heuristic-anti-cheat.service';
 import {
   ITcpKeyPressEvent,
@@ -32,7 +38,8 @@ export class TcpIngestService {
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
     private readonly antiCheatService: HeuristicAntiCheatService,
     private readonly clickProcessor: ClickProcessorService,
-    @Inject(NATS_SERVICE.PROGRESSION) private readonly progressionClient: ClientProxy,
+    @Inject(NATS_SERVICE.PROGRESSION)
+    private readonly progressionClient: ClientProxy,
   ) {}
 
   /**
@@ -112,43 +119,42 @@ export class TcpIngestService {
 
     // 3. Fetch progression to apply multipliers (cached or NATS)
     let progression = await this.clickProcessor.getProgressionCached(userId);
-    
+
     if (!progression) {
       try {
-        const rawResponse = await firstValueFrom(
-          this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, { userId }),
+        const rawResponse: unknown = await firstValueFrom(
+          this.progressionClient.send(NatsPattern.PROGRESSION_GET, { userId }),
         );
         // The NATS controller wraps the result in IApiResponse { success, data, timestamp }.
         // We must unwrap .data to get the actual IProgressionData.
-        progression = (rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse)
-          ? rawResponse.data as IProgressionData
-          : rawResponse as IProgressionData;
-        if (progression) {
-          await this.clickProcessor.cacheProgression(progression);
-        }
-      } catch (e) {
-        this.logger.error(`Failed to fetch progression for ${userId}`, e);
+        progression =
+          rawResponse &&
+          typeof rawResponse === 'object' &&
+          'data' in rawResponse
+            ? (rawResponse as { data: IProgressionData }).data
+            : (rawResponse as IProgressionData);
+        await this.clickProcessor.cacheProgression(progression);
+      } catch (error) {
+        this.logger.error(`Failed to fetch progression for ${userId}`, error);
       }
     }
 
     // Fallback if progression is truly unreachable
-    if (!progression) {
-      progression = {
-        userId,
-        linesOfCode: '0',
-        clickMultiplier: 1.0,
-        criticalChance: 0.05,
-        criticalMultiplier: 2.0,
-        passiveMultiplier: 0.0,
-        level: 1,
-        totalLinesWritten: '0',
-        experience: '0',
-      };
-    }
+    progression ??= {
+      clickMultiplier: 1,
+      criticalChance: 0.05,
+      criticalMultiplier: 2,
+      experience: '0',
+      level: 1,
+      linesOfCode: '0',
+      passiveMultiplier: 0,
+      totalLinesWritten: '0',
+      userId,
+    };
 
     // 4. Delegate to ClickProcessorService to calculate final value (with multipliers) and buffer it
     const clickResult = await this.clickProcessor.processClick(
-      { keyType, userId, timestamp },
+      { keyType, timestamp, userId },
       progression,
     );
 
@@ -184,6 +190,7 @@ export class TcpIngestService {
    * Returns the server-authoritative progression after processing all keys.
    * This is the preferred endpoint for the desktop client.
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity
   async processKeyPressBatch(
     userId: string,
     events: ITcpKeyPressEvent[],
@@ -206,34 +213,33 @@ export class TcpIngestService {
 
     if (!progression) {
       try {
-        const rawResponse = await firstValueFrom(
-          this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, { userId }),
+        const rawResponse: unknown = await firstValueFrom(
+          this.progressionClient.send(NatsPattern.PROGRESSION_GET, { userId }),
         );
-        progression = (rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse)
-          ? rawResponse.data as IProgressionData
-          : rawResponse as IProgressionData;
-        if (progression) {
-          await this.clickProcessor.cacheProgression(progression);
-        }
-      } catch (e) {
-        this.logger.error(`Failed to fetch progression for ${userId}`, e);
+        progression =
+          rawResponse &&
+          typeof rawResponse === 'object' &&
+          'data' in rawResponse
+            ? (rawResponse as { data: IProgressionData }).data
+            : (rawResponse as IProgressionData);
+        await this.clickProcessor.cacheProgression(progression);
+      } catch (error) {
+        this.logger.error(`Failed to fetch progression for ${userId}`, error);
       }
     }
 
     // Fallback if progression is truly unreachable
-    if (!progression) {
-      progression = {
-        userId,
-        linesOfCode: '0',
-        clickMultiplier: 1.0,
-        criticalChance: 0.05,
-        criticalMultiplier: 2.0,
-        passiveMultiplier: 0.0,
-        level: 1,
-        totalLinesWritten: '0',
-        experience: '0',
-      };
-    }
+    progression ??= {
+      clickMultiplier: 1,
+      criticalChance: 0.05,
+      criticalMultiplier: 2,
+      experience: '0',
+      level: 1,
+      linesOfCode: '0',
+      passiveMultiplier: 0,
+      totalLinesWritten: '0',
+      userId,
+    };
 
     // ── Batch-level anti-cheat (instead of per-key) ──
     // The desktop buffers keys for ~2s and sends them in a single HTTP batch.
@@ -253,32 +259,37 @@ export class TcpIngestService {
     const maxViolations = this.antiCheatService.getMaxViolations();
 
     if (violationCount >= maxViolations) {
-      this.logger.warn(`User ${userId} is banned (${violationCount} violations), rejecting batch`);
-      return { accepted: 0, rejected: events.length, progression: null };
+      this.logger.warn(
+        `User ${userId} is banned (${violationCount} violations), rejecting batch`,
+      );
+      return { accepted: 0, progression: null, rejected: events.length };
     }
 
     // Compute average CPS from the batch timestamps (only for batches >= 5 keys)
     let batchRejected = false;
     if (events.length >= 5) {
-      const sortedTs = events.map(e => e.timestamp).sort((a, b) => a - b);
-      const spanMs = sortedTs[sortedTs.length - 1]! - sortedTs[0]!;
-      if (spanMs > 0) {
-        const batchCPS = (events.length - 1) / (spanMs / 1000);
-        const maxCPS = this.antiCheatService.getMaxCPS();
-        if (batchCPS > maxCPS) {
-          this.logger.warn(
-            `Batch rejected for ${userId}: CPS=${batchCPS.toFixed(1)} exceeds max=${maxCPS}`,
-          );
-          batchRejected = true;
-          // Increment violations with a 10-minute TTL so they expire naturally
-          const violKey = RedisKeys.USER_VIOLATIONS(userId);
-          await this.redis.incr(violKey);
-          await this.redis.expire(violKey, 600);
+      // eslint-disable-next-line unicorn/no-array-sort -- toSorted() unavailable with es2022 target
+      const sortedTs = events.map((e) => e.timestamp).sort((a, b) => a - b);
+      const first = sortedTs[0];
+      const last = sortedTs.at(-1);
+      if (first !== undefined && last !== undefined) {
+        const spanMs = last - first;
+        if (spanMs > 0) {
+          const batchCPS = (events.length - 1) / (spanMs / 1000);
+          const maxCPS = this.antiCheatService.getMaxCPS();
+          if (batchCPS > maxCPS) {
+            this.logger.warn(
+              `Batch rejected for ${userId}: CPS=${batchCPS.toFixed(1)} exceeds max=${maxCPS}`,
+            );
+            batchRejected = true;
+            // Increment violations with a 10-minute TTL so they expire naturally
+            const violKey = RedisKeys.USER_VIOLATIONS(userId);
+            await this.redis.incr(violKey);
+            await this.redis.expire(violKey, 600);
+          }
         }
       }
     }
-
-    let lastClickResult: import('@repo/shared-types').IClickResult | null = null;
 
     if (batchRejected) {
       rejected = events.length;
@@ -288,13 +299,16 @@ export class TcpIngestService {
         const keyType = this.categoryToKeyType(event.keyCategory);
 
         try {
-          lastClickResult = await this.clickProcessor.processClick(
-            { keyType, userId, timestamp: event.timestamp },
+          await this.clickProcessor.processClick(
+            { keyType, timestamp: event.timestamp, userId },
             progression,
           );
           accepted++;
-        } catch (e) {
-          this.logger.error(`Failed to process click in batch for ${userId}`, e);
+        } catch (error) {
+          this.logger.error(
+            `Failed to process click in batch for ${userId}`,
+            error,
+          );
           rejected++;
         }
       }
@@ -318,41 +332,50 @@ export class TcpIngestService {
         // Atomically read and clear the buffer (Lua script: HGETALL + DEL)
         const flushed = await this.clickBufferService.flushBuffer(userId);
 
-        if (flushed && parseFloat(flushed.locToAdd) > 0) {
+        if (flushed && Number.parseFloat(flushed.locToAdd) > 0) {
           // Directly persist to DB via NATS (bypasses BullMQ queue entirely)
-          const rawUpdateResp = await firstValueFrom(
-            this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-              userId,
-              delta: flushed.locToAdd,
-            }),
+          const rawUpdateResp: unknown = await firstValueFrom(
+            this.progressionClient.send(
+              NatsPattern.PROGRESSION_UPDATE_BALANCE,
+              {
+                delta: flushed.locToAdd,
+                userId,
+              },
+            ),
           );
-          const updatedProg = (rawUpdateResp && typeof rawUpdateResp === 'object' && 'data' in rawUpdateResp)
-            ? rawUpdateResp.data as IProgressionData
-            : rawUpdateResp as IProgressionData;
+          const updatedProg =
+            rawUpdateResp &&
+            typeof rawUpdateResp === 'object' &&
+            'data' in rawUpdateResp
+              ? (rawUpdateResp as { data: IProgressionData }).data
+              : (rawUpdateResp as IProgressionData);
 
           // Add experience (1 XP per click)
           await firstValueFrom(
-            this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
-              userId,
-              experience: flushed.clicks.toString(),
-            }),
-          ).catch(e => this.logger.warn(`Failed to add XP for ${userId}`, e));
+            this.progressionClient.send(
+              NatsPattern.PROGRESSION_ADD_EXPERIENCE,
+              {
+                experience: flushed.clicks.toString(),
+                userId,
+              },
+            ),
+          ).catch((error: unknown) => {
+            this.logger.warn(`Failed to add XP for ${userId}`, error);
+          });
 
           // Invalidate cached progression so next read is fresh
           await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
 
-          if (updatedProg) {
-            progressionResponse = {
-              linesOfCode: updatedProg.linesOfCode,
-              level: updatedProg.level,
-              clickMultiplier: updatedProg.clickMultiplier,
-              passiveMultiplier: updatedProg.passiveMultiplier,
-              experience: updatedProg.experience,
-            };
-          }
+          progressionResponse = {
+            clickMultiplier: updatedProg.clickMultiplier,
+            experience: updatedProg.experience,
+            level: updatedProg.level,
+            linesOfCode: updatedProg.linesOfCode,
+            passiveMultiplier: updatedProg.passiveMultiplier,
+          };
         }
-      } catch (e) {
-        this.logger.error(`Failed to flush buffer to DB for ${userId}`, e);
+      } catch (error) {
+        this.logger.error(`Failed to flush buffer to DB for ${userId}`, error);
       }
     }
 
@@ -365,21 +388,19 @@ export class TcpIngestService {
     }
 
     // Last resort fallback
-    if (!progressionResponse && progression) {
-      progressionResponse = {
-        linesOfCode: progression.linesOfCode,
-        level: progression.level,
-        clickMultiplier: progression.clickMultiplier,
-        passiveMultiplier: progression.passiveMultiplier,
-        experience: progression.experience,
-      };
-    }
+    progressionResponse ??= {
+      clickMultiplier: progression.clickMultiplier,
+      experience: progression.experience,
+      level: progression.level,
+      linesOfCode: progression.linesOfCode,
+      passiveMultiplier: progression.passiveMultiplier,
+    };
 
     this.logger.debug(
-      `Batch processed for ${userId}: ${accepted} accepted, ${rejected} rejected, balance=${progressionResponse?.linesOfCode}`,
+      `Batch processed for ${userId}: ${accepted} accepted, ${rejected} rejected, balance=${progressionResponse.linesOfCode}`,
     );
 
-    return { accepted, rejected, progression: progressionResponse };
+    return { accepted, progression: progressionResponse, rejected };
   }
 
   /**
@@ -401,12 +422,13 @@ export class TcpIngestService {
     let progression: IProgressionData | null = null;
 
     try {
-      const rawResponse = await firstValueFrom(
-        this.progressionClient.send<any>(NatsPattern.PROGRESSION_GET, { userId }),
+      const rawResponse: unknown = await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_GET, { userId }),
       );
-      progression = (rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse)
-        ? rawResponse.data as IProgressionData
-        : rawResponse as IProgressionData;
+      progression =
+        rawResponse && typeof rawResponse === 'object' && 'data' in rawResponse
+          ? (rawResponse as { data: IProgressionData }).data
+          : (rawResponse as IProgressionData);
     } catch {
       // Fallback to cache if NATS fails
       progression = await this.clickProcessor.getProgressionCached(userId);
@@ -420,17 +442,17 @@ export class TcpIngestService {
     // which is NOT included in the NATS response.
     const inflightKey = RedisKeys.INFLIGHT_CLICKS(userId);
     const inflightLoc = await this.redis.hget(inflightKey, 'locToAdd');
-    const inflight = parseFloat(inflightLoc || '0') || 0;
+    const inflight = Number.parseFloat(inflightLoc ?? '0') || 0;
 
-    const baseLoc = parseFloat(progression.linesOfCode || '0') || 0;
+    const baseLoc = Number.parseFloat(progression.linesOfCode || '0') || 0;
     const totalLoc = Math.floor(baseLoc + inflight);
 
     return {
-      linesOfCode: totalLoc.toString(),
-      level: progression.level,
       clickMultiplier: progression.clickMultiplier,
-      passiveMultiplier: progression.passiveMultiplier,
       experience: progression.experience,
+      level: progression.level,
+      linesOfCode: totalLoc.toString(),
+      passiveMultiplier: progression.passiveMultiplier,
     };
   }
 
@@ -439,13 +461,16 @@ export class TcpIngestService {
    * Directly persists the LoC amount to DB via NATS (bypasses BullMQ pipeline
    * to avoid the same race condition as keystroke processing).
    */
-  async processPassiveIncome(userId: string, locAmount: number): Promise<boolean> {
+  async processPassiveIncome(
+    userId: string,
+    locAmount: number,
+  ): Promise<boolean> {
     try {
       // Directly persist passive LoC to DB via NATS (bypasses Redis buffer + BullMQ)
-      const rawUpdateResp = await firstValueFrom(
-        this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
-          userId,
+      await firstValueFrom(
+        this.progressionClient.send(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
           delta: locAmount.toString(),
+          userId,
         }),
       );
 
@@ -459,15 +484,21 @@ export class TcpIngestService {
       return true;
     } catch (error) {
       this.logger.error(
-        `Failed to persist passive income for ${userId}: ${error instanceof Error ? error.message : error}`,
+        `Failed to persist passive income for ${userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
       // Fallback: buffer in Redis (BullMQ will eventually flush it)
       try {
-        await this.clickBufferService.incrementBuffer(userId, locAmount.toString());
+        await this.clickBufferService.incrementBuffer(
+          userId,
+          locAmount.toString(),
+        );
         this.logger.warn(`Fallback: buffered passive income for ${userId}`);
         return true;
       } catch (bufferError) {
-        this.logger.error(`Fallback buffering also failed for ${userId}`, bufferError);
+        this.logger.error(
+          `Fallback buffering also failed for ${userId}`,
+          bufferError,
+        );
         return false;
       }
     }

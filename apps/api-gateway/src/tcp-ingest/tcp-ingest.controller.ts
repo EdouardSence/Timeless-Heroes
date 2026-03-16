@@ -15,7 +15,6 @@ import {
   ApiBearerAuth,
   ApiOkResponse,
   ApiOperation,
-  ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
 
@@ -28,45 +27,10 @@ import {
   KeyCategory,
 } from './tcp-ingest.types';
 
-class IngestAuthDto {
-  @ApiProperty({
-    description: 'JWT token from desktop login',
-    example: 'eyJhbG...',
-  })
-  token!: string;
-}
-
-class IngestKeyDto {
-  @ApiProperty({ description: 'Authenticated user ID' })
-  userId!: string;
-
-  @ApiProperty({
-    description: 'Anonymised key category',
-    enum: [
-      'CHAR',
-      'MODIFIER',
-      'FUNCTION',
-      'NAVIGATION',
-      'ENTER',
-      'SPACE',
-      'BACKSPACE',
-      'TAB',
-      'UNKNOWN',
-    ],
-  })
-  keyCategory!: string;
-
-  @ApiProperty({ description: 'Unix timestamp (ms)' })
-  timestamp!: number;
-}
-
 /** Response from batch ingest — contains server-authoritative balance */
 export interface IBatchIngestResponse {
-  success: boolean;
   /** Number of key events that were accepted (not blocked by anti-cheat) */
   accepted: number;
-  /** Number of key events that were rejected by anti-cheat */
-  rejected: number;
   /** Server-authoritative game state */
   progression: {
     linesOfCode: string;
@@ -75,6 +39,9 @@ export interface IBatchIngestResponse {
     passiveMultiplier: number;
     experience: string;
   } | null;
+  /** Number of key events that were rejected by anti-cheat */
+  rejected: number;
+  success: boolean;
 }
 
 @ApiTags('Ingest')
@@ -144,13 +111,23 @@ export class TcpIngestController {
   @Post('batch')
   @UseGuards(IngestAuthGuard)
   @ApiBearerAuth('JWT')
-  @ApiOperation({ summary: 'Ingest a batch of anonymised key press events and return new balance' })
-  @ApiOkResponse({ description: 'Batch processed, returns server-authoritative progression' })
+  @ApiOperation({
+    summary:
+      'Ingest a batch of anonymised key press events and return new balance',
+  })
+  @ApiOkResponse({
+    description: 'Batch processed, returns server-authoritative progression',
+  })
   async handleBatch(
-    @Body() data: { userId: string; sessionId: string; keys: ITcpKeyPressEvent[] },
+    @Body()
+    data: {
+      userId: string;
+      sessionId: string;
+      keys: ITcpKeyPressEvent[];
+    },
   ): Promise<IBatchIngestResponse> {
-    if (!data.userId || !data.keys || !Array.isArray(data.keys)) {
-      return { success: false, accepted: 0, rejected: 0, progression: null };
+    if (!data.userId) {
+      return { accepted: 0, progression: null, rejected: 0, success: false };
     }
 
     // Cap batch size to prevent abuse (max 200 keys per batch)
@@ -166,17 +143,27 @@ export class TcpIngestController {
     });
 
     if (validKeys.length === 0 && keys.length > 0) {
-      this.logger.warn(`Rejected entire batch from ${data.userId}: no valid keys`);
-      return { success: true, accepted: 0, rejected: keys.length, progression: null };
+      this.logger.warn(
+        `Rejected entire batch from ${data.userId}: no valid keys`,
+      );
+      return {
+        accepted: 0,
+        progression: null,
+        rejected: keys.length,
+        success: true,
+      };
     }
 
-    const result = await this.tcpIngestService.processKeyPressBatch(data.userId, validKeys);
+    const result = await this.tcpIngestService.processKeyPressBatch(
+      data.userId,
+      validKeys,
+    );
 
     return {
-      success: true,
       accepted: result.accepted,
-      rejected: keys.length - validKeys.length + result.rejected,
       progression: result.progression,
+      rejected: keys.length - validKeys.length + result.rejected,
+      success: true,
     };
   }
 
@@ -192,26 +179,50 @@ export class TcpIngestController {
   @ApiOperation({ summary: 'Ingest passive income earned by desktop client' })
   @ApiOkResponse({ description: 'Passive income buffered for processing' })
   async handlePassiveIncome(
-    @Body() data: { userId: string; sessionId: string; locAmount: number; seconds: number },
-  ): Promise<{ success: boolean; buffered: boolean; progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string } | null }> {
+    @Body()
+    data: {
+      userId: string;
+      sessionId: string;
+      locAmount: number;
+      seconds: number;
+    },
+  ): Promise<{
+    success: boolean;
+    buffered: boolean;
+    progression: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null;
+  }> {
     if (!data.userId || !data.locAmount || data.locAmount <= 0) {
-      return { buffered: false, success: false, progression: null };
+      return { buffered: false, progression: null, success: false };
     }
 
     // Cap a single passive batch to prevent abuse (max 300s = 5 min worth)
     const maxSeconds = 300;
     if (data.seconds > maxSeconds) {
-      this.logger.warn(`Passive income batch too large from ${data.userId}: ${data.seconds}s, capping to ${maxSeconds}s`);
+      this.logger.warn(
+        `Passive income batch too large from ${data.userId}: ${data.seconds}s, capping to ${maxSeconds}s`,
+      );
       data.locAmount = Math.floor(data.locAmount * (maxSeconds / data.seconds));
       data.seconds = maxSeconds;
     }
 
     // Server-side validation: cap locAmount to passiveMultiplier * seconds (+ 20% tolerance)
-    const currentProg = await this.tcpIngestService.getCurrentProgression(data.userId);
+    const currentProg = await this.tcpIngestService.getCurrentProgression(
+      data.userId,
+    );
     if (currentProg) {
-      const maxExpected = Math.ceil(currentProg.passiveMultiplier * data.seconds * 1.2);
+      const maxExpected = Math.ceil(
+        currentProg.passiveMultiplier * data.seconds * 1.2,
+      );
       if (data.locAmount > maxExpected && maxExpected > 0) {
-        this.logger.warn(`Passive income too high from ${data.userId}: claimed=${data.locAmount}, max=${maxExpected} (rate=${currentProg.passiveMultiplier}, seconds=${data.seconds}). Capping.`);
+        this.logger.warn(
+          `Passive income too high from ${data.userId}: claimed=${data.locAmount}, max=${maxExpected} (rate=${currentProg.passiveMultiplier}, seconds=${data.seconds}). Capping.`,
+        );
         data.locAmount = maxExpected;
       }
     }
@@ -222,15 +233,23 @@ export class TcpIngestController {
     );
 
     // Return current server balance so desktop can sync
-    let progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string } | null = null;
+    let progression: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null = null;
     if (result) {
-      progression = await this.tcpIngestService.getCurrentProgression(data.userId);
+      progression = await this.tcpIngestService.getCurrentProgression(
+        data.userId,
+      );
     }
 
     return {
       buffered: result,
-      success: true,
       progression,
+      success: true,
     };
   }
 

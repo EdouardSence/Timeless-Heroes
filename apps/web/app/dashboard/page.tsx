@@ -13,7 +13,6 @@ import { SHOP_ITEMS } from '@repo/shared-types';
 import { GlassCard, NeonButton, NeonProgress, StatCard } from '@repo/ui';
 import { useEffect, useState } from 'react';
 
-
 import styles from './dashboard.module.css';
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -45,7 +44,7 @@ const DAILY_COMMITS = [
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 function formatNumber(num: number): string {
   if (num >= 1_000_000) return (num / 1_000_000).toFixed(2) + 'M';
@@ -109,7 +108,7 @@ export default function DashboardPage() {
         setUser(userData as IUserInfo);
         setProgression(progressionData as IProgressionData);
       })
-      .catch((error_) => {
+      .catch((error_: unknown) => {
         setError(error_ instanceof Error ? error_.message : 'Unknown error');
       })
       .finally(() => {
@@ -137,7 +136,9 @@ export default function DashboardPage() {
             minHeight: '60vh',
           }}
         >
-          <p style={{ color: 'var(--color-cyan, #00e5ff)', fontSize: '1.2rem' }}>
+          <p
+            style={{ color: 'var(--color-cyan, #00e5ff)', fontSize: '1.2rem' }}
+          >
             Loading dashboard...
           </p>
         </main>
@@ -164,7 +165,7 @@ export default function DashboardPage() {
           }}
         >
           <p style={{ color: '#ff5252', fontSize: '1.2rem' }}>
-            {error || 'Failed to load data'}
+            {error ?? 'Failed to load data'}
           </p>
         </main>
       </div>

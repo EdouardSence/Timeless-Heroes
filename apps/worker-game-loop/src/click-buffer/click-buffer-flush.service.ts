@@ -19,8 +19,9 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { ClickBufferService, DistributedLock } from '@repo/redis-client';
 import { QueueName } from '@repo/shared-types';
-import type Redis from 'ioredis';
 import { Queue } from 'bullmq';
+
+import type Redis from 'ioredis';
 
 /** Lock key for the flush cron — only one replica can flush at a time */
 const FLUSH_LOCK_KEY = 'lock:click-buffer-flush';

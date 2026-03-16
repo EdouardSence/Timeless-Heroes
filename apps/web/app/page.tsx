@@ -10,7 +10,12 @@ import { FormEvent, useState } from 'react';
 
 import styles from './page.module.css';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+
+function getSubmitLabel(mode: 'login' | 'register'): string {
+  if (mode === 'login') return 'Enter the Game';
+  return 'Create Account';
+}
 
 export default function Home() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -37,11 +42,15 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || `${endpoint} failed`);
+        const data: Record<string, unknown> = (await res
+          .json()
+          .catch(() => ({}))) as Record<string, unknown>;
+        const message =
+          typeof data.message === 'string' ? data.message : undefined;
+        throw new Error(message ?? `${endpoint} failed`);
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as { accessToken: string };
 
       // Store the JWT token and redirect to dashboard
       localStorage.setItem('jwt_token', data.accessToken);
@@ -56,24 +65,29 @@ export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <div style={{
-          alignItems: 'center',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '2rem',
-          maxWidth: '420px',
-          width: '100%',
-        }}>
+        <div
+          style={{
+            alignItems: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '2rem',
+            maxWidth: '420px',
+            width: '100%',
+          }}
+        >
           {/* Title */}
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{
-              background: 'linear-gradient(135deg, #00e5ff, #b388ff, #ff80ab)',
-              fontSize: '2.5rem',
-              fontWeight: 700,
-              marginBottom: '0.5rem',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
+            <h1
+              style={{
+                background:
+                  'linear-gradient(135deg, #00e5ff, #b388ff, #ff80ab)',
+                fontSize: '2.5rem',
+                fontWeight: 700,
+                marginBottom: '0.5rem',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               Timeless Heroes
             </h1>
             <p style={{ color: '#888', fontSize: '0.95rem' }}>
@@ -96,12 +110,17 @@ export default function Home() {
             }}
           >
             {/* Mode toggle */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <div
+              style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}
+            >
               <button
                 type="button"
-                onClick={() => { setMode('login'); }}
+                onClick={() => {
+                  setMode('login');
+                }}
                 style={{
-                  background: mode === 'login' ? 'rgba(0,229,255,0.15)' : 'transparent',
+                  background:
+                    mode === 'login' ? 'rgba(0,229,255,0.15)' : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
                   color: mode === 'login' ? '#00e5ff' : '#666',
@@ -116,9 +135,14 @@ export default function Home() {
               </button>
               <button
                 type="button"
-                onClick={() => { setMode('register'); }}
+                onClick={() => {
+                  setMode('register');
+                }}
                 style={{
-                  background: mode === 'register' ? 'rgba(0,229,255,0.15)' : 'transparent',
+                  background:
+                    mode === 'register'
+                      ? 'rgba(0,229,255,0.15)'
+                      : 'transparent',
                   border: 'none',
                   borderRadius: '6px',
                   color: mode === 'register' ? '#00e5ff' : '#666',
@@ -138,7 +162,9 @@ export default function Home() {
                 type="text"
                 placeholder="Username"
                 value={username}
-                onChange={(e) => { setUsername(e.target.value); }}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                }}
                 required
                 style={inputStyle}
               />
@@ -148,7 +174,9 @@ export default function Home() {
               type="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => { setEmail(e.target.value); }}
+              onChange={(e) => {
+                setEmail(e.target.value);
+              }}
               required
               style={inputStyle}
             />
@@ -157,7 +185,9 @@ export default function Home() {
               type="password"
               placeholder="Password"
               value={password}
-              onChange={(e) => { setPassword(e.target.value); }}
+              onChange={(e) => {
+                setPassword(e.target.value);
+              }}
               required
               minLength={6}
               style={inputStyle}
@@ -186,20 +216,22 @@ export default function Home() {
                 transition: 'all 0.2s',
               }}
             >
-              {loading
-                ? 'Loading...'
-                : (mode === 'login'
-                  ? 'Enter the Game'
-                  : 'Create Account')}
+              {loading ? 'Loading...' : getSubmitLabel(mode)}
             </button>
           </form>
 
           {/* Quick links */}
           <div style={{ display: 'flex', fontSize: '0.85rem', gap: '1rem' }}>
-            <a href="/game" style={{ color: '#b388ff', textDecoration: 'underline' }}>
+            <a
+              href="/game"
+              style={{ color: '#b388ff', textDecoration: 'underline' }}
+            >
               Play Now
             </a>
-            <a href="/dashboard" style={{ color: '#00e5ff', textDecoration: 'underline' }}>
+            <a
+              href="/dashboard"
+              style={{ color: '#00e5ff', textDecoration: 'underline' }}
+            >
               Dashboard
             </a>
           </div>
