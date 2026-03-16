@@ -38,7 +38,6 @@ export interface IBatchIngestResponse {
     clickMultiplier: number;
     passiveMultiplier: number;
     experience: string;
-    experienceToNext: string;
   } | null;
   /** Number of key events that were rejected by anti-cheat */
   rejected: number;
@@ -180,8 +179,24 @@ export class TcpIngestController {
   @ApiOperation({ summary: 'Ingest passive income earned by desktop client' })
   @ApiOkResponse({ description: 'Passive income buffered for processing' })
   async handlePassiveIncome(
-    @Body() data: { userId: string; sessionId: string; locAmount: number; seconds: number },
-  ): Promise<{ success: boolean; buffered: boolean; progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string; experienceToNext: string } | null }> {
+    @Body()
+    data: {
+      userId: string;
+      sessionId: string;
+      locAmount: number;
+      seconds: number;
+    },
+  ): Promise<{
+    success: boolean;
+    buffered: boolean;
+    progression: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null;
+  }> {
     if (!data.userId || !data.locAmount || data.locAmount <= 0) {
       return { buffered: false, progression: null, success: false };
     }
@@ -218,7 +233,13 @@ export class TcpIngestController {
     );
 
     // Return current server balance so desktop can sync
-    let progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string; experienceToNext: string } | null = null;
+    let progression: {
+      linesOfCode: string;
+      level: number;
+      clickMultiplier: number;
+      passiveMultiplier: number;
+      experience: string;
+    } | null = null;
     if (result) {
       progression = await this.tcpIngestService.getCurrentProgression(
         data.userId,

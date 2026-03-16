@@ -552,7 +552,6 @@ export class ProgressionService {
       criticalChance: progression.criticalChance,
       criticalMultiplier: progression.criticalMultiplier,
       experience: progression.experience.toString(),
-      experienceToNext: progression.experienceToNext.toString(),
       level: progression.level,
       linesOfCode: progression.linesOfCode.add(extraLoC).toString(),
       passiveMultiplier: progression.passiveMultiplier,

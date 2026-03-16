@@ -644,7 +644,6 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   const serverMultiplier = typeof prog.clickMultiplier === 'number' ? prog.clickMultiplier : (gameState.multiplier ?? 1.0);
   const serverPassiveRate = typeof prog.passiveMultiplier === 'number' ? prog.passiveMultiplier : (gameState.passiveRate ?? 0);
   const serverExperience = parseFloat(String(prog.experience ?? '0')) || 0;
-  const serverExperienceToNext = parseFloat(String(prog.experienceToNext ?? '0')) || (gameState.experienceToNext ?? 100);
 
   // Apply high-water mark: never let LOC drop due to stale server responses
   backendSync.updateHighWater(rawServerLoC);
@@ -656,7 +655,6 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   gameState.multiplier = serverMultiplier;
   gameState.passiveRate = serverPassiveRate;
   gameState.experience = serverExperience;
-  gameState.experienceToNext = serverExperienceToNext;
 
   store.set('gameState', gameState);
 
@@ -664,7 +662,7 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   // UI always shows exactly what the server says.
   notifyAllWindows('game-state-update', gameState);
 
-  console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}/${serverExperienceToNext}`);
+  console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}`);
 }
 
 /**
