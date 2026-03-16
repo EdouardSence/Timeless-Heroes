@@ -25,6 +25,8 @@ interface IGameState {
   experienceToNext: number;
   multiplier: number;
   passiveRate: number;
+  prestigeLevel: number;
+  totalLinesWritten: number;
 }
 
 interface IBackendAuth {
@@ -582,6 +584,8 @@ const store = new Store<IStoreSchema>({
       experienceToNext: 100,
       multiplier: 1.0,
       passiveRate: 0.0,
+      prestigeLevel: 0,
+      totalLinesWritten: 0,
     },
     items: {},
     settings: {
@@ -614,6 +618,8 @@ const DEFAULT_GAME_STATE: IGameState = {
   experienceToNext: 100,
   multiplier: 1.0,
   passiveRate: 0.0,
+  prestigeLevel: 0,
+  totalLinesWritten: 0,
 };
 
 /** Load a user's saved state into the active game state, or reset to defaults for new users */
@@ -654,6 +660,8 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   const serverPassiveRate = typeof prog.passiveMultiplier === 'number' ? prog.passiveMultiplier : (gameState.passiveRate ?? 0);
   const serverExperience = parseFloat(String(prog.experience ?? '0')) || 0;
   const serverExperienceToNext = parseFloat(String(prog.experienceToNext ?? '0')) || (gameState.experienceToNext ?? 100);
+  const serverPrestigeLevel = typeof prog.prestigeLevel === 'number' ? prog.prestigeLevel : (gameState.prestigeLevel ?? 0);
+  const serverTotalLinesWritten = parseFloat(String(prog.totalLinesWritten ?? '0')) || (gameState.totalLinesWritten ?? 0);
 
   // Apply high-water mark: never let LOC drop due to stale server responses
   backendSync.updateHighWater(rawServerLoC);
@@ -666,6 +674,8 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   gameState.passiveRate = serverPassiveRate;
   gameState.experience = serverExperience;
   gameState.experienceToNext = serverExperienceToNext;
+  gameState.prestigeLevel = serverPrestigeLevel;
+  gameState.totalLinesWritten = serverTotalLinesWritten;
 
   store.set('gameState', gameState);
 
@@ -673,7 +683,7 @@ function applyServerProgression(prog: Record<string, unknown>): void {
   // UI always shows exactly what the server says.
   notifyAllWindows('game-state-update', gameState);
 
-  console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}/${serverExperienceToNext}`);
+  console.log(`[ApplyServer] LoC=${effectiveLoC} (server=${rawServerLoC}, hwm=${backendSync.serverLocHighWater}), level=${serverLevel}, mult=${serverMultiplier}, passive=${serverPassiveRate}, xp=${serverExperience}/${serverExperienceToNext}, prestige=${serverPrestigeLevel}, totalWritten=${serverTotalLinesWritten}`);
 }
 
 /**
@@ -988,6 +998,46 @@ function setupIpcHandlers(): void {
       return result;
     } finally {
       // Always restart the flush loop, even if purchase failed
+      backendSync.startFlushLoop();
+    }
+  });
+
+  ipcMain.handle('backend-prestige', async () => {
+    const auth = store.get('backendAuth');
+    if (!auth?.jwtToken) return { success: false, error: 'Not logged in' };
+
+    // Stop flush loop to prevent races during prestige + sync
+    backendSync.stopFlushLoop();
+    try {
+      // Force flush pending data so server has our latest state
+      await backendSync.forceFlush();
+
+      const res = await httpRequest('POST', `${API_BASE}/progression/prestige`, {}, {
+        Authorization: `Bearer ${auth.jwtToken}`,
+      });
+
+      if (res.status !== 200 && res.status !== 201) {
+        const msg = (res.data as { message?: string }).message
+          || (res.data as { error?: string }).error
+          || 'Prestige failed';
+        return { success: false, error: msg };
+      }
+
+      // Force-reset HWM so the post-prestige (reset) balance is accepted
+      backendSync.forceSetHighWater(0);
+
+      // Clear local items (all items are deleted on prestige)
+      store.set('items', {});
+
+      // Sync from server to get the post-prestige state
+      await syncProgressionFromServer();
+
+      return { success: true };
+    } catch (err) {
+      console.error('Backend prestige error:', err);
+      return { success: false, error: 'Network error' };
+    } finally {
+      // Always restart the flush loop
       backendSync.startFlushLoop();
     }
   });

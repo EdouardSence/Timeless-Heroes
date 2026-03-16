@@ -10,6 +10,8 @@ export interface GameState {
   experienceToNext: number;
   multiplier: number;
   passiveRate: number;
+  prestigeLevel: number;
+  totalLinesWritten: number;
 }
 
 export interface LeaderboardEntry {
@@ -17,6 +19,7 @@ export interface LeaderboardEntry {
   username: string;
   score: number;
   rank: number;
+  prestigeLevel: number;
 }
 
 export interface LeaderboardResponse {
@@ -62,6 +65,7 @@ export interface ElectronAPI {
   // Backend Leaderboard (TD-03)
   backendLeaderboard: (type?: string) => Promise<LeaderboardResponse>;
   backendBuyItem: (itemSlug: string) => Promise<{ success: boolean; error?: string; data?: Record<string, unknown> }>;
+  backendPrestige: () => Promise<{ success: boolean; error?: string }>;
 
   // Auth flow
   launchGame: () => void;

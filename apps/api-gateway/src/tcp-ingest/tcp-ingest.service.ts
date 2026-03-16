@@ -149,6 +149,8 @@ export class TcpIngestService {
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
+      prestigeLevel: 0,
+      prestigeMultiplier: 1,
       totalLinesWritten: '0',
       userId,
     };
@@ -248,6 +250,8 @@ export class TcpIngestService {
       level: 1,
       linesOfCode: '0',
       passiveMultiplier: 0,
+      prestigeLevel: 0,
+      prestigeMultiplier: 1,
       totalLinesWritten: '0',
       userId,
     };
@@ -264,6 +268,9 @@ export class TcpIngestService {
     // Small batches (< 5 keys) are exempt from CPS checks because
     // keyboard shortcuts (Ctrl+C, etc.) produce 2-3 keys in <15ms,
     // giving artificially high CPS that is not representative.
+
+    // After ??= fallback, progression is guaranteed non-null. Bind to const for TS narrowing.
+    const safeProgression = progression;
 
     const violations = await this.redis.get(RedisKeys.USER_VIOLATIONS(userId));
     const violationCount = violations ? Number.parseInt(violations, 10) : 0;
@@ -324,7 +331,7 @@ export class TcpIngestService {
           // progression is guaranteed non-null here (fallback block above assigns a default)
           await this.clickProcessor.processClick(
             { keyType, timestamp: event.timestamp, userId },
-            progression,
+            safeProgression,
           );
           accepted++;
         } catch (error) {

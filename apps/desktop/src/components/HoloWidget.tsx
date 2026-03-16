@@ -45,6 +45,8 @@ export default function HoloWidget() {
     experienceToNext: 100,
     multiplier: 1.0,
     passiveRate: 0.0,
+    prestigeLevel: 0,
+    totalLinesWritten: 0,
   });
 
   const [showLevelUp, setShowLevelUp] = useState(false);
@@ -261,6 +263,11 @@ export default function HoloWidget() {
         <div className="holo-widget__title">
           <span className="holo-widget__title-prefix">~/</span>
           <span className="holo-widget__title-text">cyber-cat</span>
+          {gameState.prestigeLevel > 0 && (
+            <span className="holo-widget__prestige-badge">
+              👑{gameState.prestigeLevel}
+            </span>
+          )}
           {combo > 5 && (
             <span className="holo-widget__combo-badge">
               <span className="holo-widget__combo-x">×</span>

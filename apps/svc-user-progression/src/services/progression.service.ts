@@ -483,6 +483,13 @@ export class ProgressionService {
       where: { userId },
     });
 
+    // Get current prestige level for bonus
+    const progression = await prisma.progression.findUnique({
+      select: { prestigeLevel: true },
+      where: { userId },
+    });
+    const prestigeMultiplier = 1 + (progression?.prestigeLevel ?? 0) * 2;
+
     // Reset to base values
     let clickBonus = 0;
     let passiveBonus = 0;
@@ -528,16 +535,75 @@ export class ProgressionService {
     // Cap crit chance at 95%
     critChance = Math.min(critChance, 0.95);
 
+    // Apply prestige multiplier to click and passive
+    const finalClickMultiplier = (1 + clickBonus) * clickMultiplier * prestigeMultiplier;
+    const finalPassiveMultiplier = passiveBonus * passiveMultiplier * prestigeMultiplier;
+
     // Apply bonuses and update in DB
     await prisma.progression.update({
       data: {
-        clickMultiplier: (1 + clickBonus) * clickMultiplier,
+        clickMultiplier: finalClickMultiplier,
         criticalChance: critChance,
         criticalMultiplier: critMultiplier,
-        passiveMultiplier: passiveBonus * passiveMultiplier,
+        passiveMultiplier: finalPassiveMultiplier,
       },
       where: { userId },
     });
+  }
+
+  /**
+   * Prestige: reset progress but gain a permanent multiplier.
+   * Requires level >= PRESTIGE_MIN_LEVEL (5 for demo).
+   * Resets: linesOfCode, level, experience, owned items, multipliers.
+   * Keeps: totalLinesWritten, totalClicks, prestigeLevel (incremented).
+   */
+  async prestige(userId: string): Promise<{ success: boolean; newPrestigeLevel?: number; error?: string }> {
+    const PRESTIGE_MIN_LEVEL = 5;
+
+    // Get current progression
+    const progression = await prisma.progression.findUnique({
+      where: { userId },
+    });
+
+    if (!progression) {
+      return { error: 'Progression not found', success: false };
+    }
+
+    if (progression.level < PRESTIGE_MIN_LEVEL) {
+      return { error: `Level ${PRESTIGE_MIN_LEVEL} required to prestige`, success: false };
+    }
+
+    const newPrestigeLevel = progression.prestigeLevel + 1;
+    const newPrestigeMultiplier = 1 + newPrestigeLevel * 2;
+
+    // Execute prestige in a transaction: reset progression + delete items
+    await prisma.$transaction([
+      // Reset progression (keep totalLinesWritten, totalClicks, prestige)
+      prisma.progression.update({
+        data: {
+          clickMultiplier: 1 * newPrestigeMultiplier,
+          criticalChance: 0.05,
+          criticalMultiplier: 2,
+          experience: new Decimal(0),
+          experienceToNext: new Decimal(100),
+          level: 1,
+          linesOfCode: new Decimal(0),
+          passiveMultiplier: 0,
+          prestigeLevel: newPrestigeLevel,
+        },
+        where: { userId },
+      }),
+      // Delete all owned items
+      prisma.ownedItem.deleteMany({
+        where: { userId },
+      }),
+    ]);
+
+    this.logger.log(
+      `User ${userId} prestiged to level ${newPrestigeLevel} (x${newPrestigeMultiplier} multiplier)`,
+    );
+
+    return { newPrestigeLevel, success: true };
   }
 
   /**
@@ -547,6 +613,7 @@ export class ProgressionService {
     progression: Progression,
     extraLoC = new Decimal(0),
   ): IProgressionData {
+    const prestigeMultiplier = 1 + progression.prestigeLevel * 2;
     return {
       clickMultiplier: progression.clickMultiplier,
       criticalChance: progression.criticalChance,
@@ -556,6 +623,8 @@ export class ProgressionService {
       level: progression.level,
       linesOfCode: progression.linesOfCode.add(extraLoC).toString(),
       passiveMultiplier: progression.passiveMultiplier,
+      prestigeLevel: progression.prestigeLevel,
+      prestigeMultiplier,
       totalLinesWritten: progression.totalLinesWritten.add(extraLoC).toString(),
       userId: progression.userId,
     };

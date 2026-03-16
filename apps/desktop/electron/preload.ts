@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('backend-leaderboard', type),
   backendBuyItem: (itemSlug: string) =>
     ipcRenderer.invoke('backend-buy-item', itemSlug),
+  backendPrestige: () =>
+    ipcRenderer.invoke('backend-prestige'),
   // Auth flow
   launchGame: () => ipcRenderer.send('launch-game'),
   logoutSession: () => ipcRenderer.send('logout-session'),
