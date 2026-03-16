@@ -143,13 +143,15 @@ export class TcpIngestService {
         level: 1,
         totalLinesWritten: '0',
         experience: '0',
+        experienceToNext: '100',
       };
     }
 
     // 4. Delegate to ClickProcessorService to calculate final value (with multipliers) and buffer it
+    // progression is guaranteed non-null here (fallback block above assigns a default)
     const clickResult = await this.clickProcessor.processClick(
       { keyType, userId, timestamp },
-      progression,
+      progression!,
     );
 
     this.logger.debug(
@@ -196,6 +198,7 @@ export class TcpIngestService {
       clickMultiplier: number;
       passiveMultiplier: number;
       experience: string;
+      experienceToNext: string;
     } | null;
   }> {
     let accepted = 0;
@@ -232,6 +235,7 @@ export class TcpIngestService {
         level: 1,
         totalLinesWritten: '0',
         experience: '0',
+        experienceToNext: '100',
       };
     }
 
@@ -288,9 +292,10 @@ export class TcpIngestService {
         const keyType = this.categoryToKeyType(event.keyCategory);
 
         try {
+          // progression is guaranteed non-null here (fallback block above assigns a default)
           lastClickResult = await this.clickProcessor.processClick(
             { keyType, userId, timestamp: event.timestamp },
-            progression,
+            progression!,
           );
           accepted++;
         } catch (e) {
@@ -311,6 +316,7 @@ export class TcpIngestService {
       clickMultiplier: number;
       passiveMultiplier: number;
       experience: string;
+      experienceToNext: string;
     } | null = null;
 
     if (accepted > 0) {
@@ -319,18 +325,15 @@ export class TcpIngestService {
         const flushed = await this.clickBufferService.flushBuffer(userId);
 
         if (flushed && parseFloat(flushed.locToAdd) > 0) {
-          // Directly persist to DB via NATS (bypasses BullMQ queue entirely)
-          const rawUpdateResp = await firstValueFrom(
+          // 1. Persist LoC to DB via NATS
+          await firstValueFrom(
             this.progressionClient.send<any>(NatsPattern.PROGRESSION_UPDATE_BALANCE, {
               userId,
               delta: flushed.locToAdd,
             }),
           );
-          const updatedProg = (rawUpdateResp && typeof rawUpdateResp === 'object' && 'data' in rawUpdateResp)
-            ? rawUpdateResp.data as IProgressionData
-            : rawUpdateResp as IProgressionData;
 
-          // Add experience (1 XP per click)
+          // 2. Process XP and level-ups
           await firstValueFrom(
             this.progressionClient.send<any>(NatsPattern.PROGRESSION_ADD_EXPERIENCE, {
               userId,
@@ -338,18 +341,9 @@ export class TcpIngestService {
             }),
           ).catch(e => this.logger.warn(`Failed to add XP for ${userId}`, e));
 
-          // Invalidate cached progression so next read is fresh
+          // 3. Invalidate cache and fetch FRESH progression (reflects both LoC and XP/level updates)
           await this.redis.del(RedisKeys.CACHE_USER_PROGRESSION(userId));
-
-          if (updatedProg) {
-            progressionResponse = {
-              linesOfCode: updatedProg.linesOfCode,
-              level: updatedProg.level,
-              clickMultiplier: updatedProg.clickMultiplier,
-              passiveMultiplier: updatedProg.passiveMultiplier,
-              experience: updatedProg.experience,
-            };
-          }
+          progressionResponse = await this.getCurrentProgression(userId);
         }
       } catch (e) {
         this.logger.error(`Failed to flush buffer to DB for ${userId}`, e);
@@ -372,6 +366,7 @@ export class TcpIngestService {
         clickMultiplier: progression.clickMultiplier,
         passiveMultiplier: progression.passiveMultiplier,
         experience: progression.experience,
+        experienceToNext: progression.experienceToNext ?? '100',
       };
     }
 
@@ -397,6 +392,7 @@ export class TcpIngestService {
     clickMultiplier: number;
     passiveMultiplier: number;
     experience: string;
+    experienceToNext: string;
   } | null> {
     let progression: IProgressionData | null = null;
 
@@ -431,6 +427,7 @@ export class TcpIngestService {
       clickMultiplier: progression.clickMultiplier,
       passiveMultiplier: progression.passiveMultiplier,
       experience: progression.experience,
+      experienceToNext: progression.experienceToNext ?? '100',
     };
   }
 

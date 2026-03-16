@@ -74,6 +74,7 @@ export interface IBatchIngestResponse {
     clickMultiplier: number;
     passiveMultiplier: number;
     experience: string;
+    experienceToNext: string;
   } | null;
 }
 
@@ -193,7 +194,7 @@ export class TcpIngestController {
   @ApiOkResponse({ description: 'Passive income buffered for processing' })
   async handlePassiveIncome(
     @Body() data: { userId: string; sessionId: string; locAmount: number; seconds: number },
-  ): Promise<{ success: boolean; buffered: boolean; progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string } | null }> {
+  ): Promise<{ success: boolean; buffered: boolean; progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string; experienceToNext: string } | null }> {
     if (!data.userId || !data.locAmount || data.locAmount <= 0) {
       return { buffered: false, success: false, progression: null };
     }
@@ -222,7 +223,7 @@ export class TcpIngestController {
     );
 
     // Return current server balance so desktop can sync
-    let progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string } | null = null;
+    let progression: { linesOfCode: string; level: number; clickMultiplier: number; passiveMultiplier: number; experience: string; experienceToNext: string } | null = null;
     if (result) {
       progression = await this.tcpIngestService.getCurrentProgression(data.userId);
     }
