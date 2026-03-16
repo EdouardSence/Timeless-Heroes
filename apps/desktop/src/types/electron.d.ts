@@ -34,6 +34,14 @@ export interface BackendStatus {
   userId: string | null;
 }
 
+export interface AntiCheatStatus {
+  violations: number;
+  maxViolations: number;
+  banned: boolean;
+  /** Seconds until violations expire (approximate unban time). -1 if not banned. */
+  banExpiresIn: number;
+}
+
 export interface ElectronAPI {
   // Game State
   getGameState: () => Promise<GameState>;
@@ -71,6 +79,7 @@ export interface ElectronAPI {
   onUserKeyPress: (callback: () => void) => () => void;
   onLevelUp: (callback: (level: number) => void) => () => void;
   onBackendStatus: (callback: (status: BackendStatus) => void) => () => void;
+  onAntiCheatWarning: (callback: (status: AntiCheatStatus) => void) => () => void;
 
   // Cleanup -- nuclear option, removes ALL listeners on every channel
   removeAllListeners: () => void;

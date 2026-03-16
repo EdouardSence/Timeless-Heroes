@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { GameState } from '../types/electron';
+import type { AntiCheatStatus, GameState } from '../types/electron';
 import { CyberCat } from './CyberCat';
 import './HoloWidget.css';
 
@@ -50,6 +50,8 @@ export default function HoloWidget() {
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [keyPressAnimation, setKeyPressAnimation] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [antiCheat, setAntiCheat] = useState<AntiCheatStatus | null>(null);
+  const antiCheatTimeoutRef = useRef<number | null>(null);
 
   // Combo Logic
   const [combo, setCombo] = useState(0);
@@ -94,17 +96,31 @@ export default function HoloWidget() {
       setTimeout(() => setShowLevelUp(false), 3000);
     });
 
+    const disposeAntiCheat = window.electronAPI?.onAntiCheatWarning((status) => {
+      setAntiCheat(status);
+      // Auto-hide warnings after 5s (but keep ban visible)
+      if (antiCheatTimeoutRef.current) clearTimeout(antiCheatTimeoutRef.current);
+      if (!status.banned) {
+        antiCheatTimeoutRef.current = setTimeout(
+          () => setAntiCheat(null),
+          5000,
+        ) as unknown as number;
+      }
+    });
+
     return () => {
       // Prefer individual disposers; fallback to nuclear removeAllListeners
-      if (disposeState || disposeKeyPress || disposeLevelUp) {
+      if (disposeState || disposeKeyPress || disposeLevelUp || disposeAntiCheat) {
         disposeState?.();
         disposeKeyPress?.();
         disposeLevelUp?.();
+        disposeAntiCheat?.();
       } else {
         window.electronAPI?.removeAllListeners();
       }
       if (comboTimeoutRef.current) clearTimeout(comboTimeoutRef.current);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (antiCheatTimeoutRef.current) clearTimeout(antiCheatTimeoutRef.current);
     };
   }, []);
 
@@ -219,6 +235,18 @@ export default function HoloWidget() {
               v{levelToVersion(gameState.level)}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Anti-Cheat Warning / Ban Banner */}
+      {antiCheat && (
+        <div className={`holo-widget__ac-banner ${antiCheat.banned ? 'holo-widget__ac-banner--ban' : 'holo-widget__ac-banner--warn'}`}>
+          <span className="holo-widget__ac-icon">{antiCheat.banned ? '⛔' : '⚠'}</span>
+          <span className="holo-widget__ac-text">
+            {antiCheat.banned
+              ? `BANNED — expires in ${Math.ceil(antiCheat.banExpiresIn)}s`
+              : `Warning ${antiCheat.violations}/${antiCheat.maxViolations}`}
+          </span>
         </div>
       )}
 

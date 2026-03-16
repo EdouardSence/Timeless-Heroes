@@ -398,10 +398,19 @@ class BackendSync {
       }
 
       // Apply server's authoritative progression
-      const data = res.data as { success?: boolean; progression?: Record<string, unknown> };
+      const data = res.data as {
+        success?: boolean;
+        progression?: Record<string, unknown>;
+        antiCheat?: { violations: number; maxViolations: number; banned: boolean; banExpiresIn: number };
+      };
       console.log(`[flushKeys] server response: accepted=${(data as any).accepted}, rejected=${(data as any).rejected}, progression.linesOfCode=${data.progression?.linesOfCode}, current store.linesOfCode=${store.get('gameState')?.linesOfCode}`);
       if (data.success && data.progression) {
         applyServerProgression(data.progression);
+      }
+
+      // Forward anti-cheat status to renderer (only when there are violations or a ban)
+      if (data.antiCheat && (data.antiCheat.violations > 0 || data.antiCheat.banned)) {
+        notifyAllWindows('anti-cheat-warning', data.antiCheat);
       }
     } catch (err) {
       console.error('Failed to send key batch:', err);
